@@ -1,0 +1,6 @@
+Solaris machines (Sunos 5.x)
+----------------------------
+If the code can't find cdefs.h and/or bitypes.h
+
+The cdefs.h and bitypes.h and netdb.h files belong to bind which can 
+be obtained from: ftp://ftp.isc.org/isc/bind/src

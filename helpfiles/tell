@@ -1,0 +1,18 @@
+ Syntax:  .tell <user> <message>    ,<user> <message>
+          .tell <user>
+
+Results:  Allows you to tell one user something without anyone else being
+          able to see it.  <user> is the person you want to talk to.
+          <message> is the message you want to send him/her.
+          This command also allows you to review your tells if you do not
+          specify anything after the .tell command.
+          If you do NOT specify a message, it will send to the user..
+          "You sense that <your name> is looking for you in <your_room>"
+          while still applying to vis/invis conditions.
+
+Example:  To tell 'cygnus' "hi": .tell cygnus hi  or  
+                                 ,cygnus hi       or
+                                 ,cyg hi
+          To review your tells: .tell
+
+See also: semote, igtells

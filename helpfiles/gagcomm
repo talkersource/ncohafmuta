@@ -1,0 +1,14 @@
+ Syntax:  .gagcomm
+          .gagcomm <user> [<time>]
+
+Results:  Makes it so a troublesome user cannot do any private
+          communications. This is a milder version of xcomm. This will be
+          put on an arrested user by default.
+          If used without a user, it will list out all gagcommed users 
+          currently logged in.
+          A time is optional. If you do not specify a time (in mins), the
+          user will be gagcommed until you or someone else ungagcomms
+          them. Otherwise, the talker will auto-ungagcomm them after they
+          have served <time> online.
+
+See also: arrest, muzzle, frog, xcomm

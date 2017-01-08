@@ -1,0 +1,233 @@
+
+*** /tmp/,RCSt1a005vO	Tue Oct 15 00:59:39 1996
+--- vt320.java	Mon Oct 14 23:34:24 1996
+***************
+*** 48,54 ****
+    
+  	/* The character display */
+    	private CharDisplay display;
+! 	private static int debug = 0;
+    	private String terminalID = "vt320";
+    
+  	/* X - COLUMNS, Y - ROWS */
+--- 48,54 ----
+    
+  	/* The character display */
+    	private CharDisplay display;
+! 	private static int debug = 2;
+    	private String terminalID = "vt320";
+    
+  	/* X - COLUMNS, Y - ROWS */
+***************
+*** 74,81 ****
+  	private final static int TSTATE_DCS	= 3; /* ESC P */
+  	private final static int TSTATE_DCEQ	= 4; /* ESC [? */
+  	private final static int TSTATE_ESCSQUARE= 5; /* ESC # */
+! 	private final static int TSTATE_OSC= 6; /* ESC ] */
+  
+  	private final static int KEYUP	= Event.UP % 1000;
+  	private final static int KEYDOWN= Event.DOWN % 1000;
+  	private final static int KEYLEFT= Event.LEFT % 1000;
+--- 74,132 ----
+  	private final static int TSTATE_DCS	= 3; /* ESC P */
+  	private final static int TSTATE_DCEQ	= 4; /* ESC [? */
+  	private final static int TSTATE_ESCSQUARE= 5; /* ESC # */
+! 	private final static int TSTATE_OSC= 6;       /* ESC ] */
+! 	private final static int TSTATE_SETG0= 7;     /* ESC (? */
+! 	private final static int TSTATE_SETG1= 8;     /* ESC )? */
+! 	private final static int TSTATE_SETG2= 9;     /* ESC *? */
+! 	private final static int TSTATE_SETG3= 10;    /* ESC +? */
+  
++ 	/* Font set designations  (need to add 96 char support later) */
++ 	/* 0 - DEC special char & line draw */
++ 	/* A - United Kingdom (UK) */
++ 	/* B - United States (USASCII) */
++ 	private static char g0 = 'B';	// default ASCII as G0
++ 	private static char g1 = '0';	// default DEC as G1
++ 	private static char g2 = 'A';	// default UK as G2
++ 	private static char g3 = '<';	// default User Def in G3
++ 	private static char gr = '0';	// default GR to DEC
++ 	private static char gl = 'B';	// default GL (main font) to ASCII
++ 	// array to store DEC Special -> Unicode mapping
++ 	//  Unicode   DEC  Unicode name    (DEC name)
++ 	private static char DECSPECIAL[] = {
++ 	    '\u0040', //5f blank
++ 	    '\u2666', //60 black diamond
++ 	    '\u2592', //61 grey square
++ 	    '\u2409', //62 Horizontal tab  (ht) pict. for control
++ 	    '\u240c', //63 Form Feed       (ff) pict. for control
++ 	    '\u240d', //64 Carriage Return (cr) pict. for control
++ 	    '\u240a', //65 Line Feed       (lf) pict. for control
++ 	    '\u00ba', //66 Masculine ordinal indicator
++ 	    '\u00b1', //67 Plus or minus sign
++ 	    '\u2424', //68 New Line        (nl) pict. for control
++ 	    '\u240b', //69 Vertical Tab    (vt) pict. for control
++  	    '\u2518', //6a Forms light up   and left
++ 	    '\u2510', //6b Forms light down and left
++ 	    '\u250c', //6c Forms light down and right
++ 	    '\u2514', //6d Forms light up   and right
++ 	    '\u253c', //6e Forms light vertical and horizontal
++ 	    '\u2594', //6f Upper 1/8 block                        (Scan 1)
++ 	    '\u2580', //70 Upper 1/2 block                        (Scan 3)
++ 	    '\u2500', //71 Forms light horizontal or ?em dash?    (Scan 5)
++ 	    '\u25ac', //72 \u25ac black rect. or \u2582 lower 1/4 (Scan 7)
++ 	    '\u005f', //73 \u005f underscore  or \u2581 lower 1/8 (Scan 9)
++ 	    '\u251c', //74 Forms light vertical and right
++ 	    '\u2524', //75 Forms light vertical and left
++ 	    '\u2534', //76 Forms light up   and horizontal
++ 	    '\u252c', //77 Forms light down and horizontal
++ 	    '\u2502', //78 vertical bar
++ 	    '\u2264', //79 less than or equal
++ 	    '\u2265', //7a greater than or equal
++ 	    '\u00b6', //7b paragraph
++ 	    '\u2260', //7c not equal
++ 	    '\u00a3', //7d Pound Sign (british)
++ 	    '\u00b7'};//7e Middle Dot
++ 	    
++ 
+  	private final static int KEYUP	= Event.UP % 1000;
+  	private final static int KEYDOWN= Event.DOWN % 1000;
+  	private final static int KEYLEFT= Event.LEFT % 1000;
+***************
+*** 446,457 ****
+  				}
+  				/*C = 0;*/
+  				break;
+  			default:
+  				lastwaslf=0;
+  				if (c<32) {
+  					if (c!=0)
+  						if (debug>0)
+! 							System.out.println("char: "+((int)c));
+  					break;
+  				}
+  				if(C >= display.getColumns()) {
+--- 497,518 ----
+  				}
+  				/*C = 0;*/
+  				break;
++ 			case '\016':
++ 				/* ^N, Shift out - Put G1 into GL */
++ 				gl = g1;
++ 				break;
++ 
++ 			case '\017':
++ 				/* ^O, Shift in - Put G0 into GL */
++ 				gl = g0;
++ 				break;
++ 
+  			default:
+  				lastwaslf=0;
+  				if (c<32) {
+  					if (c!=0)
+  						if (debug>0)
+! 							System.out.println("TSTATE_DATA char: "+((int)c));
+  					break;
+  				}
+  				if(C >= display.getColumns()) {
+***************
+*** 461,466 ****
+--- 522,541 ----
+  						display.insertLine(R);
+  					C = 0;
+  				} 
++ 				
++ 				// Mapping if DEC Special is chosen charset
++ 				if ( gl == '0' ) {
++ 				    if ( c >= '\u005f' && c <= '\u007e' ) {
++ 					if (debug>2)
++ 					    System.out.print("Mapping "+c);
++ 					c = DECSPECIAL[(short)c - 0x5f];
++ 				    if (debug>2)
++ 					System.out.println("to "+c);
++ 
++ 				    }
++ 				}
++ 					                      
++ 					
+  				if (insertmode==1) {
+  					display.insertChar(C, R, c, attributes);
+  				} else {
+***************
+*** 572,583 ****
+  				if (debug>1)
+  					System.out.println("ESC 7");
+  				break;
+  			default:
+  				if (debug>0)
+! 					System.out.println("ESC unknwon letter:"+c);
+  				term_state = TSTATE_DATA;
+  				break;
+  			}
+  			break;
+  		case TSTATE_ESCSQUARE:
+  			switch (c) {
+--- 647,714 ----
+  				if (debug>1)
+  					System.out.println("ESC 7");
+  				break;
++ 			case '(':
++ 				/* Designate G0 Character set (ISO 2022) */
++ 				term_state = TSTATE_SETG0;
++ 				if (debug>1)
++ 					System.out.println("ESC (");
++ 				break;
++ 			case ')':
++ 				/* Designate G0 character set (ISO 2022) */
++ 				term_state = TSTATE_SETG1;
++ 				if (debug>1)
++ 					System.out.println("ESC )");
++ 				break;
++ 			case '*':
++ 				/* Designate G1 Character set (ISO 2022) */
++ 				term_state = TSTATE_SETG2;
++ 				if (debug>1)
++ 					System.out.println("ESC *");
++ 				break;
++ 			case '+':
++ 				/* Designate G1 Character set (ISO 2022) */
++ 				term_state = TSTATE_SETG3;
++ 				if (debug>1)
++ 					System.out.println("ESC +");
++ 				break;
+  			default:
+  				if (debug>0)
+! 					System.out.println("ESC unknown letter:"+c);
+  				term_state = TSTATE_DATA;
+  				break;
+  			}
++ 			break;
++ 		case TSTATE_SETG0:
++ 			if(c=='0' || c=='A' || c=='B'){
++ 			    g0 = c;
++ 			}
++ 			if (debug>1)
++ 			    System.out.println("G0 char set? "+c);
++ 			term_state = TSTATE_DATA;
++ 			break;
++ 		case TSTATE_SETG1:
++ 			if(c=='0' || c=='A' || c=='B'){
++ 			    g1 = c;
++ 			}
++ 			if (debug>1)
++ 			    System.out.println("G1 char set? "+c);
++ 			term_state = TSTATE_DATA;
++ 			break;
++ 		case TSTATE_SETG2:
++ 			if(c=='0' || c=='A' || c=='B'){
++ 			    g2 = c;
++ 			}
++ 			if (debug>1)
++ 			    System.out.println("G2 char set? "+c);
++ 			term_state = TSTATE_DATA;
++ 			break;
++ 		case TSTATE_SETG3:
++ 			if(c=='0' || c=='A' || c=='B'){
++ 			    g3 = c;
++ 			}
++ 			if (debug>1)
++ 			    System.out.println("G3 char set? "+c);
++ 			term_state = TSTATE_DATA;
+  			break;
+  		case TSTATE_ESCSQUARE:
+  			switch (c) {

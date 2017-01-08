@@ -1,0 +1,8 @@
+ Syntax:  .bring <user>
+
+ Result:  Brings a user on the board to the room that you are in, where
+          <user> is that person.  Works like a .move, only the person is 
+          automatically brought to the room you are in.
+          Oh, and user must be of same rank or lower, Artemis! :-)
+
+See also:  move

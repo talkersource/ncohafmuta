@@ -1,0 +1,6 @@
+ Syntax:  .readlog
+          .readlog  <search_string>
+          .readlog  -<num_of_lines_from_bottom>
+
+Results:  This is to read the system's log file online.
+

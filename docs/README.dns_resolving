@@ -1,0 +1,58 @@
+** Under construction **
+
+Hostname resolution
+-------------------
+This talker, like all others, does ip -> hostname DNS mapping.
+When a connection comes in, the user's socket address is converted into IP
+form..then resolved to hostname/alphanumeric form using the 
+gethostbyaddr() function. This though has the possiblity of blocking (or
+delaying) while the ip is resolved. Either because the route to the user's
+DNS server is slow, the user's DNS server is slow, or the IP doesn't
+resolve at all. During this delay, the talker can become lagged.
+
+To try and remedy this, 2 features are being implemented.
+
+The first is talker-wide DNS caching. In this feature, when an ip comes
+in, it is checked against a (line-by-line) cache file of IP/hostname
+matches. This first cache file is the default cache file. It's manually
+edited and contains IP/hostname matches that we KNOW dont resolve well or 
+at all. If an IP matches, the hostname or error for that IP is pulled from
+the file and saved to the user. This saves the talker from going and
+tryign to resolve the IP via DNS. If the IP does NOT match, it searches
+for the IP in the MAIN cache file. again, if it's found, the hostname is
+pulled from the file to the user. If not, the IP is resolved via DNS, then
+written with the hostname to the END of the cache file. If the cache file
+is at its size limit, the IP/hostname match at the TOP of the file is
+"bumped" and every address moves up one.
+In testing with a 250 line cache file, IPs have matched approximately 60%
+of the time, over an uptime of approximately 20 days.
+#define's associated with this feature are SITECACHE_FILE,
+SITECACHE_FILE_DEF, and SITECACHE_SIZE..found in constants.h. To enable
+this feature, set the resolve_names variable to 1 in init_data (this is
+the default with the distribution). see README.init_data for more info.
+
+The second feature is side-wide DNS caching. In this feature, 
+a seperate program is run on the talker's host that takes care of
+resolving and DNS caching. This program is made to serve multiple talkers
+at the same time. When an ip comes in, it is checked against a
+(line-by-line) MASTER cache file on the host. If it matches, again, the
+hostname is pulled from the file to the user. If it doesn't it's written
+to a request file and the talker moves on. The program picks up the IP
+(along with some other distiguishing info for each talker) and resolves it
+via DNS. When it resolves (or times out) the hostname is sent back to the
+originating talker to the user's structure and the IP/Hostname match
+written to the program's MASTER cache file. The program's MASTER cache
+file is updated for resolution changes daily.
+#define's assosiated with this feature are SITE_WIDE_CACHE_FILE,
+and SITE_WIDE_REQUEST_FILE found in constants.h. To enable this feature,
+set the resolve_names variable to 2 in init_data. See README.init_data for
+more info.
+**This feature is not yet fully implemented, and still being worked on**
+
+To disable ip -> hostname resolution all together, set the resolve_names
+variable to 0 in init_data. See README.init_data for more info.
+
+-Cygnus
+Anthony J. Biacco
+code@ncohafmuta.com
+

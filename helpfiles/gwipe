@@ -1,0 +1,6 @@
+ Syntax:  .gwipe all  or  .gwipe <parameter>
+
+Results:  Wipes the messages from the gripe board. Parameters follow
+          same as .wipe, see there for them with examples.
+
+See also: wipe, gripe, swipe, wwipe

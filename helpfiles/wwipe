@@ -1,0 +1,6 @@
+ Syntax:  .wwipe all  or  .wwipe <parameter>
+
+Results:  Wipes the messages from the wizards board. Parameters follow
+          same as .wipe, see there for them with examples.
+
+See also: wipe, gwipe, swipe, wnote

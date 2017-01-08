@@ -1,0 +1,48 @@
+This code was programmed in parallel with SunOS 4.1.4 and Linux 2.0.x
+(with libc5) It is made to compile on a variety of UNIXes.
+You can find out your type of system by running: uname -a
+
+***** WINDOWS NT/95 COMPILING INFO *****
+
+see README.win95NT
+
+***** END OF WINDOWS COMPILING INFO *****
+
+
+***** UNIX COMPILING INFO *****
+Edit the file "Makefile" for your system type. The only things in there you 
+should have to modify is the DEFS and the LIBS (OPTIM and WARN defines are
+optional). You need only *1* DEFS lines and *1* LIBS line. Make sure only 1
+of each. Comment (with #) the rest out. The Makefile gives more details.
+
+System specific help MAY be under: README.<your system type>
+
+Then to compile:
+  "make"          compiles the talker code
+  "make test"     makes a.out test binary from .c files
+  "make clean"    removes a.out, core, and syslo* files
+  "make logclean" removes syslog.* and lib/lastlogs
+  "make objclean" removes object binaries from compile in objs/
+  "make dist"     makes the distribution in .tar.gz format
+  "make distuu"   makes the distribution in uuencoded text format
+  "make distzip"  makes the distribution in .zip format
+
+If you're on a system with multiprocessors you can pass the
+-j<num_of_processors+1> option to make to take advantage of this.
+So, if you're on a 2 processor system, you could do:   make -j3
+
+The code MUST be recompiled if changes are made to any .c or .h file.
+When you re-compile the talker code for changes to take effect AND the talker
+is still running, I, personally, run:
+	./shutdown ; make ; ./restart
+
+If you want to save the downtime while it compiles you can do:
+	make test
+	./shutdown ; cp a.out server ; ./restart
+
+If you KNOW you're on a unix that can write to a binary file while it's in
+use, you can do:
+	make
+	.reboot (from inside the talker)
+
+***** END OF UNIX COMPILING INFO *****

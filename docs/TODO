@@ -1,0 +1,116 @@
+Things to do..in this particular order!
+---------------------------------------
+(if you would like to assist on any of these and are good in C,
+ let me know..code@ncohafmuta.com)
+
+Add level-based mail and massmail to .smail command with options, add #define MAIL_LEVEL for
+the level allowed to do mass mails to other levels
+
+Fix/enhance write out code in write_str() write_str_nr() because it 
+doesn't take in account color codes when writing out column-specific text 
+blocks to user
+
+Finish ".set who" for different format .who lists
+
+Change options for:
+ Deleting/reading mail   and   Wiping/reading message boards
+ New options:
+  <number>-             <number> to end
+  -<number>             beginning to <number>
+  <number>-<number>     <number> to <number>
+  <number>              just message number <number>
+  l<number>             the last <number> messages
+
+.admin command to administrate almost all aspects and settings of the
+talker. The command will be command line based with descendingly specific
+levels. Sort of like the interface for Cisco IOS with their routers. All
+changes made using the command will be memory-effective ONLY unless saved
+to the config. A huge feature of this will be allowing administrator to
+edit,load, and save multiple configs on the fly. With one command you can
+change your talker to a whole other theme with new rooms,
+strings, and command names.
+ Tentative commands:
+   MAIN
+	commit	              - Save current settings to memory and
+				current boot
+	commit startup-config - Save current settings to the default
+				boot config
+	commit <config name>  - Save config settings to a new or
+				existing alternate config
+	copy <config> <config> - Copy a whole existing config to a new or
+				existing config name
+	config <type>	      - Enter configuration commannd line for
+				<type> which can be rooms,strings,globals,
+				or commands
+	load		      - Reload the current SAVED disk config
+	load <config name>    -	Load specific config into talker.
+	show configs	      - List all configurations
+	show <type>	      - Show settings for <type> under current
+				config
+	delete <config name>  - Deletes a specific configuration
+   GENERAL LINE COMMANDS
+	?		      - List commands for this line menu
+	exit		      - Exit up from this line menu
+   ROOM CONFIG LINE MENU COMMANDS
+	show		      - Show all settings for this config
+	add <room name>
+		exit <room name>
+		hide
+		atmos
+		publock
+		privlock
+	delete <room name>
+	modify <room name>
+   STRING CONFIG LINE MENU COMMANDS
+   GLOBAL CONFIG LINE MENU COMMANDS
+   COMMAND CONFIG LINE MENU COMMANDS
+
+Still, multi-user recepients for .tell (and other private commands), .move, 
+and .smail.
+
+Allocate memory for structures dynamically. Right now user structures are 
+allocated on bootup for MAX_USERS. Should allocate as needed (login/logout)
+Same for rooms. All rooms are allocated on bootup. Should be as
+needed..i.e. create and destroy rooms based on if users are in them, or
+are immediately ready to enter them.
+
+Split code into multiple C files (in progress!)
+
+Enhance color codes so users can STACK codes. like:
+^HR^BLthis is bold red and blinking^
+
+Create standards for different terminal types
+
+Implement and create load-in module support. Maybe have a directory with 
+a .c file for every user .<command>
+This also includes re-loading of commands and other data from 
+inside the talker.
+
+Port code to Win95/98/NT
+
+Greatly enhance web port so that it can truely send and receive HTTP
+requests. (75% functional) Need to fix POST support so to can do logins
+from web ports for users to use advanced functions in webpage (send mail,
+read mail, read help, read message boards)
+
+Start inter-talker connectivity
+
+Maybe create and implement an email gateway to external email. Maybe have
+a talker email account and to send email to a person you put their name
+in the Subject: field. Or maybe just <name>.<talker_name>@<talker's host>
+cygnus.pinwheels@ncohafmuta.com
+
+
+**Things being considered still**
+
+Using a database
+Using Async I/O threads
+Encrypting all user files
+Mail folders w/folder management
+.set icq, .set age (maybe? possibly too customized for the distribution
+code)
+Add route command to display a route between two rooms.  Maybe 
+make it an option of another command instead of making a new command? Or maybe
+the user should not be lazy and use .map? :)
+
+

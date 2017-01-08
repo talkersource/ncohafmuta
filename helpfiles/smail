@@ -1,0 +1,15 @@
+ Syntax:  .smail <user> <message>
+
+Results:  Sends a private message to any user on the board. <user> is the
+          person you wish to send the note to, <message> is that note.  
+          If that user is logged on at the time you send the mail he/she
+          will be notified immediately.  If not, then the user will be
+          notified the next time that he/she logs on or through email if
+          they have auto-forward on.  The username specified must be
+          typed in full. This command will work in any room on the board. 
+          Message will also be saved to your sent mail box, for further 
+          reference by you.
+
+Example:  To send a note to cygnus, type: .smail cygnus hiya!
+
+See also: rmail, cmail, fmail, rsent, csent

@@ -1,0 +1,21 @@
+ Syntax:  .shutdown -c
+          .shutdown [<num_of_minutes>]
+          .shutdown -r [<num_of_minutes>]
+
+Results:  Shuts the talker down or reboots it.  It will ask if you really
+          want to do this, just in case you accidentally type .shutdown.
+          It will quit all users before going down. The "-c" string after
+          the command is used to cancel an auto-shutdown/reboot.
+          An auto-shutdown is done by specifying a number from 1-32766
+          after the shutdown command.
+          An auto-reboot is done by specifying a number from 1-32766 after
+          the -r option of the shutdown command. Without a number
+          specified, the talk reboots immediately.
+
+Example:  To have the talker shut itself down in 3 hours,
+          type --> .shutdown 180
+
+  Notes:  On auto-shutdowns/reboots, broadcasts will be given by the
+          talker automatically to let you and the other users know how
+          long before it will shutdown/reboot. No users need to be online
+          for an auto-shutdown or auto-reboot to take place.

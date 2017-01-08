@@ -1,0 +1,1793 @@
+head	1.14;
+access;
+symbols;
+locks
+	leo:1.14; strict;
+comment	@# @;
+
+
+1.14
+date	96.09.06.06.55.54;	author leo;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	96.07.03.15.59.17;	author leo;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	96.07.03.15.49.28;	author leo;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	96.07.03.09.31.26;	author leo;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	96.07.03.08.04.41;	author leo;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	96.07.02.17.33.10;	author leo;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	96.03.28.23.41.45;	author msmeissn;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	96.03.28.19.50.59;	author msmeissn;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	96.03.28.19.40.58;	author msmeissn;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	96.03.27.22.12.46;	author msmeissn;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	96.03.27.13.47.39;	author leo;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	96.03.25.11.21.38;	author msmeissn;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	96.03.22.22.20.59;	author msmeissn;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	96.03.22.12.15.41;	author msmeissn;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.14
+log
+@new parameter VTid to enforce terminal identifier string
+@
+text
+@/*
+ * vt320 -- a DEC VT320 Terminal emulation
+ * --
+ * $Id: vt320.java,v 1.13 1996/07/03 15:59:17 leo Exp leo $
+ * $timestamp: Fri Sep  6 08:44:42 1996 by Matthias L. Jugel :$
+ *
+ * This file is part of "The Java Telnet Applet".
+ *
+ * This is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * "The Java Telnet Applet" is distributed in the hope that it will be 
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this software; see the file COPYING.  If not, write to the
+ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
+package display;
+
+import display.Terminal;
+
+import java.awt.Scrollbar;
+import java.awt.Event;
+import java.awt.Dimension;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.util.Vector;
+
+import java.applet.Applet;
+
+/**
+ * A DEC VT320 Terminal is an emulation class.
+ *
+ * @@version $Id: vt320.java,v 1.13 1996/07/03 15:59:17 leo Exp leo $
+ * @@author  Matthias L. Jugel, Marcus Meiﬂner
+ */
+public class vt320 extends Terminal
+{
+  	/* Scrollbar */
+        private Scrollbar sb;
+  
+	/* The character display */
+  	private CharDisplay display;
+	private static int debug = 0;
+  	private String terminalID = "vt320";
+  
+	/* X - COLUMNS, Y - ROWS */
+	int	R,C;
+	int	Sc,Sr,Sa;
+	int	attributes	= 0;
+	int	insertmode	= 0;
+	int	vt52mode	= 0;
+	int	normalcursor	= 0;
+
+	private	static	int	lastwaslf = 0;
+	private static	int i;
+	private final static char ESC = 27;
+	private final static char CSI = 233;
+	private final static char IND = 132;
+	private final static char NEL = 133;
+	private final static char HTS = 136;
+	private final static char DCS = 144;
+	private final static char OSC = 157;
+	private final static int TSTATE_DATA	= 0;
+	private final static int TSTATE_ESC	= 1; /* ESC */
+	private final static int TSTATE_CSI	= 2; /* ESC [ */
+	private final static int TSTATE_DCS	= 3; /* ESC P */
+	private final static int TSTATE_DCEQ	= 4; /* ESC [? */
+	private final static int TSTATE_ESCSQUARE= 5; /* ESC # */
+	private final static int TSTATE_OSC= 6; /* ESC ] */
+
+	private final static int KEYUP	= Event.UP % 1000;
+	private final static int KEYDOWN= Event.DOWN % 1000;
+	private final static int KEYLEFT= Event.LEFT % 1000;
+	private final static int KEYRIGHT= Event.RIGHT % 1000;
+	private final static int KEYF1	= Event.F1 % 1000;
+	private final static int KEYF2	= Event.F2 % 1000;
+	private final static int KEYF3	= Event.F3 % 1000;
+	private final static int KEYF4	= Event.F4 % 1000;
+	private final static int KEYPGDN = Event.PGDN % 1000;
+	private final static int KEYPGUP = Event.PGUP % 1000;
+
+	/** 
+	 * Strings to send on function key presseic
+	 */
+	private String FunctionKey[];
+	private String KeyUp;
+	private String KeyDown;
+	private String KeyLeft;
+	private String KeyRight;
+
+	private String osc,dcs;	/* to memorize OSC & DCS control sequence */
+
+	private int term_state = TSTATE_DATA;
+	private byte[]	Tabs;
+	private int[]	DCEvars = new int [10];
+	private	int	DCEvar;
+
+        /* operation system we run on, Scrollbar hack */
+        private String osn = System.getProperty("os.name");
+
+	public String[][] getParameterInfo() {
+	  String pinfo[][] = {
+	    {"VTcolumns",  "Integer",   "Columns of the terminal"},
+	    {"VTrows",     "Integer",   "Rows of the terminal"},
+	    {"VTfont",     "String",    "Terminal font (default is Courier)"},
+	    {"VTfontsize", "Integer",   "Font size"},
+	    {"VTbuffer",   "Integer",   "Scrollback buffer size"},
+	    {"VTscrollbar","Boolean",   "Enable or disable scrollbar"},
+	    {"VTresize",   "String",    "One of none, font, screen"},
+	    {"VTid",       "String",    "Terminal id, standard is VT320"},
+	  };
+	  return pinfo;
+	}
+
+	/**
+	 * Initialize terminal.
+	 * @@param parent the applet parent where to get parameters from
+	 * @@see display.Terminal
+	 */
+	public void InitializeTerminal(Object parent){
+	  String width = "80", height = "24", resize ="font";
+	  String font = "Courier", fs = "14", bufs = "100";
+	  String scrb = "false";
+	  
+	  if(parent != null) {
+	    width = ((Applet)parent).getParameter("VTcolumns");
+	    height = ((Applet)parent).getParameter("VTrows");
+	    font = ((Applet)parent).getParameter("VTfont");
+	    fs = ((Applet)parent).getParameter("VTfontsize");
+	    bufs = ((Applet)parent).getParameter("VTbuffer");
+	    scrb = ((Applet)parent).getParameter("VTscrollbar");
+	    resize = ((Applet)parent).getParameter("VTresize");
+	    resize = resize == null ? "font" : resize;
+	    if(((Applet)parent).getParameter("VTid") != null)
+	      terminalID = ((Applet)parent).getParameter("VTid");
+	  }
+	  display = new CharDisplay(width==null?80:(new Integer(width)).intValue(),
+				    height==null?24:(new Integer(height)).intValue(),
+				    font==null?"Courier":font,
+				    fs==null?14:(new Integer(fs)).intValue());
+	  display.setBufferSize(bufs==null?100:(new Integer(bufs)).intValue());
+	  if(resize.equals("none")) 
+	    display.setResizeStrategy(CharDisplay.RESIZE_NONE);
+	  if(resize.equals("font")) 
+	    display.setResizeStrategy(CharDisplay.RESIZE_FONT);
+	  if(resize.equals("screen")) 
+	    display.setResizeStrategy(CharDisplay.RESIZE_SCREEN);
+
+	  setLayout(new BorderLayout());
+	  if(scrb != null && !scrb.equals("false")) {
+	    sb = new Scrollbar(Scrollbar.VERTICAL);
+	    if(osn.equals("Windows 95"))
+	      sb.setValues(display.getBufferSize() - display.getRows(), 
+			   display.getRows(), 
+			   0, 
+			   display.getBufferSize());
+	    else
+	      sb.setValues(display.getBufferSize(), 
+			   display.getRows(), 
+			   0, 
+			   display.getBufferSize() - display.getRows());
+	    if(scrb.equals("left") || scrb.equals("true"))
+	      add("West", sb);
+	    else if(scrb.equals("right")) 
+	      add("East", sb);
+	    else
+	      System.out.println("InitializeTerminal(): unknown scrollbar "
+				 +"location: "+scrb);
+	  }
+	  add("Center", display);
+	  InitTerminalVars();
+  	}
+
+	public void InitTerminalVars() {
+	  int nw = display.getColumns();
+	  Tabs = new byte[nw];
+	  for (int i=0;i<nw;i+=8) {
+	  	Tabs[i]=1;
+	  }
+	  FunctionKey = new String[20];
+	  FunctionKey[0]= "";
+	  FunctionKey[1]= "OP";
+	  FunctionKey[2]= "OQ";
+	  FunctionKey[3]= "OR";
+	  FunctionKey[4]= "OS";
+	  FunctionKey[5]= "";
+	  FunctionKey[6]= "";
+	  FunctionKey[7]= "";
+	  FunctionKey[8]= "";
+	  FunctionKey[9]= "";
+	  FunctionKey[10]= "";
+	  FunctionKey[11]= "";
+	  FunctionKey[12]= "";
+	  FunctionKey[13]= "";
+	  FunctionKey[14]= "";
+	  FunctionKey[15]= "";
+	  FunctionKey[16]= "";
+	  FunctionKey[17]= "";
+	  FunctionKey[18]= "";
+	  FunctionKey[19]= "";
+	  KeyUp		= "[A";
+	  KeyDown	= "[B";
+	  KeyRight	= "[C";
+	  KeyLeft	= "[D";
+	}
+
+  	public Dimension getSize() {
+	  	return new Dimension(display.getColumns(), display.getRows());
+	}
+
+	public String getTerminalType() { return terminalID; }
+
+	/**
+	 * Handle events for the terminal. Only accept events for the scroll
+	 * bar. Any other events have to be propagated to the parent.
+	 * @@param evt the event
+	 */
+  	public boolean handleEvent(Event evt) {
+		String	tosend;
+		Vector	vec;
+		byte	msg[];
+
+    		if(evt != null && evt.target == sb && evt.arg != null) {
+			int val = ((Integer)evt.arg).intValue();
+			if(val > display.getBufferSize() - display.getRows())
+			  val = display.getBufferSize() - display.getRows();
+      			display.setWindowBase(val);
+      			return true;
+    		}
+		if(evt.id == Event.MOUSE_ENTER)
+		{
+		  requestFocus();
+		  return true;
+		}
+		if(evt.id == Event.MOUSE_EXIT)
+		{
+		  nextFocus();
+		  return true;
+		}
+		if (evt.id == evt.KEY_ACTION) {
+			tosend = "";
+			/* bloodsucking little buggers at netscape 
+			 * don't keep to the standard java values
+			 * of <ARROW> or <Fx> 
+			 */
+			switch (evt.key % 1000) {
+			case KEYF1:
+				tosend = FunctionKey[1];
+				break;
+			case KEYF2:
+				tosend = FunctionKey[2];
+				break;
+			case KEYF3:
+				tosend = FunctionKey[3];
+				break;
+			case KEYF4:
+				tosend = FunctionKey[4];
+				break;
+			case KEYUP:
+				tosend = KeyUp;
+				break;
+			case KEYDOWN:
+				tosend = KeyDown;
+				break;
+			case KEYLEFT:
+				tosend = KeyLeft;
+				break;
+			case KEYRIGHT:
+				tosend = KeyRight;
+				break;
+			case KEYPGDN:
+				tosend = "[6~";
+				break;
+			case KEYPGUP:
+				tosend = "[5~";
+				break;
+			default:
+				if (debug>0)
+					System.out.println("unknown event:"+(int)evt.key);
+				break;
+			}
+
+			msg = new byte[tosend.length()];
+			tosend.getBytes(0, tosend.length(), msg, 0);
+			vec = new Vector(2);
+			vec.addElement("SEND");
+			vec.addElement(msg);
+			peer.notifyStatus(vec);
+			return true;
+		}
+    		return false;
+  	}
+  
+
+  	private void handle_dcs(String dcs) {
+		System.out.println("DCS: "+dcs);
+	}
+  	private void handle_osc(String osc) {
+		System.out.println("OSC: "+osc);
+	}
+  
+	/**
+	 * Put String at current cursor position. Moves cursor
+	 * according to the String. Does NOT wrap.
+	 * @@param s the string
+	 */
+	public void putString(String s) {
+		int	i,len=s.length();
+
+		display.markLine(R,1);
+		for (i=0;i<len;i++)
+			putChar(s.charAt(i),false);
+		display.putCursor(C, R);
+		display.redraw();
+		if(sb != null)
+		  if(osn.equals("Windows 95"))
+		    sb.setValues(display.getWindowBase(), 
+				 display.getRows(), 
+				 0, 
+				 display.getBufferSize()); 
+		  else
+		    sb.setValues(display.getWindowBase(), 
+				 display.getRows(), 
+				 0, 
+				 display.getBufferSize() - display.getRows());
+	}
+
+	public void putChar(char c) {
+		putChar(c,true);
+		display.redraw();
+		if(sb != null)
+		  if(osn.equals("Windows 95"))
+		    sb.setValues(display.getWindowBase(), 
+				 display.getRows(), 
+				 0, 
+				 display.getBufferSize()); 
+		  else
+		    sb.setValues(display.getWindowBase(), 
+				 display.getRows(), 
+				 0, 
+				 display.getBufferSize() - display.getRows());
+	}
+
+	public void putChar(char c,boolean doshowcursor) {
+		int	rows = display.getRows();
+		int	columns = display.getColumns();
+		int	tm = display.getTopMargin();
+		int	bm = display.getBottomMargin();
+		String	tosend;
+		Vector	vec;
+		byte	msg[];
+
+		display.markLine(R,1);
+		if (c>255) {
+			if (debug>0)
+				System.out.println("char > 255:"+(int)c);
+			return;
+		}
+		switch (term_state) {
+		case TSTATE_DATA:
+			switch (c) {
+			case OSC:
+				osc="";
+				term_state = TSTATE_OSC;
+				break;
+			case CSI:
+				term_state = TSTATE_DCEQ;
+				break;
+			case IND:
+				if (R==bm-1)
+					display.insertLine(R,1,display.SCROLL_UP);
+				else
+					R++;
+				if (debug>1)
+					System.out.println("IND (at "+R+" )");
+				break;
+			case NEL:
+				if (R==bm-1)
+					display.insertLine(R,1,display.SCROLL_UP);
+				else
+					R++;
+				C=0;
+				if (debug>1)
+					System.out.println("NEL (at "+R+" )");
+				break;
+			case HTS:
+				Tabs[C] = 1;
+				if (debug>1)
+					System.out.println("HTS");
+				break;
+			case DCS:
+				dcs="";
+				term_state = TSTATE_DCS;
+				break;
+			case ESC:
+				term_state = TSTATE_ESC;
+				lastwaslf=0;
+				break;
+			case '\b':
+				C--;
+				if (C<0) 
+					C=0;
+				lastwaslf = 0;
+				break;
+			case '\t':
+				if (insertmode == 1) {
+					int	nr,newc;
+
+					newc = C;
+					do {
+						display.insertChar(C,R,' ',attributes);
+						newc++;
+					} while (newc<columns && Tabs[newc]==0);
+				} else {
+					do {
+						display.putChar(C++,R,' ',attributes);
+					} while (C<columns && (Tabs[C]==0));
+				}
+				lastwaslf = 0;
+				break;
+			case '\r':
+				C=0;
+				break;
+			case '\n':
+				if (lastwaslf!=0 && lastwaslf!=c)
+					break;
+				lastwaslf=c;
+				if (R == tm-1) {
+					display.insertLine(R,1);
+				} else { 
+					if (R == bm) {
+						display.insertLine(R,1);
+					} else if (R == rows-1) {
+						display.insertLine(R,1);
+					} else {
+						R++;
+					}
+				}
+				/*C = 0;*/
+				break;
+			default:
+				lastwaslf=0;
+				if (c<32) {
+					if (c!=0)
+						if (debug>0)
+							System.out.println("char: "+((int)c));
+					break;
+				}
+				if(C >= display.getColumns()) {
+					if(R < rows - 1) 
+						R++;
+					else 	
+						display.insertLine(R);
+					C = 0;
+				} 
+				if (insertmode==1) {
+					display.insertChar(C, R, c, attributes);
+				} else {
+					display.putChar(C, R, c, attributes);
+					C++;
+				}
+				break;
+			}
+			break;
+		case TSTATE_OSC:
+			if (c=='\\' && osc.charAt(osc.length()-1)==ESC) {
+				handle_osc(osc);
+				term_state = TSTATE_DATA;
+				break;
+			}
+			osc = osc + c;
+			break;
+		case TSTATE_ESC:
+			switch (c) {
+			case '#':
+				term_state = TSTATE_ESCSQUARE;
+				break;
+			case 'c':
+				/* Hard terminal reset */
+				/*FIXME:*/
+				term_state = TSTATE_DATA;
+				break;
+			case '[':
+				term_state = TSTATE_CSI;
+				DCEvar		= 0;
+				DCEvars[0]	= 0;
+				DCEvars[1]	= 0;
+				DCEvars[2]	= 0;
+				DCEvars[3]	= 0;
+				break;
+			case ']':
+				osc="";
+				term_state = TSTATE_OSC;
+				break;
+			case 'P':
+				dcs="";
+				term_state = TSTATE_DCS;
+				break;
+			case 'E':
+				if (R==bm-1)
+					display.insertLine(R,1,display.SCROLL_UP);
+				else
+					R++;
+				C=0;
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC E (at "+R+" )");
+				break;
+			case 'D':
+				System.out.println("ESC D (bm="+bm+",R="+R);
+				if (R==bm)
+					display.insertLine(R,1,display.SCROLL_UP);
+				else
+					R++;
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC D (at "+R+" )");
+				break;
+			case 'M':
+				if (R>tm)
+					R--;
+				else
+					display.insertLine(R,1,display.SCROLL_DOWN);
+				if (debug>1)
+					System.out.println("ESC M");
+				term_state = TSTATE_DATA;
+				break;
+			case 'H':
+				if (debug>0)
+					System.out.println("ESC H at "+C);
+				/* right border probably ...*/
+				if (C>=display.getColumns())
+					C=display.getColumns()-1;
+				Tabs[C] = 1;
+				term_state = TSTATE_DATA;
+				break;
+			case '=':
+				/*application keypad*/
+				if (debug>0)
+					System.out.println("ESC =");
+				term_state = TSTATE_DATA;
+				break;
+			case '>':
+				/*normal keypad*/
+				if (debug>0)
+					System.out.println("ESC >");
+				term_state = TSTATE_DATA;
+				break;
+			case '7':
+				/*save cursor */
+				Sc = C;
+				Sr = R;
+				Sa = attributes;
+				if (debug>1)
+					System.out.println("ESC 7");
+				term_state = TSTATE_DATA;
+				break;
+			case '8':
+				/*restore cursor */
+				C = Sc;
+				R = Sr;
+				attributes = Sa;
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC 7");
+				break;
+			default:
+				if (debug>0)
+					System.out.println("ESC unknwon letter:"+c);
+				term_state = TSTATE_DATA;
+				break;
+			}
+			break;
+		case TSTATE_ESCSQUARE:
+			switch (c) {
+			case '8':
+				for (int i=0;i<columns;i++)
+					for (int j=0;j<rows;j++)
+						display.putChar(i,j,'E',0);
+				break;
+			}
+			if (debug>1)
+				System.out.println("ESC#8");
+			term_state = TSTATE_DATA;
+			break;
+		case TSTATE_DCS:
+			if (c=='\\' && dcs.charAt(dcs.length()-1)==ESC) {
+				handle_dcs(dcs);
+				term_state = TSTATE_DATA;
+				break;
+			}
+			dcs = dcs + c;
+			break;
+		case TSTATE_DCEQ:
+			switch (c) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				DCEvars[DCEvar]=DCEvars[DCEvar]*10+((int)c)-48;
+				break;
+			case 'r':
+				if (debug>0)
+					System.out.println("ESC [ ? "+DCEvars[0]+" r");
+				/* DEC Mode reset */ 
+				switch (DCEvars[0]){
+				case 3: /* 132 columns*/
+					break;
+				case 4: /* scrolling mode, smooth */
+					break;
+				case 5: /* light background */
+					break;
+				case 6: /* move inside margins ? */
+					break;
+				case 12:/* local echo off */
+					break;
+				}
+				term_state = TSTATE_DATA;
+				break;
+			case 'h':
+				if (debug>0)
+					System.out.println("ESC [ ? "+DCEvars[0]+" h");
+				/* DEC Mode set */ 
+				switch (DCEvars[0]){
+				case 1:	/* Application cursor keys */
+					KeyUp	= "OA";
+					KeyDown	= "OB";
+					KeyRight= "OC";
+					KeyLeft	= "OD";
+					break;
+				case 3: /* 132 columns*/
+					break;
+				case 4: /* scrolling mode, smooth */
+					break;
+				case 5: /* light background */
+					break;
+				case 6: /* move inside margins ? */
+					break;
+				case 12:/* local echo off */
+					break;
+				}
+				term_state = TSTATE_DATA;
+				break;
+			case 'l':
+				/* DEC Mode reset */ 
+				if (debug>0)
+					System.out.println("ESC [ ? "+DCEvars[0]+" l");
+				switch (DCEvars[0]){
+				case 1:	/* Application cursor keys */
+					KeyUp	= "[A";
+					KeyDown	= "[B";
+					KeyRight= "[C";
+					KeyLeft	= "[D";
+					break;
+				case 3: /* 80 columns*/
+					break;
+				case 4: /* scrolling mode, jump */
+					break;
+				case 5: /* dark background */
+					break;
+				case 6: /* move outside margins ? */
+					break;
+				case 12:/* local echo on */
+					break;
+				}
+				term_state = TSTATE_DATA;
+				break;
+			case ';':
+				DCEvar++;
+				DCEvars[DCEvar] = 0;
+				break;
+			case 'n':
+				if (debug>0)
+					System.out.println("ESC [ ? "+DCEvars[0]+" n");
+				switch (DCEvars[0]) {
+				case 15:
+					/* printer? no printer. */
+					tosend = ((char)ESC)+"[?13n";
+					msg = new byte[tosend.length()];
+					tosend.getBytes(0, tosend.length(), msg, 0);
+					vec = new Vector(2);
+					vec.addElement("SEND");
+					vec.addElement(msg);
+					peer.notifyStatus(vec);
+					System.out.println("ESC[5n");
+					break;
+				default:break;
+				}
+				term_state = TSTATE_DATA;
+				break;
+			default:
+				if (debug>0)
+					System.out.println("ESC [ ? "+DCEvars[0]+" "+c);
+				term_state = TSTATE_DATA;
+				break;
+			}
+			break;
+		case TSTATE_CSI:
+			switch (c) {
+			case '?':
+				DCEvar=0;
+				DCEvars[0]=0;
+				term_state=TSTATE_DCEQ;
+				if(debug>0)
+				  System.out.println("->TSTATE_DCEQ");
+				break;
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				DCEvars[DCEvar]=DCEvars[DCEvar]*10+((int)c)-48;
+				break;
+			case ';':
+				DCEvar++;
+				DCEvars[DCEvar] = 0;
+				break;
+			case 'c':/* send primary device attributes */
+				/* send (ESC[?61c) */
+				tosend = ((char)ESC)+"[?1;2c";
+				vec = new Vector(2);
+				msg = new byte[tosend.length()];
+				tosend.getBytes(0, tosend.length(), msg, 0);
+				vec.addElement("SEND");
+				vec.addElement(msg);
+				peer.notifyStatus(vec);
+				term_state = TSTATE_DATA;
+				if (debug>0)
+					System.out.println("ESC [ "+DCEvars[0]+" c");
+				break;
+			case 'q':
+				if (debug>0)
+					System.out.println("ESC [ "+DCEvars[0]+" q");
+				term_state = TSTATE_DATA;
+				break;
+			case 'g':
+				/* used for tabsets */
+				switch (DCEvars[0]){
+				case 3:/* clear them */
+					int nw = display.getColumns();
+					Tabs = new byte[nw];
+					break;
+				default:
+					Tabs[C] = 0;
+					break;
+				}
+				if (debug>0)
+					System.out.println("ESC [ "+DCEvars[0]+" g");
+				term_state = TSTATE_DATA;
+				break;
+			case 'h':
+				switch (DCEvars[0]) {
+				case 4:
+					insertmode = 1;
+					break;
+				}
+				term_state = TSTATE_DATA;
+				if (debug>0)
+					System.out.println("ESC [ "+DCEvars[0]+" h");
+				break;
+			case 'l':
+				switch (DCEvars[0]) {
+				case 4:
+					insertmode = 0;
+					break;
+				}
+				term_state = TSTATE_DATA;
+				if (debug>0)
+					System.out.println("ESC [ "+DCEvars[0]+" l");
+				break;
+			case 'D':
+				if (DCEvars[0]==0)
+					C--;
+				else
+					C-=DCEvars[0];
+				if (C<0) C=0;
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" D");
+				break;
+			case 'C':
+				if (DCEvars[0]==0)
+					C++;
+				else
+					C+=DCEvars[0];
+				if (C>columns-1)
+					C=columns-1;
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" C");
+				break;
+			case 'A':
+				if (DCEvars[0]==0)
+					R--;
+				else
+					R-=DCEvars[0];
+				if (R<0) R=0;
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" A");
+				break;
+			case 'r':
+				if (DCEvar==0) {
+					display.setTopMargin(0);
+					display.setBottomMargin(rows);
+				} else {
+					display.setTopMargin(DCEvars[0]-1);
+					display.setBottomMargin(DCEvars[1]-1);
+				}
+				if (debug>1)
+					System.out.println("ESC ["+DCEvars[0]+" ; "+DCEvars[1]+" r");
+				term_state = TSTATE_DATA;
+				break;
+			case 'H':	/* move cursor */
+				/* gets 2 arguments */
+				R = DCEvars[0]-1;
+				C = DCEvars[1]-1;
+				if (C<0) C=0;
+				if (R<0) R=0;
+				term_state = TSTATE_DATA;
+				if (debug>2)
+					System.out.println("ESC [ "+DCEvars[0]+";"+DCEvars[1]+" H");
+				break;
+			case 'f':	/* move cursor 2 */
+				/* gets 2 arguments */
+				R = DCEvars[0]-1;
+				C = DCEvars[1]-1;
+				if (C<0) C=0;
+				if (R<0) R=0;
+				term_state = TSTATE_DATA;
+				if (debug>2)
+					System.out.println("ESC [ "+DCEvars[0]+";"+DCEvars[1]+" f");
+				break;
+			case 'L':
+				/* insert n lines */
+				if (DCEvars[0]==0)
+					display.insertLine(R);
+				else 
+					display.insertLine(R,DCEvars[0]);
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" L");
+				break;
+			case 'B':
+				/* cursor down n (1) times */
+				if (DCEvars[0]==0)
+					R++;
+				else
+					R+=DCEvars[0];
+				while (R>rows-1) {
+					display.insertLine(rows-1);
+					R--;
+				}
+				term_state = TSTATE_DATA;
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" B (at C="+C+")");
+				break;
+			case 'M':
+				if (DCEvars[0]==0)
+					display.deleteLine(R);
+				else
+					for (int i=1;i<DCEvars[0];i++)
+						display.deleteLine(R);
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+"M");
+				term_state = TSTATE_DATA;
+				break;
+			case 'K':
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" K");
+				/* clear in line */
+				switch (DCEvars[0]) {
+				case 0:/*clear to right*/
+					if (C<columns-2)
+						display.deleteArea(C,R,columns-C-1,1);
+					break;
+				case 1:/*clear to the left*/
+					if (C>0)
+						display.deleteArea(0,R,C-1,1);
+					break;
+				case 2:/*clear whole line */
+					display.deleteArea(0,R,columns,1);
+					break;
+				}
+				term_state = TSTATE_DATA;
+				break;
+			case 'J':
+				/* clear display.below current line */
+				switch (DCEvars[0]) {
+				case 0:
+					display.deleteArea(0,R,columns,rows-R);
+					display.markLine(R,rows-R+1);
+					break;
+				case 1:
+					display.deleteArea(0,0,columns,R-1);
+					display.markLine(0,R);
+					break;
+				case 2:
+					display.deleteArea(0,0,columns,rows);
+					display.markLine(0,rows+1);
+					break;
+				}
+				if (debug>1)
+					System.out.println("ESC [ "+DCEvars[0]+" J");
+				term_state = TSTATE_DATA;
+				break;
+			case 'n':
+				switch (DCEvars[0]){
+				case 5: /* malfunction? No malfunction. */
+					tosend = ((char)ESC)+"[0n";
+					vec = new Vector(2);
+					msg = new byte[tosend.length()];
+					tosend.getBytes(0, tosend.length(), msg, 0);
+					vec.addElement("SEND");
+					vec.addElement(msg);
+					peer.notifyStatus(vec);
+					System.out.println("ESC[5n");
+					break;
+				case 6:
+					tosend = ((char)ESC)+"["+R+";"+C+"R";
+					vec = new Vector(2);
+					msg = new byte[tosend.length()];
+					tosend.getBytes(0, tosend.length(), msg, 0);
+					vec.addElement("SEND");
+					vec.addElement(msg);
+					peer.notifyStatus(vec);
+					System.out.println("ESC[6n");
+					break;
+				default:
+					if (debug>0)
+						System.out.println("ESC [ "+DCEvars[0]+" n??");
+					break;
+				}
+				term_state = TSTATE_DATA;
+				break;
+			case 'm':	/* attributes as color, bold , blink,*/
+				if (debug>1)
+					System.out.print("ESC [ ");
+				if (DCEvar == 0 && DCEvars[0] == 0)
+					attributes = 0;
+				for (i=0;i<=DCEvar;i++) {
+					switch (DCEvars[i]) {
+					case 0:
+						if (DCEvar>0)
+							attributes =0;
+						break;
+					case 4:
+						attributes |= CharDisplay.UNDERLINE;
+						break;
+					case 1:
+						attributes |= CharDisplay.BOLD;
+						break;
+					case 7:
+						attributes |= CharDisplay.INVERT;
+						break;
+					case 5: /* blink on */
+						break;
+					case 25: /* blinking off */
+						break;
+					case 27:
+						attributes &= ~CharDisplay.INVERT;
+						break;
+					case 24:
+						attributes &= ~CharDisplay.UNDERLINE;
+						break;
+					case 22:
+						attributes &= ~CharDisplay.BOLD;
+						break;
+					case 30:
+					case 31:
+					case 32:
+					case 33:
+					case 34:
+					case 35:
+					case 36:
+					case 37:
+						attributes &= ~(0xf<<3);
+						attributes |= ((DCEvars[i]-30)+1)<<3;
+						break;
+					case 40:
+					case 41:
+					case 42:
+					case 43:
+					case 44:
+					case 45:
+					case 46:
+					case 47:
+						attributes &= ~(0xf<<7);
+						attributes |= ((DCEvars[i]-40)+1)<<7;
+						break;
+
+					default:
+						
+						break;
+					}
+					if (debug>1)
+						System.out.print(""+DCEvars[i]+";");
+				}
+				if (debug>1)
+					System.out.print(" (attributes = "+attributes+")m \n");
+				term_state = TSTATE_DATA;
+				break;
+			default:
+				if (debug>0)
+					System.out.println("ESC [ unknwon letter:"+c);
+				term_state = TSTATE_DATA;
+				break;
+			}
+			break;
+		default:
+			term_state = TSTATE_DATA;
+			break;
+		}
+		if (C >= columns) C = columns;
+		if (R >= rows)	R = rows;
+		if (C < 0)	C = 0;
+		if (R < 0)	R = 0;
+		if (doshowcursor) {
+			display.putCursor(C, R);
+		}
+		display.markLine(R,1);
+	}
+}
+@
+
+
+1.13
+log
+@removed ' ' from \b
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.12 1996/07/03 15:49:28 leo Exp leo $
+ * $timestamp: Wed Jul  3 17:53:16 1996 by Matthias L. Jugel :$
+d41 1
+a41 1
+ * @@version $Id: vt320.java,v 1.12 1996/07/03 15:49:28 leo Exp leo $
+d52 1
+d118 1
+d142 2
+d219 2
+@
+
+
+1.12
+log
+@corrected null pointer bug when no scrollbar is in use
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.11 1996/07/03 09:31:26 leo Exp leo $
+ * $timestamp: Wed Jul  3 17:47:46 1996 by Matthias L. Jugel :$
+d41 1
+a41 1
+ * @@version $Id: vt320.java,v 1.11 1996/07/03 09:31:26 leo Exp leo $
+a404 1
+				display.putChar(C,R,' ',attributes);
+@
+
+
+1.11
+log
+@Added hack to have control over scrollbar behaviour.
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.10 1996/07/03 08:04:41 leo Exp leo $
+ * $timestamp: Wed Jul  3 11:18:44 1996 by Matthias L. Jugel :$
+d41 1
+a41 1
+ * @@version $Id: vt320.java,v 1.10 1996/07/03 08:04:41 leo Exp leo $
+d317 11
+a327 10
+		if(osn.equals("Windows 95"))
+		  sb.setValues(display.getWindowBase(), 
+				display.getRows(), 
+				0, 
+				display.getBufferSize()); 
+		else
+		   sb.setValues(display.getWindowBase(), 
+				display.getRows(), 
+				0, 
+				display.getBufferSize() - display.getRows());
+d333 11
+a343 10
+		if(osn.equals("Windows 95"))
+		  sb.setValues(display.getWindowBase(), 
+			       display.getRows(), 
+			       0, 
+			       display.getBufferSize()); 
+		else
+		   sb.setValues(display.getWindowBase(), 
+				display.getRows(), 
+				0, 
+				display.getBufferSize() - display.getRows());
+@
+
+
+1.10
+log
+@removed more debugging output (enclosed in if(debug > 0))
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.9 1996/07/02 17:33:10 leo Exp leo $
+ * $timestamp: Wed Jul  3 10:04:16 1996 by Matthias L. Jugel :$
+d41 1
+a41 1
+ * @@version $Id: vt320.java,v 1.9 1996/07/02 17:33:10 leo Exp leo $
+d46 3
+a48 2
+  	/* Scrollbar on the left side */
+ 	private Scrollbar sb = new Scrollbar(Scrollbar.VERTICAL);
+d105 3
+d129 1
+a129 1
+	  boolean scrb = false;
+d137 1
+a137 2
+	    scrb = (((Applet)parent).getParameter("VTscrollbar")
+		 + "").equals("true");
+a152 2
+	  sb.setValues(display.getBufferSize() - display.getRows(), 
+		       display.getRows(), 0, display.getBufferSize());
+d154 20
+a173 1
+	  if(scrb) add("West", sb);
+d232 10
+d317 10
+a326 2
+		sb.setValues(display.getWindowBase(), display.getRows(), 
+			     0, display.getBufferSize());
+d332 10
+a341 2
+		sb.setValues(display.getWindowBase(), display.getRows(), 
+			     0, display.getBufferSize());
+@
+
+
+1.9
+log
+@added VTresize parameter
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.16 1996/04/03 14:21:11 msmeissn Exp leo $
+ * $timestamp: Tue Jul  2 19:31:22 1996 by Matthias L. Jugel :$
+d41 1
+a41 1
+ * @@version $Id: vt320.java,v 1.16 1996/04/03 14:21:11 msmeissn Exp leo $
+d665 2
+a666 1
+				System.out.println("->TSTATE_DCEQ");
+@
+
+
+1.8
+log
+@statuspeer functionality
+/.
+@
+text
+@d4 19
+a22 2
+ * $Id: vt320.java,v 1.7 1996/03/28 19:50:59 msmeissn Exp msmeissn $
+ * $timestamp: Thu Mar 28 20:26:30 1996 by Matthias L. Jugel :$
+d40 3
+a42 2
+ * @@author	Matthias L. Jugel
+ * @@version	$Id: vt320.java,v 1.7 1996/03/28 19:50:59 msmeissn Exp msmeissn $
+d50 1
+d55 4
+a58 2
+	int	attributes = 0;
+	int	insertmode = 0;
+d63 6
+d71 27
+a97 2
+	private final static int TSTATE_DCE	= 2; /* ESC [ */
+	private final static int TSTATE_DCEQ	= 3; /* ESC [? */
+d100 2
+a101 1
+	private int[]	DCEvars = new int [4]; /* enough ? */
+d111 2
+d123 1
+a123 1
+	  String width = "80", height = "24";
+d125 1
+d133 4
+d143 6
+d151 1
+a151 2
+		       display.getRows(), 0, 
+		       display.getBufferSize() - display.getRows());
+d153 1
+a153 1
+	  add("West", sb);
+d155 1
+d158 33
+d201 4
+d206 4
+a209 1
+      			display.setWindowBase(((Integer)evt.arg).intValue());
+d212 51
+d266 7
+d288 1
+a288 1
+			     0, display.getBufferSize() - display.getRows());
+d295 1
+a295 1
+			     0, display.getBufferSize() - display.getRows());
+d303 3
+d308 5
+a312 2
+		if (c>255)
+			System.out.println("char > 255:"+c);
+d316 33
+d362 1
+a362 1
+					int	nr;
+d364 2
+a365 2
+					nr = 7-(C+7)%8;
+					while (nr-->0)
+d367 2
+d370 1
+a370 1
+					while ((C+7)%8>0)
+d372 1
+d394 1
+a394 1
+				C = 0;
+d399 3
+a401 1
+					System.out.println("char: "+((int)c));
+d410 3
+d414 2
+a415 6
+					if (insertmode==1) {
+						display.insertChar(C, R, c, attributes);
+					} else {
+						display.putChar(C, R, c, attributes);
+						C++;
+					}
+d420 8
+d430 8
+d439 1
+a439 1
+				term_state = TSTATE_DCE;
+d446 18
+d465 2
+a466 1
+				if (R==bm-1)
+d471 2
+a472 1
+				System.out.println("ESC D (at "+R+" )");
+d475 15
+a489 2
+				display.insertLine(R,1,display.SCROLL_DOWN);
+				System.out.println("ESC M");
+d494 2
+d500 2
+d509 2
+d519 2
+d523 21
+a543 1
+				System.out.println("ESC unknwon letter:"+c);
+d547 1
+d563 66
+d633 19
+d653 2
+a654 1
+				System.out.println("ESC [ ? "+DCEvars[0]+" "+c);
+d659 1
+a659 1
+		case TSTATE_DCE:
+d685 29
+a714 1
+				System.out.println("ESC [ "+DCEvars[0]+" c");
+d723 2
+a724 1
+				System.out.println("ESC [ "+DCEvars[0]+" h");
+d733 2
+a734 1
+				System.out.println("ESC [ "+DCEvars[0]+" l");
+d743 2
+a744 1
+				System.out.println("ESC [ "+DCEvars[0]+" D");
+d754 2
+a755 1
+				System.out.println("ESC [ "+DCEvars[0]+" C");
+d764 2
+a765 1
+				System.out.println("ESC [ "+DCEvars[0]+" A");
+d768 9
+a776 3
+				System.out.println("ESC ["+DCEvars[0]+" ; "+DCEvars[1]+" r");
+				display.setTopMargin(DCEvars[0]-1);
+				display.setBottomMargin(DCEvars[1]-1);
+d786 12
+a797 1
+				System.out.println("ESC [ "+DCEvars[0]+";"+DCEvars[1]+" H");
+d806 2
+a807 1
+				System.out.println("ESC [ "+DCEvars[0]+" L");
+d812 3
+a814 3
+					DCEvars[0]=1;
+				R+=DCEvars[0];
+
+d820 2
+a821 1
+				System.out.println("ESC [ ... B");
+d829 2
+a830 1
+				System.out.println("ESC [ ... M");
+d834 2
+a835 2
+				System.out.println("ESC [ "+DCEvars[0]+" K");
+				System.out.println("Cursor is at C="+C+" columns="+columns);
+d839 1
+a839 1
+					if (C<columns-C-2)
+d857 1
+d861 1
+d865 1
+d868 2
+a869 1
+				System.out.println("ESC [ "+DCEvars[0]+" J");
+d874 10
+d885 3
+a887 3
+					String	tosend = ((char)ESC)+"["+R+";"+C+"R";
+					Vector vec = new Vector(2);
+					byte msg[] = new byte[tosend.length()];
+d895 2
+a896 1
+					System.out.println("ESC [ "+DCEvars[0]+" n??");
+d902 4
+a905 2
+				System.out.print("ESC [ ");
+				attributes = 0;
+d909 2
+a915 1
+						System.out.println("->BOLD");
+d942 2
+a943 1
+						attributes |= (DCEvars[i]-30)<<3;
+d953 2
+a954 1
+						attributes |= (DCEvars[i]-40)<<6;
+d961 2
+a962 1
+					System.out.print(""+DCEvars[i]+";");
+d964 2
+a965 1
+				System.out.print("m \n");
+d969 2
+a970 1
+				System.out.println("ESC [ unknwon letter:"+c);
+d979 4
+@
+
+
+1.7
+log
+@*** empty log message ***
+@
+text
+@d4 1
+a4 1
+ * $Id: vt320.java,v 1.5 1996/03/27 22:12:46 msmeissn Exp $
+d17 1
+d24 1
+a24 1
+ * @@version	$Id: vt320.java,v 1.5 1996/03/27 22:12:46 msmeissn Exp msmeissn $
+a144 1
+
+d191 2
+a192 1
+				if (c < 32) {
+a195 1
+				lastwaslf=0;
+d257 1
+d312 5
+d444 18
+d479 13
+@
+
+
+1.6
+log
+@*** empty log message ***
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.5 1996/03/27 22:12:46 msmeissn Exp msmeissn $
+ * $timestamp: Wed Mar 27 14:24:06 1996 by Matthias L. Jugel :$
+d16 1
+d101 1
+a101 1
+    		if(evt != null && evt.target == sb) {
+@
+
+
+1.5
+log
+@fixes, multiple
+@
+text
+@d4 1
+a4 1
+ * $Id: vt320.java,v 1.4 1996/03/27 13:47:39 leo Exp msmeissn $
+d22 1
+a22 1
+ * @@version	$Id: vt320.java,v 1.4 1996/03/27 13:47:39 leo Exp msmeissn $
+a169 1
+				System.out.println("\\r");
+a172 1
+				System.out.println("\\n");
+d218 3
+d223 4
+a226 1
+				display.insertLine(R,1,display.SCROLL_UP);
+d228 1
+a228 1
+				System.out.println("ESC D");
+d438 1
+a475 4
+						System.out.println(
+							"(ESC [ ... m) DCEvars[i]"+
+							DCEvars[i]
+						);
+d479 1
+d481 1
+@
+
+
+1.4
+log
+@New configuration handling (parameters).
+@
+text
+@d4 1
+a4 1
+ * $Id: vt320.java,v 1.4 1996/03/26 21:56:34 msmeissn Exp $
+d22 1
+a22 1
+ * @@version	$Id: vt320.java,v 1.4 1996/03/26 21:56:34 msmeissn Exp $
+d35 1
+d157 10
+a166 2
+				while ((C+7)%8>0)
+					display.putChar(C++,R,' ',attributes);
+d170 3
+d174 1
+d192 4
+d204 6
+a209 2
+					display.putChar(C, R, c, attributes);
+					C++;
+d222 1
+a222 1
+				display.insertLine(R);
+d227 1
+d306 27
+d338 2
+d367 9
+d408 2
+a409 1
+					display.deleteArea(0,R,C-1,1);
+a418 3
+				int	len;
+
+				len = rows;
+d421 1
+a421 1
+					display.deleteArea(0,R+1,columns,len-R);
+@
+
+
+1.3
+log
+@*** empty log message ***
+@
+text
+@d4 2
+a5 2
+ * $Id: vt320.java,v 1.2 1996/03/22 22:20:59 msmeissn Exp msmeissn $
+ * $timestamp: Fri Mar 22 12:13:28 1996 by Matthias L. Jugel :$
+d14 1
+d17 2
+d22 1
+a22 1
+ * @@version	$Id: vt320.java,v 1.2 1996/03/22 22:20:59 msmeissn Exp msmeissn $
+d28 2
+d33 1
+d48 11
+d61 2
+a62 5
+	 * @@param w width of the screen in characters
+	 * @@param h height of the screen in characters
+	 * @@param f font to be used
+	 * @@param fs font size
+	 * @@see #display.Terminal
+d64 23
+a86 8
+	public void InitializeTerminal(int w, int h, String f, int fs) {
+	  	super.InitializeTerminal(w, h, f, fs);
+    		sb.setValues(display.getBufferSize() - display.getRows(), 
+			     display.getRows(), 0, 
+			     display.getBufferSize() - display.getRows());
+		setLayout(new BorderLayout());
+    		add("West", sb);
+		add("Center", display);
+d89 4
+d99 1
+a99 1
+    		if(evt.target == sb) {
+d132 5
+d142 1
+d153 6
+d162 1
+a162 1
+				if (lastwaslf!=0 && lastwaslf!=c) 
+d165 11
+a175 4
+				if (R < display.getRows()-1)
+					R++;
+				else
+					display.insertLine(R);
+d181 1
+a181 1
+					if(R < display.getRows() - 1) 
+d201 1
+a201 1
+				display.insertLine(display.getRows()-1);
+d209 21
+d255 1
+a255 1
+				System.out.println("ESC [ ? unknown letter:"+c);
+d301 6
+a316 1
+				int	rows = display.getRows();
+a338 2
+				int	columns;
+
+d340 1
+a340 2
+				System.out.println("Cursor is at C="+C);
+				columns = display.getColumns();
+d344 2
+a345 2
+					if (C<columns-1)
+						display.deleteArea(C+1,R,columns-C-2,1);
+d360 1
+a360 1
+				len = display.getRows();
+d363 1
+a363 1
+					display.deleteArea(0,R+1,display.getColumns(),len-R);
+d366 1
+a366 1
+					display.deleteArea(0,0,display.getColumns(),R-1);
+d369 1
+a369 1
+					display.deleteArea(0,0,display.getColumns(),display.getRows());
+d372 1
+@
+
+
+1.2
+log
+@*** empty log message ***
+@
+text
+@d4 1
+a4 1
+ * $Id: vt320.java,v 1.1 1996/03/22 12:15:41 msmeissn Exp msmeissn $
+d19 1
+a19 1
+ * @@version	$Id: vt320.java,v 1.1 1996/03/22 12:15:41 msmeissn Exp msmeissn $
+d100 2
+d151 1
+d153 4
+d212 4
+a215 1
+				C++;
+d217 1
+d219 9
+d230 1
+a230 1
+				R = DCEvars[0];
+d233 1
+d235 1
+d249 1
+d251 9
+d263 2
+d270 1
+a270 1
+						display.deleteArea(C+1,R,columns-C-2,0);
+d273 1
+a273 1
+					display.deleteArea(0,R,C-1,0);
+d276 1
+a276 1
+					display.deleteArea(0,R,columns,0);
+d303 2
+d338 1
+a338 1
+							"(ESC [ ... H) DCEvars[i]"+
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d4 1
+a4 1
+ * $Id: Terminal.java,v 1.6 1996/03/21 15:56:48 leo Exp leo $
+d19 1
+a19 1
+ * @@version	$Id$
+d36 1
+a105 1
+				System.out.println("->TS_ESC");
+a141 1
+				System.out.println("->TS_DCE");
+d146 4
+d151 1
+a151 1
+				System.out.println("->TS_DATA");
+d156 24
+d182 6
+a197 3
+				System.out.println("DCEvars[DCEvar] = "+
+					DCEvars[DCEvar]+", c = "+(int)c
+				);
+a198 3
+				System.out.println("-> DCEvars[DCEvar] = "+
+					DCEvars[DCEvar]
+				);
+d204 4
+a208 1
+				System.out.println("->H("+DCEvars[0]+";"+DCEvars[1]);
+d210 27
+a236 1
+				if (DCEvar!=1)
+d238 7
+a244 3
+				C = DCEvars[0];
+				R = DCEvars[1];
+				System.out.println("->TS_DATA");
+a250 3
+				System.out.println("->J");
+				if (DCEvar<1)
+					DCEvars[0]=0;
+d254 1
+a254 2
+					for (i=R+1;i<len;i++) {
+					}
+d257 1
+d260 1
+a260 3
+					for (i=0;i<len;i++) {
+						display.deleteLine(0);
+					}
+a262 1
+				System.out.println("->TS_DATA");
+d302 1
+a302 1
+							"DCEvars[i]"+
+a308 1
+				System.out.println("->TS_DATA");
+d312 1
+a312 1
+				System.out.println("->TS_DATA");
+@

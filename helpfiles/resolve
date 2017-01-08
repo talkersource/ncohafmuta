@@ -1,0 +1,8 @@
+ Syntax:  .resolve      (it's a toggle)
+
+Results:  Resolves ip addresses into alpha hostnames in the .site listing.
+          This setting is on by default.
+
+Example:  134.48.22.24   resolves to   vinny.csd.mu.edu
+
+See also: site

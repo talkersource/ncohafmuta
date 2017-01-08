@@ -1,0 +1,21 @@
+#!/bin/csh -f
+# by Cygnus
+# cygnus@ncohafmuta.com
+#
+setenv SIG $1
+
+
+if (-e ./server.pid) then
+echo -n "Shutting down talker.."
+
+if ("$SIG" == "") then
+	kill -USR1 `cat server.pid`
+else
+	kill -$SIG `cat server.pid`
+endif
+
+echo "talker is off."
+
+else
+	echo "Cant find server.pid file! Is talker really running to begin with?"
+endif

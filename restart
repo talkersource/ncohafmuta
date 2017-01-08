@@ -1,0 +1,65 @@
+#!/bin/csh -f
+# by Cygnus
+# cygnus@ncohafmuta.com
+#
+
+setenv CONFIG $1
+
+# Set to 0 if you dont want it to try and boot the robot
+setenv BOTON 1
+
+rm -f server.pid
+
+# Link changes helpfile to CHANGES file in lib directory
+echo "Linking changes..."
+pushd helpfiles
+rm -f changes
+ln -s ../docs/CHANGES changes
+
+# Run TOP in helpfiles directory to update topics helpfile
+echo -n "Updating helpfiles list..."
+./TOP
+popd
+
+#  This next part copies over the lastcommand and syslog file to a backup,
+# so that when the talker restarts, whatever command crashed the talker
+# isn't lost. SOMEONE was rebooting the talker after a crash without
+# reading the lastcommand file to see what screwed it up (not mentioning
+# any names) JOELIE!
+
+	if (-e syslog) then
+         echo "Coping system logs to backup file..."
+	 cp syslog syslog.`/bin/date '+%m%d%y.%T'`
+	 rm syslog
+         touch syslog
+	endif
+
+	if (-e lastcommand) then
+         echo "Coping lastcommand file to backup file..."
+	 cp lastcommand lastcommand.`/bin/date '+%m%d%y.%T'`
+	endif
+
+	if (-e lib/lastlogs) then
+         echo "Removing old lastlogs..."
+         rm lib/lastlogs
+         touch lib/lastlogs
+	endif
+
+echo "Starting the talker server..."
+echo ""
+if ("$CONFIG" == "config") then
+ ./server
+else
+ ./server $CONFIG
+endif
+
+# Start the bot if BOTON is not 0
+	if ($BOTON != 0) then
+	 pushd bot
+	 echo "Starting robot.."
+         if (-e ./restart) then
+#	 ./restart
+	 endif
+	 popd
+	endif
+

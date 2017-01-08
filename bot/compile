@@ -1,0 +1,4 @@
+cp storybot storybot.old
+echo 'gcc -O3 -o storybot storybot.c'
+gcc -O3 -o storybot storybot.c
+

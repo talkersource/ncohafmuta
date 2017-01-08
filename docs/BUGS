@@ -1,0 +1,18 @@
+Everyone knows (or should know) that no REAL program has no bugs. As we
+always try to make a program technically perfect, usually it just doesn't
+happen, therefore..
+
+ Known bugs in this code
+ -----------------------
+
+1. When a remote who is done .w @<talker>, If a user tries to .quit while
+   they're in the middle of their remote .who, their connection wont
+   disconnect until the remote who finishes (I'm not great with child
+   processes so if anymore can tell or show me how to fix it or write the code
+   that fixes it, let me know)
+
+   Solution if problem occurs: Disable remote whos
+
+-Cygnus
+Anthony J. Biacco
+code@ncohafmuta.com

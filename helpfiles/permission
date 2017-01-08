@@ -1,0 +1,13 @@
+ Syntax:  .permission <add|sub> <user> <room>
+
+Results:  Gives permission or takes it away for a user to enter the
+          room you specify as <room>.
+          Used to add or delete permission from secured rooms for USER.
+          Useless if the user is not a wiz and can't teleport to ROOM.
+          If you log out of a seucre room, you will return to the sidewalk
+          upon re-entering the talker unless you have .permission for that 
+          room. This applies to users and wizes.
+
+ Example:  To give frey access to the gazebo: .permission add frey gazebo
+
+See also: go, private

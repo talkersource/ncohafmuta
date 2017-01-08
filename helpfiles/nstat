@@ -1,0 +1,9 @@
+ Syntax:  .nstat [<user>]
+
+Results:  Use this command to see how much nerf-energy and nerf-shots
+          you or another user has left.  Also will show how many people
+          you or another person has nerfed to death, and how many people
+          have nerfed you/<user>.  The last line will show how good
+          you/<user> is based on your/their stats.
+
+See also: nerf

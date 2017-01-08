@@ -1,0 +1,19 @@
+#!/bin/csh -f
+# by Cygnus
+# cygnus@ncohafmuta.com
+#
+
+
+#  This next part copies over the log file to a backup,
+
+	if (-e botlog) then
+         echo "Coping bot log to backup file..."
+	 cp botlog botlog.`/bin/date '+%m%d%y.%T'`
+	 rm botlog
+         touch botlog
+	else
+
+	endif
+
+echo "Starting the storybot..."
+./storybot

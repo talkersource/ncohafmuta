@@ -1,0 +1,61 @@
+The Java Telnet Applet
+
+Installation:
+
+1) This applet must run/reside on the same server that the talker is on.
+2) Put this whole directory structure into a directory in your main web
+   directory.
+3) Type ./configure
+4) Change in index.html..
+   * The <TITLE> </TITLE> to something other than Java Talker Connection
+   * Ditto on the words after <font size=+2>
+   * All instances of "misty.com" to THIS hostname.
+   * The port parameter's value to the port the talker runs on.
+   * The address http://misty.com:5030 to the addrress of the talker's web
+     port (this is Pinwheel's)
+
+To get the client up, try..
+ http://this_host/path_to_your_web_dir/applet_directory/index.html
+
+-Cygnus
+
+
+Authors: Matthias L. Jugel (leo@first.gmd.de)
+
+This applet is the result of our attempt to make a useful java application
+and to provide better access to the world of internet through the almost
+everywhere available Web browser.
+
+We hope you find this piece of software as useful as we do. The source code
+is publicly available under the GPL.
+
+If you encounter any problems, bugs or else don't hesitate to contact us.
+
+This distibution should contain the following files and directories:
+
+README 			- this file
+REVISION 		- contains version information about .java files
+INSTALL 		- how to install the classes
+COPYING 		- GNU General Public Licence
+BUGS 			- known bugs
+report/ 		- bug reports we are investigating
+Makefile 		- to create .class files and documentation
+
+telnet.java		- the telnet applet
+socket/TelnetIO.java 	- all telnet negotiation handling
+socket/StatusPeer.java 	- a status peer interface
+display/Terminal.java 	- an abstract terminal class
+display/CharDisplay.java- a general purpose character display
+display/vt320.java	- a VT320/ANSI emulation class using CharDisplay
+
+IOtest.java 		- an example program which works like a 
+			  script executor
+CharDisplayTest.java 	- a test class for display/CharDisplay.java
+
+tools/proxy.java 	- a simple proxy server
+
+*.html 			- various test files
+
+Documentation/ 		- documentation of the JAVA source code
+RCS/			- revision control, contains the history of 
+			  the source code

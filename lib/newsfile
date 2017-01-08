@@ -1,0 +1,39 @@
+                 Last Updated: Tue May 5 00:30:00 EDT 1998
+
+* Version 1.2.0alph-pl16
+
+New commands:
+ .revoke
+ .set webpic <url>      (sets the URL to a picture of you for your PW web
+			 page)
+New features:
+ Web port is funtional as a web server. Access to user information, pics,
+and who's online in real time and updated on-the-fly.
+http://pw.ncohafmuta.com:5030/
+ You can get to your own page directly, at:
+http://pw.ncohafmuta.com:5030/_users?search=your_user_name
+
++ Users idle for 100 minutes or more in the main room will be placed in the idle_room 
+  at wizards' discretion.
+      
+               PLEASE read the help on ALL this stuff.
+   You can now return your seats and tray tables to their upright positions
+
+
+Help Files
+~~~~~~~~~~
+New users should look at these first...
+
+.h new         - Newbie help 
+.faq           - Frequently Asked Questions
+.rules         - A guide to behavior on this talker and
+                 Stuff that protects us and you
+.h topics      - An index of ALL help topics
+.map           - A map of this talker
+
+.h wizguide    - How to be a good wizard
+.h newwiz      - File you should read when you first become a wizard.
+.h levels      - A description on the levels/ranks of PinWHeeLs
+
+.h clients     - A list of clients/programs to get on talkers and muds
+.talker        - A good list of all talkers around.

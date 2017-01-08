@@ -1,0 +1,9 @@
+ Syntax:  .nuke <user>
+
+Results:  Wipes a user from the talker. Deleted files will be the data
+          file, macros, mail, alerts, gags, and profiles. Useful if
+          you wish to .restrict a site to new users and want that alias to
+          be restricted.
+          If <user> is online, they will be killed first by .nuke.
+
+See also: expire
