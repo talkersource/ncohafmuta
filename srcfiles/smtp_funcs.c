@@ -230,12 +230,12 @@ if (type != 4) {
  else if (type==1) {
   fgets(t_mess,256,miscconn[user].fd);
   t_mess[strlen(t_mess)-1]=0;
-  sprintf(mess,"MAIL FROM: %s\r\n",t_mess);
+  sprintf(mess,"MAIL FROM: <%s>\r\n",t_mess);
  } /* if type 1 */
  else if (type==2) {
   fgets(t_mess,256,miscconn[user].fd);
   t_mess[strlen(t_mess)-1]=0;
-  sprintf(mess,"RCPT TO: %s\r\n",t_mess);
+  sprintf(mess,"RCPT TO: <%s>\r\n",t_mess);
  } /* if type 2 */
  else if (type==3) {
   sprintf(mess,"DATA\r\n");

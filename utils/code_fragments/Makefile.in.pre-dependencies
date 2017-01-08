@@ -1,7 +1,7 @@
 #####          YOU SHOULD NOT NEED TO EDIT ANYTHING AFTER THIS LINE  #####
 ##########################################################################
 # Temp sub-directory that will be made for "make dist" processing
-DIST-DIR	= ncohafmuta-1.4.1
+DIST-DIR	= ncohafmuta-1.4.0
 
 # The directory where the exectuable,
 # and all other main files/dirs lie
@@ -49,27 +49,31 @@ RES_OFILES    = $(OBJDIR)/resolver_clipon.o
 #
 #.SUFFIXES: .c .o
 
-all:   		make_line make_server make_res
+all:   		make_server make_res
 		@echo '-----------------------------------------------------------------------------'
+		@echo 'If you changed .h files, do: make objclean before make to force recompile of all objects'
 		@echo ''
 		@echo 'Made all'
 
-test:		make_line make_testserver make_res
+test:		make_testserver make_res
 		@echo '-----------------------------------------------------------------------------'
+		@echo 'If you changed .h files, do: make objclean before make to force recompile of all objects'
 		@echo ''
 		@echo 'Made test binary'
 
-$(SERVBIN):	make_line make_server make_res
+$(SERVBIN): make_server make_res
 		@echo '-----------------------------------------------------------------------------'
+		@echo 'If you changed .h files, do: make objclean before make to force recompile of all objects'
 		@echo ''
 		@echo 'Made $(SERVBIN)'
 
-$(TESTBIN):	make_line make_testserver make_res
+$(TESTBIN): make_testserver make_res
 		@echo '-----------------------------------------------------------------------------'
+		@echo 'If you changed .h files, do: make objclean before make to force recompile of all objects'
 		@echo ''
 		@echo 'Made $(TESTBIN)'
 
-$(RESBIN):	make_line make_res
+$(RESBIN): make_res
 		@echo '-----------------------------------------------------------------------------'
 		@echo ''
 		@echo 'Made $(RESBIN)'
@@ -86,14 +90,24 @@ make_res: $(RES_OFILES) Makefile
 	  $(CC) $(CFLAGS) $(HDRS) -o $(RESBIN) $(RES_OFILES) $(LIBS)
 	  chmod 700 $(RESBIN)
 
-make_line:
-	@echo '-----------------------------------------------------------------------------'
+########## OLD STUFF
+#.c.o:
+#	$(CC) $(CFLAGS) $(HDRS) $(SRCDIR)/$(*F).c -o $@
+### WORKS
+##.c.o:
+##	$(CC) $(CFLAGS) $(HDRS) -c $(SRCDIR)/$(*F).c -o $@
+#
+#$(OFILES) $(RES_OFILES):
+#	$(CC) $(CFLAGS) $(HDRS) -c $(SRCDIR)/$(*F).c -o $@
+#$(CFILES):
+#$(RES_CFILES):
+########## END OLD STUFF
 
 clean:	objclean
 	rm -f $(SERVBIN) $(TESTBIN) $(RESBIN) core config.log
 
 distclean:	clean smtpclean logclean
-	rm -f $(HDRDIR)/config.h	
+	rm -f hdrfiles/config.h	
 	rm -f junk/*
 	rm -f Makefile
 
@@ -129,16 +143,16 @@ mkdist:
 	mkdir -m 700 $(DIST-DIR)/tzinfo
 	mkdir -m 700 $(DIST-DIR)/docs
 	mkdir -m 700 $(DIST-DIR)/logfiles
-	mkdir -m 700 $(DIST-DIR)/$(SRCDIR)
-	mkdir -m 700 $(DIST-DIR)/$(HDRDIR)
-	mkdir -m 700 $(DIST-DIR)/$(OBJDIR)
+	mkdir -m 700 $(DIST-DIR)/srcfiles
+	mkdir -m 700 $(DIST-DIR)/hdrfiles
+	mkdir -m 700 $(DIST-DIR)/objfiles
 	mkdir -m 700 $(DIST-DIR)/junk ;\
-	cp -r $(MAIN-DIR)/$(SRCDIR)/* $(DIST-DIR)/$(SRCDIR)
-	cp -r $(MAIN-DIR)/$(HDRDIR)/* $(DIST-DIR)/$(HDRDIR)
-	rm -fr $(DIST-DIR)/$(SRCDIR)/old
-	rm -fr $(DIST-DIR)/$(SRCDIR)/newold
-	rm -f $(DIST-DIR)/$(SRCDIR)/*.old
-	rm -f $(DIST-DIR)/$(HDRDIR)/config.h
+	cp -r $(MAIN-DIR)/srcfiles/* $(DIST-DIR)/srcfiles
+	cp -r $(MAIN-DIR)/hdrfiles/* $(DIST-DIR)/hdrfiles
+	rm -fr $(DIST-DIR)/srcfiles/old
+	rm -fr $(DIST-DIR)/srcfiles/newold
+	rm -f $(DIST-DIR)/srcfiles/*.old
+	rm -f $(DIST-DIR)/hdrfiles/config.h
 	cp $(MAIN-DIR)/restart $(DIST-DIR)/
 	cp $(MAIN-DIR)/shutdown $(DIST-DIR)/
 	cp $(MAIN-DIR)/Makefile.in $(DIST-DIR)/
@@ -412,129 +426,64 @@ love:
 
 # DO NOT REMOVE THIS LINE OR CHANGE ANYTHING AFTER IT	#
 # UNLESS YOU ADD MORE C FILES TO COMPILE IN		#
-$(OBJDIR)/authuser_funcs.o: $(SRCDIR)/authuser_funcs.c \
- $(HDRDIR)/authuser.h $(HDRDIR)/constants.h $(HDRDIR)/includes.h \
- $(HDRDIR)/netdb.h $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h \
- $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/authuser_funcs.o -c $(SRCDIR)/authuser_funcs.c
-$(OBJDIR)/check_funcs.o: $(SRCDIR)/check_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/check_funcs.o -c $(SRCDIR)/check_funcs.c
-$(OBJDIR)/comm_cmds.o: $(SRCDIR)/comm_cmds.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/comm_cmds.o -c $(SRCDIR)/comm_cmds.c
-$(OBJDIR)/command_funcs.o: $(SRCDIR)/command_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/command_funcs.o -c $(SRCDIR)/command_funcs.c
-$(OBJDIR)/datautil_funcs.o: $(SRCDIR)/datautil_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/datautil_funcs.o -c $(SRCDIR)/datautil_funcs.c
-$(OBJDIR)/everify_funcs.o: $(SRCDIR)/everify_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/everify_funcs.o -c $(SRCDIR)/everify_funcs.c
-$(OBJDIR)/fileutil_funcs.o: $(SRCDIR)/fileutil_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/fileutil_funcs.o -c $(SRCDIR)/fileutil_funcs.c
-$(OBJDIR)/game_funcs.o: $(SRCDIR)/game_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/text.h \
- $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/game_funcs.o -c $(SRCDIR)/game_funcs.c
-$(OBJDIR)/get_funcs.o: $(SRCDIR)/get_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/get_funcs.o -c $(SRCDIR)/get_funcs.c
-$(OBJDIR)/login_funcs.o: $(SRCDIR)/login_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/login_funcs.o -c $(SRCDIR)/login_funcs.c
-$(OBJDIR)/main.o: $(HDRDIR)/constants.h \
- $(HDRDIR)/includes.h $(HDRDIR)/netdb.h $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h \
- $(HDRDIR)/resolver_clipon.h $(HDRDIR)/config.h
+$(OBJDIR)/main.o: $(SRCDIR)/main.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/main.o -c $(SRCDIR)/main.c
-$(OBJDIR)/misc_funcs.o: $(SRCDIR)/misc_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/authuser_funcs.o: $(SRCDIR)/authuser_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/authuser_funcs.o -c $(SRCDIR)/authuser_funcs.c
+$(OBJDIR)/check_funcs.o: $(SRCDIR)/check_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/check_funcs.o -c $(SRCDIR)/check_funcs.c
+$(OBJDIR)/everify_funcs.o: $(SRCDIR)/everify_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/everify_funcs.o -c $(SRCDIR)/everify_funcs.c
+$(OBJDIR)/command_funcs.o: $(SRCDIR)/command_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/command_funcs.o -c $(SRCDIR)/command_funcs.c
+$(OBJDIR)/fileutil_funcs.o: $(SRCDIR)/fileutil_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/fileutil_funcs.o -c $(SRCDIR)/fileutil_funcs.c
+$(OBJDIR)/game_funcs.o: $(SRCDIR)/game_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/game_funcs.o -c $(SRCDIR)/game_funcs.c
+$(OBJDIR)/get_funcs.o: $(SRCDIR)/get_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/get_funcs.o -c $(SRCDIR)/get_funcs.c
+$(OBJDIR)/login_funcs.o: $(SRCDIR)/login_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/login_funcs.o -c $(SRCDIR)/login_funcs.c
+$(OBJDIR)/misc_funcs.o: $(SRCDIR)/misc_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/misc_funcs.o -c $(SRCDIR)/misc_funcs.c
-$(OBJDIR)/resolve_funcs.o: $(SRCDIR)/resolve_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/resolve_funcs.o: $(SRCDIR)/resolve_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/resolve_funcs.o -c $(SRCDIR)/resolve_funcs.c
-$(OBJDIR)/resolver_client.o: $(SRCDIR)/resolver_client.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/resolver_clipon.h \
- $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/resolver_client.o -c $(SRCDIR)/resolver_client.c
-$(OBJDIR)/resolver_clipon.o: $(SRCDIR)/resolver_clipon.c \
- $(HDRDIR)/includes.h $(HDRDIR)/nameser.h $(HDRDIR)/netdb.h $(HDRDIR)/osdefs.h \
- $(HDRDIR)/resolv.h $(HDRDIR)/resolver_clipon.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/resolver_clipon.o -c $(SRCDIR)/resolver_clipon.c
-$(OBJDIR)/restrict_funcs.o: $(SRCDIR)/restrict_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/restrict_funcs.o: $(SRCDIR)/restrict_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/restrict_funcs.o -c $(SRCDIR)/restrict_funcs.c
-$(OBJDIR)/room_cmds.o: $(SRCDIR)/room_cmds.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/room_cmds.o -c $(SRCDIR)/room_cmds.c
-$(OBJDIR)/rwho_funcs.o: $(SRCDIR)/rwho_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/rwho_funcs.o: $(SRCDIR)/rwho_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/rwho_funcs.o -c $(SRCDIR)/rwho_funcs.c
-$(OBJDIR)/server.o: $(SRCDIR)/server.c \
- $(HDRDIR)/authuser.h \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/resolver_clipon.h \
- $(HDRDIR)/text.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/server.o -c $(SRCDIR)/server.c
-$(OBJDIR)/set_funcs.o: $(SRCDIR)/set_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/set_funcs.o -c $(SRCDIR)/set_funcs.c
-$(OBJDIR)/signal_funcs.o: $(SRCDIR)/signal_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/signal_funcs.o -c $(SRCDIR)/signal_funcs.c
-$(OBJDIR)/smtp_funcs.o: $(SRCDIR)/smtp_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/smtp_funcs.o: $(SRCDIR)/smtp_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/smtp_funcs.o -c $(SRCDIR)/smtp_funcs.c
-$(OBJDIR)/snprintf_funcs.o: $(SRCDIR)/snprintf_funcs.c \
- $(HDRDIR)/includes.h $(HDRDIR)/netdb.h $(HDRDIR)/snprintf.h \
- $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/snprintf_funcs.o -c $(SRCDIR)/snprintf_funcs.c
-$(OBJDIR)/social_funcs.o: $(SRCDIR)/social_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/social_funcs.o: $(SRCDIR)/social_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/social_funcs.o -c $(SRCDIR)/social_funcs.c
-$(OBJDIR)/socket_funcs.o: $(SRCDIR)/socket_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/resolver_clipon.h \
- $(HDRDIR)/config.h
+$(OBJDIR)/socket_funcs.o: $(SRCDIR)/socket_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/socket_funcs.o -c $(SRCDIR)/socket_funcs.c
-$(OBJDIR)/strutil_funcs.o: $(SRCDIR)/strutil_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/snprintf_funcs.o: $(SRCDIR)/snprintf_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/snprintf_funcs.o -c $(SRCDIR)/snprintf_funcs.c
+$(OBJDIR)/strutil_funcs.o: $(SRCDIR)/strutil_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/strutil_funcs.o -c $(SRCDIR)/strutil_funcs.c
-$(OBJDIR)/telopt_funcs.o: $(SRCDIR)/telopt_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/telopt_funcs.o -c $(SRCDIR)/telopt_funcs.c
-$(OBJDIR)/userutil_funcs.o: $(SRCDIR)/userutil_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/userutil_funcs.o: $(SRCDIR)/userutil_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/userutil_funcs.o -c $(SRCDIR)/userutil_funcs.c
-$(OBJDIR)/whowww_funcs.o: $(SRCDIR)/whowww_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
-	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/whowww_funcs.o -c $(SRCDIR)/whowww_funcs.c
-$(OBJDIR)/write_funcs.o: $(SRCDIR)/write_funcs.c \
- $(HDRDIR)/constants.h $(HDRDIR)/includes.h $(HDRDIR)/netdb.h \
- $(HDRDIR)/osdefs.h $(HDRDIR)/protos.h $(HDRDIR)/config.h
+$(OBJDIR)/write_funcs.o: $(SRCDIR)/write_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/write_funcs.o -c $(SRCDIR)/write_funcs.c
+$(OBJDIR)/comm_cmds.o: $(SRCDIR)/comm_cmds.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/comm_cmds.o -c $(SRCDIR)/comm_cmds.c
+$(OBJDIR)/room_cmds.o: $(SRCDIR)/room_cmds.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/room_cmds.o -c $(SRCDIR)/room_cmds.c
+$(OBJDIR)/server.o: $(SRCDIR)/server.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/server.o -c $(SRCDIR)/server.c
+$(OBJDIR)/signal_funcs.o: $(SRCDIR)/signal_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/signal_funcs.o -c $(SRCDIR)/signal_funcs.c
+$(OBJDIR)/datautil_funcs.o: $(SRCDIR)/datautil_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/datautil_funcs.o -c $(SRCDIR)/datautil_funcs.c
+$(OBJDIR)/telopt_funcs.o: $(SRCDIR)/telopt_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/telopt_funcs.o -c $(SRCDIR)/telopt_funcs.c
+$(OBJDIR)/whowww_funcs.o: $(SRCDIR)/whowww_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/whowww_funcs.o -c $(SRCDIR)/whowww_funcs.c
+$(OBJDIR)/set_funcs.o: $(SRCDIR)/set_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/set_funcs.o -c $(SRCDIR)/set_funcs.c
+$(OBJDIR)/resolver_client.o: $(SRCDIR)/resolver_client.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/resolver_client.o -c $(SRCDIR)/resolver_client.c
+$(OBJDIR)/resolver_clipon.o: $(SRCDIR)/resolver_clipon.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/resolver_clipon.o -c $(SRCDIR)/resolver_clipon.c
+

@@ -1,5 +1,5 @@
 ##########################################################################
-##  Makefile for Ncohafmuta 1.2.0 utilities  by: Cygnus                 ## 
+##  Makefile for Ncohafmuta 1.4.x utilities  by: Cygnus                 ## 
 ##                                         Last modified: Apr 12,1997   ##
 ##########################################################################
 

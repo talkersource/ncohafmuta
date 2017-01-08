@@ -5,6 +5,20 @@ cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
+ 03/15/04 1.4.1
+* Fixed glitch with resetting autoforward limits at midnight, where if 
+  a user was online when the reset was done, their limit wouldn't get reset 
+  back to 0
+* Updated SMTP delivery from and to envelopes to use <> enclosers as per RFC
+* Added header file depends to Makefile.in, so make knows to recompile objects 
+  when a .h file changes (don't need to do a "make objclean" now, if you just
+  change a .h file). Also cleaned up file a bit.
+* Updated docs/smtp_handling.txt explaining SMTP error/failure/success
+  codes and command-reply sequences
+
+ 11/05/03 1.5.0 (new development version)
+* Version 1.4.0 copied to start version 1.5.0. No code release.
+
  11/05/03 1.4.0
 * Updated README.windows with info for getting a small, free mail server 
   for sending/forwarding mail out from the talker.

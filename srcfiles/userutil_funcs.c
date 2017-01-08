@@ -198,9 +198,24 @@ add=0;
 
 i=0;
 a=0;
+    /*---------------------------------------------------------*/
+    /* PART 3 - Save data                                      */
+    /*---------------------------------------------------------*/
+        if ((a = get_user_num_exact(t_ustr.name,-1)) != -1) {
+                write_log(DEBUGLOG,YESTIME,"USERFORS: Reset %s's automsgs to 0 (online)\n",ustr[a].name);
+                ustr[a].automsgs = t_ustr.automsgs;
+                while (strlen(t_ustr.custAbbrs[i].com) > 1) {
+                        strcpy(ustr[a].custAbbrs[i].abbr,t_ustr.custAbbrs[i].abbr);
+                        strcpy(ustr[a].custAbbrs[i].com,t_ustr.custAbbrs[i].com);
+                        i++;
+                }
+                i=0;
+                a=0;
+        }
+
         write_user(small_buffer);
         } /* end of else */
-   }
+   } /* while */
 
 if (changed)
  write_log(SYSTEMLOG,YESTIME,"Re-evaluated user abbreviations\n");

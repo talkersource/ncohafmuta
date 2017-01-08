@@ -6,7 +6,7 @@ setenv BFILE backup.tar
 setenv BACKUPDRIVE backupd
 
 echo /--------------------------------------/
-echo / Ncohafmuta 1.4.0 Data Backup Utility /
+echo / Ncohafmuta 1.4.x Data Backup Utility /
 echo /--------------------------------------/
 
 if (-e $BFILE) then

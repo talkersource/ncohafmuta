@@ -36,12 +36,12 @@
 /*                                                      -Cygnus         */
 /*----------------------------------------------------------------------*/
 
-/* last modified: Oct 5th, 2003  Cygnus */
+/* last modified: Mar 15th, 2004  Cygnus */
 
 #ifndef _CONSTANTS_H
 #define _CONSTANTS_H
 
-#define VERSION  "Ncohafmuta 1.4.0 by Cygnus"
+#define VERSION  "Ncohafmuta 1.4.1 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
@@ -125,17 +125,19 @@
 /*------------------------------------------------*/
 /* Password encryption key                        */
 /*                                                */
-/* You should NOT need to change this at all!     */
+/* This is used to encrypt user passwords         */
+/*                                                */
+/* YOU MIGHT WANT TO CHANGE lock[] TO SOMETHING   */
+/* UNIQUE BEFORE ANY USERS GET CREATED            */
 /*                                                */
 /* WARNING: Never change this once you have users */
-/*          it is used to encrypt the passwords   */
-/*          and if you change it they will not be */
-/*          able to get back in                   */
+/*          created, because if you change it,    */
+/*          they will not be able to log back in! */
 /*------------------------------------------------*/
 
 #ifdef _DEFINING_CONSTANTS
-int lock[]={'D','E','E','P','L','O','C','K'};  /* 8 chars */
-int num_locks=8;                                       
+int lock[]={'D','E','E','P','L','O','C','K'};  /* 8 characters */
+int num_locks=8; /* set this to the number of characters in lock[] */
 #else
 extern int lock[];
 extern int num_locks;
