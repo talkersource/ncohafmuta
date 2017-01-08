@@ -264,29 +264,27 @@ if (mode==0) {
 
                 strcpy(astring, ustr[user].char_buffer);
                 buff_size = strlen(astring);
-                ustr[user].char_buffer_size = 0;
-
-                if ((astring[0] == '\012') && (ustr[user].logging_in)
-		    && (ustr[user].logging_in < 11)) return -5;
-
-                /*----------------------------------------------------*/
-                /* some nice users were doing some things that would  */
-                /* intentionally kill the system.  This should trap   */
-                /* that and report such incidents.                    */
-                /*----------------------------------------------------*/
-                
-                if (buff_size > 8000)
-                  {
-                    write_log(WARNLOG,YESTIME,"HACK flood from site %21.21s possibly as %s\n",
-                                  ustr[user].site,
-                                  ustr[user].say_name);
-                    sprintf(mess,"%s HACK flood from site %21.21s possibly as %s\n",
+		if ((FLOOD_INPUT_LIMIT > 0) && (ustr[user].bytes_read != -1))
+			ustr[user].bytes_read += buff_size;
+		if ((FLOOD_INPUT_LIMIT > 0) && (ustr[user].bytes_read >= FLOOD_INPUT_LIMIT)) {
+			/*---------------------------------------------------*/
+			/* some nice users were doing some things that would */
+			/* intentionally hurt the system.  This should trap  */
+			/* that and report such incidents.                   */
+			/* Auto-restrict only happens on login floods, other */
+			/* -wise it's a 1-minute suspension, with disconnec  */
+			/* -tion if it happens again.			     */
+			/*---------------------------------------------------*/
+			ustr[user].bytes_read = -1;
+			write_log(WARNLOG,YESTIME,"HACK flood from site %21.21s possibly as %s\n",
+				ustr[user].site, ustr[user].say_name);
+			sprintf(mess,"%s HACK flood from site %21.21s possibly as %s\n",
                                   STAFF_PREFIX,ustr[user].site,
                                   strip_color(ustr[user].say_name));
-                    writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0); 
-                    
-                    if (ustr[user].logging_in)
-                      {
+			writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0); 
+
+                      if (ustr[user].logging_in)
+                       {
                         write_str(user,"----------------------------------------------------------------");
                         write_str(user,"Notice:  You are attempting to use this computer system in a way");
                         write_str(user,"         which is considered a crime under United States federal");
@@ -303,26 +301,29 @@ if (mode==0) {
 
                         user_quit(user,1);
                         return -6;
-                       }
+                       } /* logging_in if */
                       else
                        {
                         if (ustr[user].locked == 0)
                           {
-                           write_str(user,"Notice: Buffer data has been lost. ");
-                           write_str(user,"        Further lose of data will result in connection termination.");
+                           write_str(user,"NOTICE: Data has been lost due to excessive input - flood protection.");
+                           write_str(user,"        Further loss of data will result in connection termination.");
                            ustr[user].locked = 1;
                            return -3;
                           }
                          else
                           {
-                           write_str(user,"Notice: Connection terminated due to loss of data.\n");
+                           write_str(user,"NOTICE: Connection terminated due to excessive input.");
                            user_quit(user,1);
                            return -6;
                           }
+                       } /* logging_in else */
+		} /* FLOOD_INPUT_LIMIT if */
 
-                       }
+                ustr[user].char_buffer_size = 0;
 
-                  } /* end of if buff size */
+                if ((astring[0] == '\012') && (ustr[user].logging_in)
+		    && (ustr[user].logging_in < 11)) return -5;
 
 } /* end of if mode USER */
 else if (mode==1 || mode==2) {
@@ -521,7 +522,7 @@ else if (mode==2) {
                 /* that and report such incidents.                    */
                 /*----------------------------------------------------*/
                 
-                if (buff_size > 8000)
+                if ((FLOOD_INPUT_LIMIT > 0) && (buff_size > FLOOD_INPUT_LIMIT))
                   {
                     write_log(WARNLOG,YESTIME,"%s HACK flood from site %21.21s\n",
                                   mode==1?"WWW":"RWHO",mode==1?wwwport[user].site:miscconn[user].site);

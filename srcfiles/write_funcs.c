@@ -664,10 +664,10 @@ strncpy(logfile,z_mess,FILE_NAME_LEN);
     va_start(args,str);
     if (wanttime) {
     sprintf(z_mess,"%s: ",get_time(0,0));
-    vsprintf(z_mess+strlen(z_mess),str,args);
+    vsnprintf(z_mess+strlen(z_mess),sizeof(z_mess)-strlen(z_mess),str,args);
     }
     else
-    vsprintf(z_mess,str,args);
+    vsnprintf(z_mess,sizeof(z_mess),str,args);
 
     va_end(args);
     strcpy(z_mess, strip_color(z_mess));
@@ -1108,6 +1108,12 @@ if (length==-1) length = strlen(queue_str);
 #if defined(QWRITE_DEBUG)
 write_log(DEBUGLOG,NOTIME,"QW : Want to write %d chars to buffer\n",length);
 #endif
+if ((FLOOD_OUTPUT_LIMIT > 0) && (ustr[user].alloced_size > FLOOD_OUTPUT_LIMIT)) {
+#if defined(QWRITE_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QW : Failed data realloc. User at queue limit - flood protection\n");
+#endif
+	return;
+}
 if (ustr[user].alloced_size) {
 #if defined(QWRITE_DEBUG)
 	write_log(DEBUGLOG,NOTIME,"QW : reallocing data of current size %d (malloced: %d)\n",strlen(ustr[user].output_data),ustr[user].alloced_size);

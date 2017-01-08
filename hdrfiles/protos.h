@@ -240,6 +240,7 @@ void command_disabled(int user);
 void print_dir(int user, char *inpstr, char *s_search);
 void check_shut(void);
 void check_idle(void);
+void check_flood_limits(void);
 void atmospherics(void);
 void write_area(int area, char *inpstr);
 void write_meter(int mode);

@@ -4,16 +4,21 @@ Nate reports successful compilation and running on OS/2 using the EMX
 emulator with gcc 1.2. He also reports successful running on NT using the
 OS/2 binary (as long as you compile with EMX with the -v1 switch)
 
-Cygnus Win32 GCC (http://sources.redhat.com/cygwin): (TESTED AND RECOMMENDED)
-  * Works with latest version of cygwin.
-  * In the setup program, download AT LEAST the following packages:
-    (you may skip all the rest by clicking on the package version, which
-     will change the selection to 'Skip')
+Cygwin/Cygnus Win32 GCC: (TESTED AND RECOMMENDED)
+  * Cygwin provides a unix-like environment on Windows OSes for compiling 
+    and running apps. 
+  * Works with latest version of cygwin. 
+  * Download the setup program from http://sources.redhat.com/cygwin 
+  * Run the the setup program. 
+  * In the setup program, pick 'Install from Internet', then download AT 
+    LEAST the following packages: (you may skip all the rest by clicking on 
+    the package name)
     ash, autoconf, automake, bash, binutils, byacc, bzip2, clear, cygwin, 
-    fileutils, gawk, gcc, grep, gzip, login, make, sed, sh-utils, tar, 
-    textutils, w32api
-    (or just download all of the packages in the Base and Devel categories 
-     (click on 'Default' to 'Install'))
+    fileutils, gawk, gcc, grep, gzip, inetutils, login, make, more, mt, sed, 
+    sh-utils, tar, textutils, w32api, wget 
+  * The Cygwin bash shell program will be put in a Program Group for you 
+    to run from your Start menu. 
+  * Now follow unix configuring and compiling info.
   * See caveats below.
 For Borland C++ v4.5 and v5.0: (NOT TESTED)
   * Load the file into the IDE and select WIN32 Console app, static
@@ -23,7 +28,7 @@ Microsoft: (NOT TESTED)
 
 ***** END OF WINDOWS COMPILING INFO *****
 
-Running on Cygwin has the following additional functional disadvantages:
+Running on Cygwin has the following functional disadvantages:
 
 * MUST use SMTP option for external/forwarding email (see MAILPROG variable
   in hdrfiles/constants.h). If you can call that a disadvantage *shrug*
@@ -31,9 +36,9 @@ Running on Cygwin has the following additional functional disadvantages:
   server to use with ncohafmuta, download SMarTPost from: 
   http://www.freddys-utilities.co.uk/smtp/index.php
   and then set your MAILPROG variable to 127.0.0.1:25
-* soft-rebooting kills all talker network sockets, so does NOT work. Jazzin
-  reports though, that on WinXP it DOES work, so it may be dependent on the
-  windows platform and cygwin version.
+* On older cygwin versions, soft-rebooting kills all talker network 
+  sockets, so does not work. Make sure you're using the latest from the 
+  Cygwin homepage.
 
 Running on a Windows OS (NOT CYGWIN - i.e. Borland, Visual C++) has the 
 following functional disadvantages:

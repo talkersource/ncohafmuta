@@ -668,6 +668,8 @@ LOOP_FOREVER
 	   /* If a connection exists, add the online users socket */
 	   /* to the read mask set                                */
 	    if (ustr[user].sock != -1) {
+	     /* bytes_read == -1 is user suspension by flood protection */
+	     if (ustr[user].bytes_read != -1)
              FD_SET(ustr[user].sock,&readmask);
              if (ustr[user].alloced_size)
              FD_SET(ustr[user].sock,&writemask);

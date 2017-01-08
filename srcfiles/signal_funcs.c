@@ -176,6 +176,7 @@ RETSIGTYPE sigcall(int sig)
 		if (num_of_users)
 		{
 			check_idle();
+			check_flood_limits();
 		}
 
 		if (LOGIN_LIMITING)

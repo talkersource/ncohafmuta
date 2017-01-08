@@ -3943,25 +3943,29 @@ if (!strlen(inpstr)) {
 else {
 
 if (!strcmp(inpstr,"-l") || !strcmp(inpstr,"-s")) {
-write_str(user,"+---------------------------------------------------------------------------+");
+ write_str(user,"+---------------------------------------------------------------------------+");
+ if (!strlen(FORTPROG)) {
+  write_str(user,"The talker's fortune feature is not enabled.");
+ }
+ else {
    if (!strcmp(inpstr,"-l"))
     sprintf(t_mess,"%s 2> /dev/null",FORTPROG);
    else if (!strcmp(inpstr,"-s"))
     sprintf(t_mess,"%s -s 2> /dev/null",FORTPROG);
 
- if (!(pp=popen(t_mess,"r"))) {
+   if (!(pp=popen(t_mess,"r"))) {
         write_str(user,"No quote.");
         return;
         }
-while (fgets(line,256,pp) != NULL) {
+   while (fgets(line,256,pp) != NULL) {
         line[strlen(line)-1]=0;
         write_str(user,line);
       } /* end of while */
-pclose(pp);
-
-write_str(user,"+---------------------------------------------------------------------------+");
+   pclose(pp);
  }
- else write_str(user,"Option not understood.");
+ write_str(user,"+---------------------------------------------------------------------------+");
+}
+else write_str(user,"Option not understood.");
 
  } /* end of else */
 
@@ -9043,6 +9047,7 @@ tot_mem=
 	+2 /* anchor_time */
 	+2 /* promote */
 	+2 /* tempsuper */
+	+2 /* bytes_read */
 	+strlen(t_ustr.home_room)
 	+strlen(t_ustr.webpic)
 	+strlen(t_ustr.afkmsg)
@@ -9245,7 +9250,8 @@ if (tmpConv != NULL) {
 	+MY_SIZE(ustr[u].temp_buffer,mode)
 	+2 /* tempnum1 */
 	+2 /* term_type */
-	+MY_SIZE(ustr[u].prev_term_type,mode);
+	+MY_SIZE(ustr[u].prev_term_type,mode)
+	+2; /* bytes_read */
 
        if (ustr[u].pro_enter)
          userm += (82*PRO_LINES);
@@ -15743,6 +15749,7 @@ ustr[user].miscnum4       =t_ustr.miscnum4;
 ustr[user].miscnum5       =t_ustr.miscnum5;
 ustr[user].tempnum1       =t_ustr.tempnum1;
 ustr[user].term_type      =t_ustr.term_type;
+ustr[user].bytes_read     =t_ustr.bytes_read;
 strcpy(ustr[user].icq,t_ustr.icq);
 strcpy(ustr[user].miscstr1,t_ustr.miscstr1);
 strcpy(ustr[user].miscstr2,t_ustr.miscstr2);
@@ -15887,6 +15894,7 @@ t_ustr.miscnum4        =ustr[user].miscnum4;
 t_ustr.miscnum5        =ustr[user].miscnum5;
 t_ustr.tempnum1        =ustr[user].tempnum1;
 t_ustr.term_type       =ustr[user].term_type;
+t_ustr.bytes_read      =ustr[user].bytes_read;
 strcpy(t_ustr.icq,ustr[user].icq);
 strcpy(t_ustr.miscstr1,ustr[user].miscstr1);
 strcpy(t_ustr.miscstr2,ustr[user].miscstr2);

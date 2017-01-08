@@ -550,6 +550,7 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].file_posn	 = 0;
    ustr[u].term_type     = -1;
    ustr[u].prev_term_type[0] = 0;
+   ustr[u].bytes_read	 = 0;
 
    initabbrs(u);
    listen_all(u);
@@ -743,6 +744,7 @@ int v;
    ustr[u].log_stage	 = 0;
    ustr[u].temp_buffer[0]= 0;
    ustr[u].file_posn	 = 0;
+   ustr[u].bytes_read	 = 0;
 
    initabbrs(u);
    listen_all(u);

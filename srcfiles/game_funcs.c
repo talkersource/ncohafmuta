@@ -25,19 +25,28 @@ void quotes(int user)
 char line[257];
 FILE *pp;
 
-if (!ustr[user].quote) { return; }
+ if (!strlen(FORTPROG)) {
+  return;
+ }
 
-write_str(user,"+---- Quote for this login --------------(type .quote to turn these off)----+");
- sprintf(t_mess,"%s -s 2> /dev/null",FORTPROG);
- if (!(pp=popen(t_mess,"r"))) {
-	write_str(user,"No quote.");
-	return;
+ if (!ustr[user].quote) {
+  return;
+ }
+ else {
+  write_str(user,"+---- Quote for this login --------------(type .quote to turn these off)----+");
+  sprintf(t_mess,"%s -s 2> /dev/null",FORTPROG);
+	if (!(pp=popen(t_mess,"r"))) {
+		write_str(user,"No quote.");
+		return;
 	}
-while (fgets(line,256,pp) != NULL) {
-	line[strlen(line)-1]=0;
-	write_str(user,line);
-      } /* end of while */
-pclose(pp);
+	while (fgets(line,256,pp) != NULL) {
+		line[strlen(line)-1]=0;
+		write_str(user,line);
+	} /* end of while */
+  pclose(pp);
+ }
+
+return;
 }
 
 

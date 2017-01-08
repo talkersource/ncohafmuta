@@ -5,6 +5,18 @@ cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
+ 04/11/04 1.5.3
+* Added a temp. user struct called bytes_read.
+* Added a function and prototype called check_flood_limits()
+* Added flood protection for input and output.
+* Added FLOOD_INPUT_LIMIT and FLOOD_OUTPUT_LIMIT protection settings to 
+  hdrfiles/constants.h
+* Added a README.flood_protection file in docs/
+* Added a check for no define fortune program
+* Fixed a missing dependency in Makefile.in which would cause main.c not
+  to compile itself again if changed.
+* Fixed glitch in write_log buffering.
+
  03/20/04 1.5.2
 * Version 1.4.2 changes
 * Updated ascii code comments in socket_funcs.c

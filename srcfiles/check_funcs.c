@@ -328,7 +328,9 @@ return 1;
 }
 
 
-/*** Check for new mail ***/
+/*
+ * Check for new user mail 
+ */
 void check_mail(int user) 
 {
 struct stat stbuf;
@@ -363,8 +365,9 @@ if (ustr[user].new_mail &&
 }
 
 
-
-/*** Check for auto_shutdown and auto_reboot ***/
+/*
+ * Check for auto_shutdown and auto_reboot
+ */
 void check_shut(void)
 {
 int offset=0;
@@ -419,7 +422,10 @@ if (down_time==1) shutdown_auto();
 down_time = offset;
 }
 
-/*** see if any users are near or at idle limit or need flags reset ***/
+
+/*
+ * See if any users are near or at idle limit or need flags reset
+ */
 void check_idle(void)
 {
 int min,user;
@@ -564,6 +570,27 @@ if (fight.issued)
 }	
 
 
+/*
+ * Zero out user input bytes for flood protection
+ */
+void check_flood_limits(void)
+{
+int user;
+
+ if (FLOOD_INPUT_LIMIT > 0) {
+	for (user=0; user<MAX_USERS; ++user) {
+		if (ustr[user].bytes_read != 0)
+			ustr[user].bytes_read = 0;
+	} /* user for */
+ } /* FLOOD_INPUT_LIMIT if */
+
+ return;
+}
+
+
+/*
+ * Check miscellaneous connections for needed actions
+ */
 void check_misc_connects(void) {
 int user=0;
 
@@ -592,6 +619,7 @@ for (user=0;user<MAX_MISC_CONNECTS;++user)
 
   } /* for */
 
+ return;
 }
 
 
@@ -659,6 +687,7 @@ if (!mailgateway_port) return;
  need_connections--;
  }
 
+ return;
 }
 
 

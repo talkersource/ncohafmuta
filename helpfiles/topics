@@ -1,9 +1,12 @@
  
 ------------ ---------- Type .help <topic> for more details!
-Last Changed  HELP Topic
+Last Changed HELP Topic
 ------------ ----------
-Jul  2 13:11 TOP
-Jul  1 09:00 changes -> ../docs/CHAN
+Apr 11 11:08 changes -> ../docs/CHAN
+Mar 20 17:56 set_localecho
+Mar 20 17:53 set_space
+Sep 21  2003 credits
+Jul  2  2003 TOP
 Jun 28  2002 exitmsg
 Jun 28  2002 entermsg
 Jun 28  2002 entpro
@@ -129,7 +132,6 @@ Apr 25  2001 set_pbreak
 Apr 25  2001 set_picurl
 Apr 25  2001 set_recap
 Apr 25  2001 set_rows
-Apr 25  2001 set_space
 Apr 25  2001 set_visemail
 Apr 25  2001 set_who
 Apr 25  2001 shemote
@@ -177,7 +179,6 @@ Apr 25  2001 close
 Apr 25  2001 cls
 Apr 25  2001 color
 Apr 25  2001 coloruse
-Apr 25  2001 credits
 Apr 25  2001 creply
 Apr 25  2001 delatmos
 Apr 25  2001 descroom

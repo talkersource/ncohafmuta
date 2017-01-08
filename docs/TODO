@@ -3,6 +3,43 @@ Things to do..in no good order!
 (if you would like to assist on any of these and are good in C,
  let me know..ncohafmuta@asteroid-b612.org)
 
+1.5.x
+-----
+* = DONE
+1 . Maybe distinguish smtp codes between errors/successes/failures as per 
+    charts
+2 . Maybe show MAIL FROM and RCPT TO output in logs
+3 . Storybot devel.
+4 . Remove deprecated functions (e.g. .desc)
+5 . Finish terminal type detection/ and write code for talker to actually 
+    use it functionally.
+*6. .set localecho (maybe magic keyword for use at login prompt too)
+	*add set_localecho() prototype
+	*change set_car_ret() and set_white_space() prototype (no inpstr)
+	*add set_localecho helpfile
+	*fix set_space helpfile
+	*add localecho login keyword
+	*add localecho info to loginhelp file.
+	*add cr or lf respectively to clients that only send one or the 
+	 other
+	*make sure localecho doesn't write if passhid is on (login, 
+	 afk-lock)
+	*add write_char() function and prototype
+7 . Fix balance of tell colors (to and from should be colored or not 
+    colored or have an option to change behavior)
+8 . change ".set icq" to ".set im" then either add ".set imtype" or make 
+    it .set im <type> <handle>
+    e.g. .set im yahoo poetry_guy_23. Update .examine and ".set show" 
+    format info.
+9 . auto-afk option
+10. new config stuff from below.
+11. stacked colors
+12. Add user afk status to soft-reboot DB
+13. Maybe add room conversation buffers to soft-reboot DB
+
+
+Future
+------
 Maybe put .to messages in tell buffer for users that go idle. Alternative 
 is to auto-afk a user after XX number of minutes idle, then a .to would 
 fail since the user is idle.
@@ -97,12 +134,11 @@ a .c file for every user .<command>
 This also includes re-loading of commands and other data from 
 inside the talker.
 
-Port code to Win95/98/NT (kind of works, cygwin support)
+Port code to Windows natively
+(might not need because it already works great with Cygwin)
 
 CYGWIN STUFF:
 1. popen() doesn't work right
-2. Soft-rebooting works sporatically. Seems to depend on cygwin version
-   and windows platform
 
 Greatly enhance web port so that it can truely send and receive HTTP
 requests. (85% functional) _menu functions need to be finished for

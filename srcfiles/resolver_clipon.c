@@ -1072,10 +1072,10 @@ strncpy(logfile,z_mess,FILE_NAME_LEN);
     va_start(args,str);
     if (wanttime) {
     sprintf(z_mess,"%s: ",get_time(0,0));
-    vsprintf(z_mess+strlen(z_mess),str,args);
+    vsnprintf(z_mess+strlen(z_mess),sizeof(z_mess)-strlen(z_mess),str,args);
     }
     else
-    vsprintf(z_mess,str,args);
+    vsnprintf(z_mess,sizeof(z_mess),str,args);
     va_end(args);
     fputs(z_mess,fp);
     FCLOSE(fp);

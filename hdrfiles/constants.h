@@ -41,7 +41,7 @@
 #ifndef _CONSTANTS_H
 #define _CONSTANTS_H
 
-#define VERSION  "Ncohafmuta 1.5.2 by Cygnus"
+#define VERSION  "Ncohafmuta 1.5.3 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
@@ -753,6 +753,27 @@ extern int num_locks;
 				/* kicked out of the login prompt       */
 
 /*-------------------------------------------------------------------*/
+/* Flood protection                                                  */
+/*                                                                   */
+/* Flood protection by the talker prevents a client/user from        */
+/* bogging the talker down with excessive data or command requests   */
+/* It also prevents them from building up excessive output, usually  */
+/* as a result of the former, to take up excessive system memory     */
+/* FLOOD_INPUT_LIMIT controls how many bytes/characters the talker   */
+/* will accept from any one user in a 1 minute period. Set to 0 to   */
+/* disable this protection.                                          */
+/* FLOOD_OUTPUT_LIMIT controls how many bytes/characters the talker  */
+/* will buffer up to, for any one user, for output. Set to 0 to      */
+/* disable. REMEMBER, this is a limit, not an allocation..so this    */
+/* will not hurt your normal memory usage.                           */
+/* See README.flood_protection for more details.                     */
+/*-------------------------------------------------------------------*/
+
+#define FLOOD_INPUT_LIMIT	2500
+#define FLOOD_OUTPUT_LIMIT	10000
+
+
+/*-------------------------------------------------------------------*/
 /* Login-limiting                                                    */
 /*                                                                   */
 /* Login-limiting by the talker prevents a client/user from a single */
@@ -763,6 +784,7 @@ extern int num_locks;
 /* the talker auto-restricts said ip, and kills all current connexs  */
 /* currently held by said ip                                         */
 /*-------------------------------------------------------------------*/
+
 #define LOGIN_LIMITING		1	/* should we enable login-limiting? */
 					/* 1 for yes, 0 for no              */
 #define MAX_CONNLIST_ENTRIES    20      /* how many UNIQUE ips should we    */
@@ -1315,6 +1337,7 @@ struct profile {
 	int tempnum1;		/* 1.2.2 - temp - was igtell */
 	int term_type;		/* 1.3.2 */
 	char prev_term_type[10];	/* 1.3.2 */
+	int bytes_read;		/* 1.5.3 */
         };
 /* typedef profile *UserPtr; */
 #ifdef _DEFINING_CONSTANTS
