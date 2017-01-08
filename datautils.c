@@ -467,7 +467,7 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].miscstr2[0]	 = 0;
    ustr[u].miscstr3[0]	 = 0;
    ustr[u].miscstr4[0]	 = 0;
-   ustr[u].miscnum1	 = 0;
+   ustr[u].pause_login   = 0;
    ustr[u].miscnum2	 = 0;
    ustr[u].miscnum3	 = 0;
    ustr[u].miscnum4	 = 0;
@@ -625,7 +625,7 @@ int v;
    ustr[u].miscstr2[0]	 = 0;
    ustr[u].miscstr3[0]	 = 0;
    ustr[u].miscstr4[0]	 = 0;
-   ustr[u].miscnum1	 = 0;
+   ustr[u].pause_login   = 0;
    ustr[u].miscnum2	 = 0;
    ustr[u].miscnum3	 = 0;
    ustr[u].miscnum4	 = 0;

@@ -1,4 +1,4 @@
-Syntax :  .users [-n]
+Syntax :  .users [<search string>|-n]
 
 Results:  .users will display a list of all current users if no search 
           string is supplied.  If a search string is supplied, all names 

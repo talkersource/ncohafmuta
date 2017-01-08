@@ -1,4 +1,4 @@
-1900 42 1 1 4 2 1 ABCDEFGHIKNRX^h
+1900 43 1 1 4 2 1 ABCDEFGHIKNRX^h
 A front_gate CDFGK^h 0 0
 B stables CV` 0 1
 C hay_loft AB 0 1
@@ -41,3 +41,4 @@ g down_under K 0 1
 h newbie_heaven A 0 0
 i Chips_Den K 0 1
 j BaaLs_Back_9 K 0 1
+k bed_of_roses * 0 1

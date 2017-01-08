@@ -1,15 +1,80 @@
                       /*** Ncohafmuta 1.2.* changes ***/
- 4/8/99 1.2.1
+ 8/24/99 (stable: pl3  devel: pl4)
+ Fixed memory overwrite in .wlog that causes a segfault when staff gives
+a long inpstr.
+ Fixed glitch in revoking .say where the first word of chat was cut off.
+
+ 8/4/99 (stable: pl2  devel: pl3)
+ Fixed a glitch that let users with .say revoked still say messages as
+long as they just typed it and didn't use .say
+ Made it so that if a user has .wiztell revoked they wont see wiztells
+either. Also if they have .wiztell granted, they will also see wiztells.
+ Made it so that a .greet with special characters errors out instead of
+showing the room just blank lines.
+
+ 7/12/99 pl1
+ Fixed a bug that caused the talker to segfault on blank username file
+open. Should C really allow a directory to be opened with fopen()???
+ tinfo tracking now sends process PID too to be sure it updates the right
+talker entry (in case multiple running with same SYSTEM_NAME)
+ Fixed hole in .site which allows . (dot) files to go through and segfault
+the talker.
+
+ 5/10/99
+ Added count calculation in t_who() for friends .who formatting. Thanx    
+Joelie.
+ Added brackets around in if in syssign(). Function was telling bot twice
+that a user was logged in. Thanx Joelie.
+
+ 5/4/99
+ .to direct emote/possesive emotes now handle spaces better.
+ Also, if user you're .to'ing to is invis, they will show up as so as per
+INVIS_TALK_LABEL.
+ Made the code so that if you set a port offset (i.e.
+WIZ_OFFSET,WWW_OFFSET,WHO_OFFSET) to 0 that port wont bind/listen/startup
+on talker boot. modified functions main(), make_sockets(), and 
+system_access() to make this work.
+ Fixed .sthink where the output wasn't being written to the user's
+conversation buffer. Little thing i forgot to put back in.
+
+ 4/25/99 1.2.1
+ Updated and added all relevant helpfiles.
+ Added timestamps to restricts and unrestricts in logs, and logging of
+creation attempts from bannewed sites.
+ Changed format of default ".set" listing. options now shown in 2 columns
+with no descriptions to save space. Help for options still under .h
+set_<option>
+ Added ".set pause" for toggling of the pause during the login sequence. Added
+set_pause(). Moved .autofwd and .autoread to .set autofwd and .set autoread
+ Added mode option to check_site() to specify ip check or hostname check. IP substring
+checks will now match from beginning of restricted site, instead of just anywhere in
+site.
+ Added .to direct emotes/possesive emotes. Added VIS_DIREMOTES and INVIS_DIREMOTES
+defines
+ Added VIS_SEMOTES,VIS_SEMOTES_P,VIS_SEMOTES_M,VIS_SEMOTES_MP,
+INVIS_SEMOTES,INVIS_SEMOTES_P,INVIS_SEMOTES_M,INVIS_SEMOTE_MP,
+VISFROMSEMOTE,VISFROMSEMOTE_P defines
+ Added multi-tells,semotes,sthinks,brings Added MAX_MULTIS define to regulate
+how many simultaneous people can be in a multi-com. 
+ Added .ftell and .femote. Can also use .tell -f and .semote -f to achieve
+same results
  Added the .ttt (tic-tac-toe) .hangman and .guess (for hangman) commands.
- Added the following structures for these command: ttt_kills (saved), ttt_killed
-(saved), ttt_board, ttt_playing, ttt_opponent, hang_wins (saved), hang_losses (saved),
-hang_stage, hang_word, hang_word_show, hang_guesses. Added some
-constant strings to constants.h for new commands.
+ Added the following structures for these command: ttt_kills (saved), 
+ttt_killed (saved), ttt_board, ttt_playing, ttt_opponent, hang_wins
+(saved), hang_losses (saved), hang_stage, hang_word, hang_word_show,
+hang_guesses. Added some constant strings to constants.h for new commands.
  Added saved user structure "icq", .set icq, and icq info to .examine
  Added 9 miscellaneous saved structures for future expansion. 4 text, 5
 numeric. Changed UDATA_VERSION to 122.ver
  Changed the way ints,longs,and time_ts are gotten with rval() rlong() and
 rtime(). Added funcs getint() and getlong()
+ Added ROOM_LEN and RANK_LEN that determine spacing for some commands. .rooms, .who to
+name two
+ Fixed hidden room spacing in .ustat
+
+   88888888888888888888888888888888888888888888888888888888888888888888
+   8888888888888888 Below this point are 1.2.0 changes 8888888888888888 
+   88888888888888888888888888888888888888888888888888888888888888888888
 
  4/3/99
  Added -n option to .users to just count the users (as per calysto's request)
@@ -570,7 +635,7 @@ delete talkers. Read the helpfile.
  Added #define's TALKERLIST and NO_TLIST
 
    88888888888888888888888888888888888888888888888888888888888888888888
-   8888888888888888 Below this point is 1.1.1 changes 88888888888888888 
+   8888888888888888 Below this point are 1.1.1 changes 8888888888888888 
    88888888888888888888888888888888888888888888888888888888888888888888
 
  8/2/97
@@ -741,7 +806,9 @@ messages are written back to the message boards so it's faster.
  5/5/97
  Made some changes in .suname and .supass
 
-** End of 1.1.1 changes **
+   88888888888888888888888888888888888888888888888888888888888888888888
+   8888888888888888 Below this point are 1.1.0 changes 8888888888888888 
+   88888888888888888888888888888888888888888888888888888888888888888888
 
  5/2/97 pl5
  Fixed bugs and glitches
@@ -919,8 +986,10 @@ user's file by hand if need be, and minimizes the program's chance of reading
 an improper value or corrupting the file.
  Changed user structures rawtime, numcoms, and totl to "long" declarations.
 
+   88888888888888888888888888888888888888888888888888888888888888888888
+   8888888888888888 Below this point are 1.0.* changes 8888888888888888 
+   88888888888888888888888888888888888888888888888888888888888888888888
 
-                     /*** Ncohafmuta 1.0.* changes ***/
  3/14/97
  Moved timed alarm() events to main function and made easier to read.
  Changed Daylight Savings Time info in constants.h (more coming later)

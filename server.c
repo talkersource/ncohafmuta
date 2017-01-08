@@ -24,7 +24,7 @@
                 investigate using a database
                 investigate using threads or async IO for connections
                 investigate creating an email gateway
-                multiline mail, tells, move
+                multiline mail, board writes
                 add command initialization from a file
                 create standards for diffent term type 
                 allocate structure dynamically
@@ -249,12 +249,9 @@ struct {
                                      /* socials get a type of NONE */
 	char cabbr[2];               /* the default abbr. for the command */
        } sys[] = {
-		  {".junk",    1,      187,    INFO,""},
 		  {".abbrs",    1,      117,    INFO,""},
 		  {".afk",      0,      75,     SETS,""},
                   {".auto",     3,      186,    MISC,""},
-		  {".autofwd",  1,      132,    MAIL,""},
-		  {".autoread", 1,      131,    MAIL,""},
 		  {".bafk",     0,      99,     SETS,""},
 		  {".bop",      1,      172,    NONE,""},
 		  {".bubble",   1,      121,    MISC,""},
@@ -357,7 +354,9 @@ struct {
 		  {".write",    1,      14,     MESG,""},
 		  {".alert",    1,      146,    SETS,""},
 		  {".fail",     1,      127,    SETS,""},
+		  {".femote",   1,      113,    COMM,""},
 		  {".friends",  1,      191,    INFO,""},
+		  {".ftell",    1,      161,    COMM,""},
 		  {".gag",      1,      145,    SETS,""},
 		  {".greet",    1,      40,     MISC,""},
 		  {".guess",    1,      218,    MISC,""},
@@ -914,6 +913,14 @@ else {
 mess[0]=0;
 #endif
 
+sprintf(mess,
+"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: UP\nROOT_ID: %s\nVERSION: %s\nHOSTNAME: %s\nMAIN_PORT: %d\nWIZ_PORT: %d\nWHO_PORT: %d\nWWW_PORT: %d\nSYSTEM_EMAIL: %s\nNUM_USERS: %ld\nNEWUSER_STATUS: %d\nTHEME: %s\nEIGHTTPLUS: %d\nEND:\n\" > .tinfo",
+SYSTEM_NAME,(unsigned int)getpid(),ROOT_ID,VERSION,thishost,PORT,
+PORT+WIZ_OFFSET,PORT+WHO_OFFSET,PORT+WWW_OFFSET,SYSTEM_EMAIL,
+system_stats.tot_users,allow_new,TTHEME,EIGHTTPLUS);
+system(mess);
+system("mail tinfo@ncohafmuta.com < .tinfo");
+
 /* Initalize signal handlers                           */  
 init_signals();
 
@@ -977,6 +984,10 @@ LOOP_FOREVER
           }
 
        for (i=0;i<4;++i) {
+	/* 1 = wiz 2 = who 3 = www */
+	if (i==1) { if (WIZ_OFFSET==0) continue; }
+	else if (i==2) { if (WHO_OFFSET==0) continue; }
+	else if (i==3) { if (WWW_OFFSET==0) continue; }
 	/* Add the listening sockets to the read mask set */
 	FD_SET(listen_sock[i],&readmask);
         }
@@ -1010,6 +1021,7 @@ LOOP_FOREVER
 	/*---------------------------------------*/
 	/* Check for connection to who socket    */
 	/*---------------------------------------*/
+	if (WHO_OFFSET != 0) {
 	if (FD_ISSET(listen_sock[2],&readmask)) 
 	  {
            size=sizeof(acc_addr);
@@ -1065,12 +1077,14 @@ LOOP_FOREVER
                }
               free_sock(new_user,port);
               continue;
-             }
-           }
+             } /* end of accept else */
+           } /* end of FD_ISSET */
+	} /* end of WHO_OFFSET if */
 
 	/*--------------------------------------------*/
 	/* Check for connection to mini www socket    */
 	/*--------------------------------------------*/
+	if (WWW_OFFSET != 0) {
 	if (FD_ISSET(listen_sock[3], &readmask)) 
 	  {
            size=sizeof(acc_addr);
@@ -1125,6 +1139,7 @@ LOOP_FOREVER
                }
              } /* end of accept else */
            } /* end of FD_ISSET */
+	} /* end of WWW_OFFSET if */
 
 	/*---------------------------------------*/
 	/* Check for connection to listen socket */
@@ -1148,7 +1163,8 @@ LOOP_FOREVER
                 }
               port = '1';
             }
-        
+
+	if (WIZ_OFFSET != 0) {        
            if ( FD_ISSET(listen_sock[1],&readmask))
              {
                size=sizeof(acc_addr);
@@ -1165,6 +1181,7 @@ LOOP_FOREVER
                  }
                port = '2';
              }
+	} /* end of WIZ_OFFSET if */
              
               /* Set socket to non-blocking */
 #if defined(WIN32) && !defined(__CYGWIN32__)
@@ -1269,7 +1286,7 @@ LOOP_FOREVER
 	     
              if (check_restriction(new_user, ANY) == 1) 
                {
-                sprintf(mess,"%s: Connection attempt from restricted site %s:%s\n",get_time(0,0),ustr[new_user].site,
+                sprintf(mess,"%s: Connection attempt, RESTRICTed site %s:%s\n",get_time(0,0),ustr[new_user].site,
 		ustr[new_user].net_name);
 		print_to_syslog(mess);
                 user_quit(new_user);
@@ -1470,7 +1487,7 @@ LOOP_FOREVER
 		/* send speech to speaker & everyone else in same area */
 		/*-----------------------------------------------------*/
 		commands++;
-                say(user, inpstr);
+		say(user, inpstr, 0);
 	      } /* end of MAIN USER FOR */
 
 	user=0;
@@ -1636,6 +1653,7 @@ if (mode==0) {
 
                        case '\013':  user_quit(user); break;    /* enq */
                        case '\014':  user_quit(user); break;    /* enq */
+                       case '\015':  break;
 
                        case '\016':  user_quit(user); break;    /* enq */
                        case '\017':  user_quit(user); break;    /* enq */
@@ -1668,7 +1686,7 @@ if (mode==0) {
 		telnet_write_eor(user);
 		}
 
-                    if (inpchar[0] == '\012' || inpchar[0] == '\015')
+                    if (inpchar[0] == '\012')
                         {
                          complete_line = 1;
                          ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
@@ -1719,7 +1737,8 @@ if (mode==0) {
                 buff_size = strlen(astring);
                 ustr[user].char_buffer_size = 0;
 
-                if (astring[0] == '\012') return err;
+                if ((astring[0] == '\012') && (ustr[user].logging_in)
+		    && (ustr[user].logging_in < 11)) return err;
 
                 /*----------------------------------------------------*/
                 /* some nice users were doing some things that would  */
@@ -1919,9 +1938,23 @@ return astring;
 /*----------------------------------*/
 /* Normal speech                    */
 /*----------------------------------*/
-void say(int user, char *inpstr)
+void say(int user, char *inpstr, int mode)
 {
+  int z=0,gravoked=0;
   int area = ustr[user].area;
+
+if (!mode) {
+ /* Check if command was revoked from user - UNDER CONSTRUCTION */
+ for (z=0;z<MAX_GRAVOKES;++z) {
+        if (!isrevoke(ustr[user].revokes[z])) continue;
+        if (strip_com(ustr[user].revokes[z])==sys[get_com_num(user,".say")].jump_vector) { gravoked=1; break; }
+   }
+ if (gravoked==1) {
+    write_str(user,NOT_WORTHY);
+    gravoked=0; z=0;
+    return;
+    }
+} /* end of !mode */
  
   if (!strlen(inpstr) && strcmp(astr[area].name,BOT_ROOM))
     {
@@ -3140,7 +3173,7 @@ if (mode==0) {
 		fputs("NA\n",wfp); /* miscstr2 */
 		fputs("NA\n",wfp); /* miscstr3 */
 		fputs("NA\n",wfp); /* miscstr4 */
-		fputs("0 0 0 0 0\n",wfp); /* miscnum1-5 */
+		fputs("1 0 0 0 0\n",wfp); /* pause_login, miscnum2-5 */
 		}
 		/* tack on new marker for this version */
 		sprintf(mess,"--ENDVER %s\n",UDATA_VERSION);
@@ -3176,7 +3209,7 @@ else if (mode==1) {
 		fputs("NA\n",wfp); /* miscstr2 */
 		fputs("NA\n",wfp); /* miscstr3 */
 		fputs("NA\n",wfp); /* miscstr4 */
-		fputs("0 0 0 0 0\n",wfp); /* miscnum1-5 */
+		fputs("1 0 0 0 0\n",wfp); /* pause_login, miscnum2-5 */
 		/* tack on marker */
 		sprintf(mess,"--ENDVER %s\n",UDATA_VERSION);
 		fputs(mess,wfp);
@@ -4013,7 +4046,7 @@ void login(int user, char *inpstr)
    }
 
   /* If user is coming from a login info prompt */
-if (PAUSE_LOGIN==1) {
+if (ustr[user].pause_login==1) {
   if (ustr[user].logging_in==11) {
      add_user(user);
      add_user2(user,0);
@@ -4108,6 +4141,9 @@ if (PAUSE_LOGIN==1) {
      if (check_verify(user,0) == 1) {
 	     if (check_restriction(user, NEW) == 1)
 		{
+                sprintf(mess,"%s: Creation attempt (%s), BANNEWed site %s:%s\n",get_time(0,0),ustr[user].login_name,ustr[user].site,
+		ustr[user].net_name);
+		print_to_syslog(mess);
                 ustr[user].login_pass[0]=0;
                 ustr[user].password[0]=0;
 		attempts(user);
@@ -4131,6 +4167,9 @@ if (PAUSE_LOGIN==1) {
         /* First check if new users are banned from this site */
         if (check_restriction(user, NEW) == 1)
          {
+                sprintf(mess,"%s: Creation attempt (%s), BANNEWed site %s:%s\n",get_time(0,0),ustr[user].login_name,ustr[user].site,
+		ustr[user].net_name);
+		print_to_syslog(mess);
           attempts(user);
           return;
          }
@@ -4249,7 +4288,7 @@ if (ustr[user].super < MIN_HIDE_LEVEL)
     ustr[user].vis=1;
   }
 
-write_str(user,"+---------------------------------------------------------------------------+");   
+write_str(user,"+---------------------------------------------------------------------------+");
 if (ustr[user].vis)
   {write_str_nr(user,"Status [^HYVisible,^ ");}
   else
@@ -4285,7 +4324,6 @@ if (astr[ustr[user].area].private)
    ustr[user].area=INIT_ROOM;
    write_str(user,IS_PRIVATE);
   }
-  
 write_str(user,"");
 sprintf(z_mess,"Welcome to ^%s^ %s %s",SYSTEM_NAME,ranks[ustr[user].super],ustr[user].say_name);
 write_str(user,z_mess);  
@@ -4316,7 +4354,7 @@ write_str(user,"+---------------------------------------------------------------
 		return;
 		}
 	 }
-	if (PAUSE_LOGIN==1) {
+	if (ustr[user].pause_login==1) {
          write_str_nr(user,"--- Press <ENTER> to complete login ---");
 	 telnet_write_eor(user);
 	}
@@ -4335,6 +4373,9 @@ write_str(user,"+---------------------------------------------------------------
      /*---------------------------------------------*/      
      if (check_restriction(user, NEW) == 1)
        {
+                sprintf(mess,"%s: Creation attempt (%s), BANNEWed site %s:%s\n",get_time(0,0),ustr[user].login_name,ustr[user].site,
+		ustr[user].net_name);
+		print_to_syslog(mess);
         attempts(user);
         return;
        }
@@ -4416,7 +4457,7 @@ write_str(user,"+---------------------------------------------------------------
      copy_from_user(user);                        
      write_user(ustr[user].login_name);            
      ustr[user].logging_in=12;
-     if (PAUSE_LOGIN==1) {
+     if (ustr[user].pause_login==1) {
       write_str_nr(user,"--- Press <ENTER> to complete login ---");
       telnet_write_eor(user);
      }
@@ -4974,8 +5015,8 @@ inpstr[newpos]='\0';
 
 void writeall_str(char *str, int area, int user, int send_to_user, int who_did, int mode, int type, int sw)
 {
-int u,i=0;
-int gagged=0;
+int u,i=0,z=0;
+int gagged=0,gravoked=0;
 char str2[ARR_SIZE];
 
 str2[0]=0;
@@ -5006,8 +5047,35 @@ strcat(str2,str);
      for (u=0;u<MAX_USERS;++u)
        {
         if (!user_wants_message(u,type)) continue;
+
+/* WRITE CODE TO CHECK THIS FOR ONLY TYPE OF WIZT */
+if (type == WIZT) {
+/* Check if command was revoked from user */
+ for (z=0;z<MAX_GRAVOKES;++z) {
+        if (!isrevoke(ustr[u].revokes[z])) continue;
+        if (strip_com(ustr[u].revokes[z])==get_com_num_plain(".wiztell")) {
+                gravoked=1; break;
+        }
+   }
+if (gravoked==1) { gravoked=0; continue; }
+gravoked=0;
+z=0;
+
+/* Check if command was granted to user */
+ if (ustr[u].super < WIZ_LEVEL && !ustr[u].logging_in && u != user && ustr[u].area!=-1) {
+  for (z=0;z<MAX_GRAVOKES;++z) {
+                print_to_syslog("looking for is granted!\n");
+        if (!isgrant(ustr[u].revokes[z])) continue; 
+                print_to_syslog("past is grant!\n");
+        if (strip_com(ustr[u].revokes[z])==get_com_num_plain(".wiztell")) {
+                print_to_syslog("granted!\n");
+                gravoked=1; break;
+          }
+  } /* end of for */
+ } /* end of if lower level */
+} /* end of if WIZT */
         
-	if (ustr[u].super >= WIZ_LEVEL && !ustr[u].logging_in && u != user)  
+	if (((ustr[u].super >= WIZ_LEVEL) || (gravoked==1)) && !ustr[u].logging_in && u != user && ustr[u].area!=-1)  
 	  {
 	   if (mode == BOLD)
 	     {
@@ -5357,6 +5425,25 @@ for (f=0; sys[f].su_com != -1; ++f)
 return -1;
 }
 
+int get_com_num_plain(char *inpstr)
+{
+int f=0;
+  
+for (f=0; sys[f].su_com != -1; ++f)
+        if (!instr2(0,sys[f].command,inpstr,0) && strlen(inpstr)>1) return sys[f].jump_vector;
+
+return -1;
+}     
+
+int get_rank(char *inpstr)
+{
+int f=0;
+  
+for (f=0; sys[f].su_com != -1; ++f)
+        if (!instr2(0,sys[f].command,inpstr,0) && strlen(inpstr)>1) return sys[f].su_com;
+
+return 0;
+}     
 
 /*---------------------------------------------------------*/
 /* keep an audit trail of user logins and logoffs          */
@@ -5383,9 +5470,10 @@ print_to_syslog(mess);
     write_bot(mess);
 
   /* If user coming in in bot room, tell bot that user is here */
-  if (!strcmp(astr[ustr[user].area].name,BOT_ROOM))
+  if (!strcmp(astr[ustr[user].area].name,BOT_ROOM)) {
     sprintf(mess,"+++++ came in:%s", ustr[user].say_name);
     write_bot(mess);
+    }
 
   sprintf(filename,"%s",LASTLOGS);
   if (!(fp=fopen(filename,"a"))) {
@@ -5506,14 +5594,22 @@ else if (type==2) {
 print_to_syslog(mess);
 
 if (type==1) {
-  if (check_misc_restrict(whoport[user].sock,buf,namebuf) == 1)
+  if (check_misc_restrict(whoport[user].sock,buf,namebuf) == 1) {
+   sprintf(mess,"%s: WHO Connection attempt, RESTRICTed site %s:%s\n",get_time(0,0),
+   buf,namebuf);
+   print_to_syslog(mess);
    return -1;
+   }
   else
    return 0;
   }
 else if (type==2) {
-  if (check_misc_restrict(wwwport[user].sock,buf,namebuf) == 1)
+  if (check_misc_restrict(wwwport[user].sock,buf,namebuf) == 1) {
+   sprintf(mess,"%s: WWW Connection attempt, RESTRICTed site %s:%s\n",get_time(0,0),
+   buf,namebuf);
+   print_to_syslog(mess);
    return -1;
+   }
   else
    return 0;
   }
@@ -5752,7 +5848,7 @@ switch(sys[com_num].jump_vector) {
 	case 84: cls(user); break;
 	case 85: fight_another(user,inpstr); break;
 	case 86: resolve_names_set(user); break;
-	case 90: say(user,inpstr); break;
+	case 90: say(user,inpstr,1); break;
 	case 91: meter(user, inpstr); break;
 	case 95: set_quota(user, inpstr); break;
 	case 96: command_disabled(user); break;
@@ -5775,7 +5871,7 @@ switch(sys[com_num].jump_vector) {
         case 110: bbcast(user,inpstr); break;
         case 111: version(user); break;
         case 112: shemote(user,inpstr); break; 
-        case 113: break; /* was .color */
+        case 113: femote(user,inpstr); break;
         case 114: suname(user,inpstr);  break;
         case 115: supass(user,inpstr);  break;
         case 116: enterm(user,inpstr);  break;
@@ -5796,8 +5892,8 @@ switch(sys[com_num].jump_vector) {
         case 128: succm(user,inpstr);  break;
         case 129: mutter(user,inpstr);  break;
         case 130: write_board(user,inpstr,3); break; /* suggestions */
-        case 131: autoread(user);  break;
-        case 132: autofwd(user);  break;
+        case 131: break;
+        case 132: break;
         case 133: fmail(user,inpstr);  break;
         case 134: swipe(user,inpstr);  break;
         case 135: anchor_user(user,inpstr); break;
@@ -5830,7 +5926,7 @@ switch(sys[com_num].jump_vector) {
         case 158: exitm(user,inpstr);  break;
         case 159: home_user(user);  break;
         case 160: nerf(user,inpstr);  break;
-        case 161: break;
+        case 161: frtell(user,inpstr); break;
         case 162: reload(user);  break;
         case 163: list_socs(user);  break;
         case 164: socials(user,inpstr,1);  break;  /* hug */
@@ -5856,7 +5952,7 @@ switch(sys[com_num].jump_vector) {
         case 184: gag_comm(user,inpstr,0);  break;
         case 185: frog_user(user,inpstr);  break;
         case 186: auto_com(user,inpstr);  break;
-        case 187: write_cygnus(user); break;
+        case 187: break;
         case 188: eight_ball(user,inpstr);  break;
         case 189: warning(user,inpstr);  break;
         case 190: arrest(user,inpstr,1);  break;
@@ -6053,7 +6149,7 @@ if (ustr[user].logging_in) {
 	ustr[user].miscstr2[0]   = 0;
 	ustr[user].miscstr3[0]   = 0;
 	ustr[user].miscstr4[0]   = 0;
-	ustr[user].miscnum1      = 0;
+	ustr[user].pause_login   = 0;
 	ustr[user].miscnum2      = 0;
 	ustr[user].miscnum3      = 0;
 	ustr[user].miscnum4      = 0;
@@ -6256,7 +6352,7 @@ ustr[user].miscstr1[0]   = 0;
 ustr[user].miscstr2[0]   = 0;
 ustr[user].miscstr3[0]   = 0;
 ustr[user].miscstr4[0]   = 0;
-ustr[user].miscnum1      = 0;
+ustr[user].pause_login   = 0;
 ustr[user].miscnum2      = 0;
 ustr[user].miscnum3      = 0;
 ustr[user].miscnum4      = 0;
@@ -6546,11 +6642,11 @@ sprintf(mess,"len without mod        : %d\nlen of colors          : %d\nlen of r
 write_str(user,mess);
 */
 if (ustr[user].who==1)
-        sprintf(mess,"%-*s :%-8s:%-14s:%-3.3d min %s",count,und,rank,an,min,i_buff);
+        sprintf(mess,"%-*s :%-*s:%-*s:%-3.3d m %s",count,und,RANK_LEN,rank,ROOM_LEN,an,min,i_buff);
 else if (ustr[user].who==2)
-        sprintf(mess,"%-15s %c%c%-*s %-5.5d %s %3.3d",an,s,vi,count,und,min,i_buff,idl);
+        sprintf(mess,"%-*s %c%c%-*s %-5.5d %s %3.3d",ROOM_LEN,an,s,vi,count,und,min,i_buff,idl);
 else
-        sprintf(mess,"%-15s %-5.5d %s %3.3d %c%c%s",an,min,i_buff,idl,s,vi,und);
+        sprintf(mess,"%-*s %-5.5d %s %3.3d %c%c%s",ROOM_LEN,an,min,i_buff,idl,s,vi,und);
 
 count=0;
 		
@@ -6694,12 +6790,13 @@ for (v=0;v<NUM_AREAS;++v) {
                 else vi=' ';
 	}
 
+count=DESC_LEN+count_color(und,0);
 if (ustr[user].who==1)
-        sprintf(mess,"%-*s :%-8s:%-14s:%-3.3d min %s",count,und,rank,an,min,i_buff);
+        sprintf(mess,"%-*s :%-*s:%-*s:%-3.3d min %s",count,und,RANK_LEN,rank,ROOM_LEN,an,min,i_buff);
 else if (ustr[user].who==2)
-        sprintf(mess,"%-15s %c%c%-*s %-5.5d %s %3.3d",an,s,vi,count,und,min,i_buff,idl);
+        sprintf(mess,"%-*s %c%c%-*s %-5.5d %s %3.3d",ROOM_LEN,an,s,vi,count,und,min,i_buff,idl);
 else
-        sprintf(mess,"%-15s %-5.5d %s %3.3d %c%c%s",an,min,i_buff,idl,s,vi,und);
+        sprintf(mess,"%-*s %-5.5d %s %3.3d %c%c%s",ROOM_LEN,an,min,i_buff,idl,s,vi,und);
 
 count=0;
                  
@@ -6855,7 +6952,7 @@ for (u=0;u<MAX_USERS;++u) {
 		if (!ustr[u].vis) vi='_';
                 else vi=' ';
 
-	sprintf(mess,"%-15s %-5.5d %s %3.3d %c%c%s\n",an,min,i_buff,idl,s,vi,und);
+	sprintf(mess,"%-*s %-5.5d %s %3.3d %c%c%s\n",ROOM_LEN,an,min,i_buff,idl,s,vi,und);
 	        
 		strncpy(temp,mess,256);
 		strtolower(temp);
@@ -6972,6 +7069,13 @@ for (u=0; u<MAX_USERS; ++u)
   } /* end of for */
 
 if (!found) {
+/* plug security hole */
+if (check_fname(inpstr,user))
+  {                                     
+   write_str(user,"Illegal name.");
+   return;
+  }
+
    if (!check_for_user(inpstr)) {
      write_str(user,NO_USER_STR);
      return;
@@ -7016,7 +7120,7 @@ if (!strlen(inpstr))
   
 if (ustr[user].frog) {
    strcpy(inpstr,FROG_TALK);
-   say(user,inpstr);
+   say(user,inpstr,0);
    return;
    }
 
@@ -7039,11 +7143,20 @@ write_str(user,mess);
 /*** tells another user something without anyone else hearing ***/
 void tell_usr(int user, char *inpstr, int mode)
 {
+int point=0,count=0,i=0,lastspace=0,lastcomma=0,gotchar=0;
+int point2=0,multi=0;
+int multilistnums[MAX_MULTIS];
+char multilist[MAX_MULTIS][ARR_SIZE];
+char multiliststr[ARR_SIZE];
 char other_user[ARR_SIZE];
-int u;
+int u=-1;
 char prefix[25];
 int pos = ustr[user].conv_count % NUM_LINES;
 int f;
+
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; multilistnums[i]=-1; }
+multiliststr[0]=0;
+i=0;
 
 if (!strlen(inpstr)) 
   {
@@ -7066,42 +7179,131 @@ if (ustr[user].gagcomm) {
    write_str(user,NO_COMM);
    return;
    }
-  
-tells++;
 
 sscanf(inpstr,"%s ",other_user);
+if (!strcmp(other_user,"-f")) {
+	other_user[0]=0;
+	for (i=0;i<MAX_ALERT;++i) {
+	 if (strlen(ustr[user].friends[i])) {
+	  strcpy(multilist[count],ustr[user].friends[i]);
+	  count++;
+	  if (count==MAX_MULTIS) break;
+	  }
+	}
+	if (!count) {
+		write_str(user,"You dont have any friends!");
+		return;
+	}
+	i=0;
+	remove_first(inpstr);
+  }
+else {
+other_user[0]=0;
+
+for (i=0;i<strlen(inpstr);++i) {
+	if (inpstr[i]==' ') {
+		if (lastspace && !gotchar) { point++; point2++; continue; }
+		if (!gotchar) { point++; point2++; }
+		lastspace=1;
+		continue;
+	  } /* end of if space */
+	else if (inpstr[i]==',') {
+		if (!gotchar) {
+			lastcomma=1;
+			point++;
+			point2++;
+			continue;
+		}
+		else { 
+		if (count <= MAX_MULTIS-1) {
+		midcpy(inpstr,multilist[count],point,point2-1);
+		count++;
+		}
+		point=i+1;
+		point2=point;
+		gotchar=0;
+		lastcomma=1;
+		continue;
+		}
+
+	} /* end of if comma */
+	if ((inpstr[i-1]==' ') && (gotchar)) {
+		if (count <= MAX_MULTIS-1) {
+		midcpy(inpstr,multilist[count],point,point2-1);
+		count++;
+		}
+		break;
+	}
+	gotchar=1;
+	lastcomma=0;
+	lastspace=0;
+	point2++;
+} /* end of for */
+midcpy(inpstr,multiliststr,i,ARR_SIZE);
+
+if (!strlen(multiliststr)) {
+	/* no message string, copy last user */
+	midcpy(inpstr,multilist[count],point,point2);
+	count++;
+	strcpy(inpstr,"");
+	}
+else {
+	strcpy(inpstr,multiliststr);
+	multiliststr[0]=0;
+     }
+} /* end of friend else */
+
+i=0;
+point=0;
+point2=0;
+gotchar=0;
+
+tells++;
+
+if (count>1) multi=1;
+
+/* go into loop and check users */
+for (i=0;i<count;++i) {
+
+strcpy(other_user,multilist[i]);
 
 /* plug security hole */
 if (check_fname(other_user,user)) 
   {
+   if (!multi) {
    write_str(user,"Illegal name.");
    return;
+   }
+   else continue;
   }
 
 strtolower(other_user);
-
-remove_first(inpstr);
 
 if ((u=get_user_num(other_user,user))== -1) 
   {
    if (!read_user(other_user)) {
       write_str(user,NO_USER_STR);
-      return;
+      if (!multi) return;
+      else continue;
       }
    not_signed_on(user,other_user);
 if (user_wants_message(user,FAILS)) {
    sprintf(mess,"%s",t_ustr.fail);
    write_str(user,mess);
    }
-   return;
+      if (!multi) return;
+      else continue;
   }
 
-
-if (!gag_check(user,u,0)) return;
+if (!gag_check(user,u,0)) {
+      if (!multi) return;
+      else continue;
+  }
 
 if (ustr[u].pro_enter || ustr[u].vote_enter || ustr[u].roomd_enter) {
     write_str(user,IS_ENTERING);
-    return;
+      if (!multi) return;
+      else continue;
     }
   
 if (ustr[u].afk)
@@ -7127,9 +7329,54 @@ if (ustr[u].igtell && ustr[user].tempsuper<WIZ_LEVEL)
    sprintf(mess,"%s is ignoring tells",ustr[u].say_name);
    write_str(user,mess);
    if (user_wants_message(user,FAILS)) write_str(user,ustr[u].fail);
-   return;
+      if (!multi) return;
+      else continue;
   }
-  
+
+/* check if this user is already in the list */
+/* we're gonna reuse some ints here          */
+for (point2=0;point2<MAX_MULTIS;++point2) {
+	if (multilistnums[point2]==u) { gotchar=1; break; }
+   }
+point2=0;
+if (gotchar) {
+  gotchar=0;
+  continue;
+  }
+
+/* it's ok to send the tell to this user, add them to the multistr */
+/* add this user to the list for our next loop */
+multilistnums[point]=u;
+point++;
+} /* end of user for */  
+i=0;
+
+/* no multilistnums, must be all bad users */
+if (!point) {
+	return;
+  }
+
+/* loop to compose the messages and print to the users */
+for (i=0;i<point;++i) {
+u=multilistnums[i];
+
+count=0;
+point2=0;
+multiliststr[0]=0;
+/* make multi string to send to this user */
+for (point2=0;point2<point;++point2) {
+/* dont send recipients name to themselves */
+if (u==multilistnums[point2]) continue;
+else count++;
+if (count>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
+
 if ((ustr[u].monitor==1) || (ustr[u].monitor==3))
   {
     strcpy(prefix,"<");
@@ -7167,29 +7414,30 @@ if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
 
 if (ustr[user].vis) 
   {
+   if (!multi)
     sprintf(mess,VIS_TELLS,ustr[user].say_name,inpstr);
+   else
+    sprintf(mess,VIS_TELLS_M,ustr[user].say_name,multiliststr,inpstr);
   }
  else
   {
   if ((ustr[u].monitor==1) || (ustr[u].monitor==3))
     {
       sprintf(prefix,"? %s",ustr[user].say_name);
-      sprintf(mess,VIS_TELLS,prefix,inpstr);
+      if (!multi)
+       sprintf(mess,VIS_TELLS,prefix,inpstr);
+      else
+       sprintf(mess,VIS_TELLS_M,prefix,multiliststr,inpstr);
     }
    else
     {
-     sprintf(mess,INVIS_TELLS,INVIS_TALK_LABEL,inpstr);
+     if (!multi)
+      sprintf(mess,INVIS_TELLS,INVIS_TALK_LABEL,inpstr);
+     else
+      sprintf(mess,INVIS_TELLS_M,INVIS_TALK_LABEL,multiliststr,inpstr);
     }
   }
 }
-
-
-/*-----------------------------------*/
-/* store the tell in the rev buffer  */
-/*-----------------------------------*/
-
-strncpy(ustr[u].conv[ustr[u].conv_count],mess,MAX_LINE_LEN);
-ustr[u].conv_count = ( ++ustr[u].conv_count ) % NUM_LINES;
 
 /* if a .beep (mode 1) and .set beeps are on add an extra beep */
 /* if mode 0, a normal tell, if beep listening add beep        */
@@ -7214,6 +7462,13 @@ if (mode==1) {
    }
  }
 
+/*-----------------------------------*/
+/* store the tell in the rev buffer  */
+/*-----------------------------------*/
+/* moved because of multi tells */
+strncpy(ustr[u].conv[ustr[u].conv_count],mess,MAX_LINE_LEN);
+ustr[u].conv_count = ( ++ustr[u].conv_count ) % NUM_LINES;
+
 if (ustr[u].hilite==2)
  write_str(u,mess);
 else {
@@ -7221,24 +7476,77 @@ else {
  write_hilite(u,mess);
  }
 
+} /* end of message compisition for loop */
+
+if (multi) {
+point2=0;
+multiliststr[0]=0;
+/* make multi string to send to this user */
+for (point2=0;point2<point;++point2) {
+/* dont send recipients name to themselves */
+if (point2>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
+} /* end of if multi */
+
 /* write to teller */
-if (strlen(inpstr))
-sprintf(mess,VIS_FROMTELLS,ustr[u].say_name,inpstr);
-else sprintf(mess,"Telepathic message sent to %s.",ustr[u].say_name);
+if (strlen(inpstr)) {
+ if (!multi)
+  sprintf(mess,VIS_FROMTELLS,ustr[u].say_name,inpstr);
+ else
+  sprintf(mess,VIS_FROMTELLS,multiliststr,inpstr);
+}
+else {
+ if (!multi)
+  sprintf(mess,"Telepathic message sent to %s.",ustr[u].say_name);
+ else
+  sprintf(mess,"Multi-Telepathic message sent to %s.",multiliststr);
+}
 
 write_str(user,mess);
+if (!multi) {
 if (user_wants_message(user,SUCCS) && strlen(inpstr) && strlen(ustr[u].succ))
 write_str(user,ustr[u].succ);
+}
 
 strncpy(ustr[user].conv[ustr[user].conv_count],mess,MAX_LINE_LEN);
 ustr[user].conv_count = ( ++ustr[user].conv_count ) % NUM_LINES;
+
+i=0;
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; }
+multiliststr[0]=0;
+
 return;
 }
 
-/*** tells another user something without anyone else hearing ***/
+/* friend tell */
+void frtell(int user, char *inpstr)
+{
+char str[ARR_SIZE+4];
+
+strcpy(str,"-f ");
+strcat(str,inpstr);
+tell_usr(user,str,0);
+}
+
+/* friend emote */
+void femote(int user, char *inpstr)
+{
+char str[ARR_SIZE+4];
+
+strcpy(str,"-f ");
+strcat(str,inpstr);
+semote(user,str);
+}
+
+/*** beep a user ***/
 void beep_u(int user, char *inpstr)
 {
-
 if (!strlen(inpstr)) 
   {
     write_str(user,"Beep who?");  
@@ -7247,7 +7555,6 @@ if (!strlen(inpstr))
 
 tell_usr(user,inpstr,1);
 }
-
 
 
 /*** not signed on - subsid func ***/
@@ -10044,54 +10351,135 @@ writeall_str(mess, 1, user, 0, user, NORM, ECHOM, 0);
 /** same as .think but remotely **/
 void sthink(int user, char *inpstr)
 {
+int point=0,count=0,i=0,lastspace=0,lastcomma=0,gotchar=0;
+int point2=0,multi=0;
+int multilistnums[MAX_MULTIS];
+char multilist[MAX_MULTIS][ARR_SIZE];
+char multiliststr[ARR_SIZE];
 char other_user[ARR_SIZE];
-int u;
+int u=-1;
 char prefix[25];
+
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; multilistnums[i]=-1; }
+multiliststr[0]=0;
+i=0;
 
 if (ustr[user].gagcomm) {
    write_str(user,NO_COMM);
    return;
    }
 
+for (i=0;i<strlen(inpstr);++i) {
+        if (inpstr[i]==' ') {
+                if (lastspace && !gotchar) { point++; point2++; continue; }
+                if (!gotchar) { point++; point2++; }
+                lastspace=1;
+                continue;
+          } /* end of if space */
+        else if (inpstr[i]==',') {
+                if (!gotchar) {
+                        lastcomma=1;
+			point++;
+			point2++;
+			continue;
+                }
+                else {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+                count++;
+                }
+                point=i+1;
+                point2=point;
+                gotchar=0;
+                lastcomma=1;
+                continue;
+                }
+                
+        } /* end of if comma */
+        if ((inpstr[i-1]==' ') && (gotchar)) {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+                count++;  
+                }
+                break;
+        }
+        gotchar=1;
+        lastcomma=0;
+        lastspace=0;
+        point2++;
+} /* end of for */
+midcpy(inpstr,multiliststr,i,ARR_SIZE);
+                
+if (!strlen(multiliststr)) {
+        /* no message string, copy last user */
+        midcpy(inpstr,multilist[count],point,point2);
+        count++;
+        strcpy(inpstr,"");
+        }
+else {
+        strcpy(inpstr,multiliststr);
+        multiliststr[0]=0;
+     }
+
+i=0;
+point=0;
+point2=0;
+gotchar=0;
+        
 if (!strlen(inpstr)) 
   {
    write_str(user,"Who are you thinking about?");  
+	for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; } 
+	multiliststr[0]=0;
    return;
   }
 
-  
-sscanf(inpstr,"%s ",other_user);
+tells++; 
+
+if (count>1) multi=1;
+
+/* go into loop and check users */
+for (i=0;i<count;++i) {
+
+strcpy(other_user,multilist[i]);
 
 /* plug security hole */
 if (check_fname(other_user,user)) 
   {
+   if (!multi) {
    write_str(user,"Illegal name.");
    return;
+   }
+   else continue;
   }
 
 strtolower(other_user);
-
-remove_first(inpstr);
 
 if ((u=get_user_num(other_user,user))== -1) 
   {
    if (!read_user(other_user)) {
       write_str(user,NO_USER_STR);
-      return;
+      if (!multi) return;
+      else continue;
       }
    not_signed_on(user,t_ustr.say_name);
 if (user_wants_message(user,FAILS)) {
    sprintf(mess,"%s",t_ustr.fail);
    write_str(user,mess);
    }
-   return;
+      if (!multi) return;
+      else continue;
   }
 
-if (!gag_check(user,u,0)) return;
+if (!gag_check(user,u,0)) {
+      if (!multi) return;
+      else continue;
+   }
 
 if (ustr[u].pro_enter || ustr[u].vote_enter || ustr[u].roomd_enter) {
     write_str(user,IS_ENTERING);
-    return;
+      if (!multi) return;
+      else continue;
     }
 
 if (ustr[u].afk)
@@ -10117,14 +10505,53 @@ if (ustr[u].igtell && ustr[user].tempsuper<WIZ_LEVEL)
    sprintf(mess,"%s is ignoring tells, semotes, and sthinks",ustr[u].say_name);
    write_str(user,mess);
    if (user_wants_message(user,FAILS)) write_str(user,ustr[u].fail);
-   return;
+      if (!multi) return;
+      else continue;
   }
   
-if (!strlen(inpstr)) 
-  {
-   write_str(user,"Suddenly, your mind goes blank.");
-   return;
-  }
+/* check if this user is already in the list */
+/* we're gonna reuse some ints here          */
+for (point2=0;point2<MAX_MULTIS;++point2) {
+        if (multilistnums[point2]==u) { gotchar=1; break; }
+   }
+point2=0;
+if (gotchar) {
+  gotchar=0;
+  continue;
+  }   
+    
+/* it's ok to send the tell to this user, add them to the multistr */
+/* add this user to the list for our next loop */
+multilistnums[point]=u;
+point++;
+} /* end of user for */
+i=0;
+
+/* no multilistnums, must be all bad users */
+if (!point) {
+        return;
+  } 
+
+/* loop to compose the messages and print to the users */
+for (i=0;i<point;++i) {
+u=multilistnums[i];
+
+count=0;
+point2=0;
+multiliststr[0]=0;
+/* make multi string to send to this user */
+for (point2=0;point2<point;++point2) {
+/* dont send recipients name to themselves */
+if (u==multilistnums[point2]) continue;
+else count++;
+if (count>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
 
 if ((ustr[u].monitor==1) || (ustr[u].monitor==3))
   {
@@ -10140,14 +10567,30 @@ if ((ustr[u].monitor==1) || (ustr[u].monitor==3))
 if (ustr[user].frog) strcpy(inpstr,"I'm a frog, I'm a frog!");
 
 /* write to user being told */
-if (ustr[user].vis) 
-	sprintf(mess,"--> %s thinks . o O ( %s )", ustr[user].say_name, inpstr);
-else sprintf(mess,"%s--> %s thinks . o O ( %s )",prefix,INVIS_ACTION_LABEL,inpstr); 
+if (ustr[user].vis) {
+  if (!multi)
+   sprintf(mess,"--> %s thinks . o O ( %s )", ustr[user].say_name, inpstr);
+  else
+   sprintf(mess,"--> %s thinks (To you%s) . o O ( %s )", ustr[user].say_name,multiliststr,inpstr);
+  }
+else {
+  if (!multi)
+   sprintf(mess,"%s--> %s thinks . o O ( %s )",prefix,INVIS_ACTION_LABEL,inpstr); 
+  else
+   sprintf(mess,"%s--> %s thinks (To you%s) . o O ( %s )",prefix,INVIS_ACTION_LABEL,multiliststr,inpstr); 
+  }
 
 if (ustr[u].beeps) {
  if (user_wants_message(u,BEEPS))
   strcat(mess,"\07");
  }
+
+/*-----------------------------------*/
+/* store the sthink in the rev buffer*/
+/*-----------------------------------*/
+/* moved because of multi tells */
+strncpy(ustr[u].conv[ustr[u].conv_count],mess,MAX_LINE_LEN);
+ustr[u].conv_count = ( ++ustr[u].conv_count ) % NUM_LINES;
 
 if (ustr[u].hilite==2)
  write_str(u,mess);
@@ -10156,19 +10599,42 @@ else {
  write_hilite(u,mess);
  }
 
-/*-----------------------------------*/
-/* store the sthink in the rev buffer*/
-/*-----------------------------------*/
+} /* end of message compisition for loop */
 
-strncpy(ustr[u].conv[ustr[u].conv_count],mess,MAX_LINE_LEN);
-ustr[u].conv_count = ( ++ustr[u].conv_count ) % NUM_LINES;
-	
+if (multi) {
+point2=0;
+multiliststr[0]=0;
+/* make multi string to send to this user */
+for (point2=0;point2<point;++point2) {
+/* dont send recipients name to themselves */
+if (point2>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
+} /* end of if multi */
+
 /* write to teller */
-sprintf(mess,"You thought to %s: %s",ustr[u].say_name,inpstr);
+if (!multi)
+ sprintf(mess,"You thought to %s: %s",ustr[u].say_name,inpstr);
+else
+ sprintf(mess,"You thought to %s: %s",multiliststr,inpstr);
 
 write_str(user,mess);
+if (!multi) {
 if (user_wants_message(user,SUCCS) && strlen(ustr[u].succ))
  write_str(user,ustr[u].succ);
+}
+
+strncpy(ustr[user].conv[ustr[user].conv_count],mess,MAX_LINE_LEN);
+ustr[user].conv_count = ( ++ustr[user].conv_count ) % NUM_LINES;
+
+i=0;
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; }
+multiliststr[0]=0;   
 
 }
 
@@ -10605,7 +11071,7 @@ ustr[user].mutter[0]=0;
 /*------------------------------------------------*/
 /* set autoread                                   */
 /*------------------------------------------------*/
-void autoread(int user)
+void set_autoread(int user)
 {
 
   if (ustr[user].autor==3)
@@ -10628,14 +11094,14 @@ void autoread(int user)
       write_str(user, "Autoread now on ^HYfor logins only^.");
       ustr[user].autor = 1;
     }
-  write_str(user,"* .autoread again for more options *");  
+  write_str(user,"* .set autoread again for more options *");  
 
   copy_from_user(user);
   write_user(ustr[user].name);
 }
 
 /** auto forward mail to email_addr **/
-void autofwd(int user)
+void set_autofwd(int user)
 {
 
   if (ustr[user].autof==2)
@@ -10653,7 +11119,7 @@ void autofwd(int user)
       write_str(user, "Autofwd now on ^HYonly when you're not online^.");
       ustr[user].autof = 2;
     }
-  write_str(user,"* .autofwd again for more options *");  
+  write_str(user,"* .set autofwd again for more options *");  
 
   copy_from_user(user);
   write_user(ustr[user].name);
@@ -12936,7 +13402,7 @@ strcpy(t_ustr.miscstr1,	"NA");
 strcpy(t_ustr.miscstr2, "NA");
 strcpy(t_ustr.miscstr3, "NA");
 strcpy(t_ustr.miscstr4, "NA");
-t_ustr.miscnum1      = 0;
+t_ustr.pause_login   = 1;
 t_ustr.miscnum2      = 0;
 t_ustr.miscnum3      = 0;
 t_ustr.miscnum4      = 0;
@@ -17502,7 +17968,7 @@ tot_mem=
 	+strlen(t_ustr.miscstr2)
 	+strlen(t_ustr.miscstr3)
 	+strlen(t_ustr.miscstr4)
-	+2 /* miscnum1 */
+	+2 /* pause_login */
 	+2 /* miscnum2 */
 	+2 /* miscnum3 */
 	+2 /* miscnum4 */
@@ -17668,7 +18134,7 @@ for (u=0;u<MAX_USERS;++u) {
 	+strlen(ustr[u].miscstr2)
 	+strlen(ustr[u].miscstr3)
 	+strlen(ustr[u].miscstr4)
-	+2 /* miscnum1 */
+	+2 /* pause_login */
 	+2 /* miscnum2 */
 	+2 /* miscnum3 */
 	+2 /* miscnum4 */
@@ -18235,6 +18701,7 @@ void say_to_user(int user, char *inpstr)
 int u;
 int area = ustr[user].area;
 char other_user[ARR_SIZE];
+char comstr[ARR_SIZE];
 
 if (!strlen(inpstr)) {
    write_str(user,"You must specify a user and a message.");
@@ -18285,11 +18752,69 @@ if (ustr[u].afk) {
 
 if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
 
+        comstr[0]=inpstr[0];
+        comstr[1]=0;
+
+if (comstr[0] == ustr[user].custAbbrs[get_emote(user)].abbr[0])
+  {
+        inpstr[0] = ' ';
+        while(inpstr[0] == ' ') inpstr++;
+
+        comstr[0]=inpstr[0];
+        comstr[1]=0;
+
+     if (comstr[0] == '\'') {
+        /* inpstr[0] = ' '; */
+        while(inpstr[0] == ' ') inpstr++;
+	if (!ustr[u].vis)
+        sprintf(mess,VIS_DIREMOTE,ustr[user].say_name,inpstr,INVIS_ACTION_LABEL);
+	else
+        sprintf(mess,VIS_DIREMOTE,ustr[user].say_name,inpstr,ustr[u].say_name);
+        }
+    else {
+     strcpy(comstr," ");
+     strcat(comstr,inpstr);
+     strcpy(inpstr,comstr);
+     if (!ustr[u].vis)
+     sprintf(mess,VIS_DIREMOTE,ustr[user].say_name,inpstr,INVIS_ACTION_LABEL);
+     else
+     sprintf(mess,VIS_DIREMOTE,ustr[user].say_name,inpstr,ustr[u].say_name);
+     }
+    
+    write_str(user,mess);
+   if (!ustr[user].vis) {
+     if (comstr[0] == '\'') {
+	/*
+        inpstr[0] = ' ';
+        while(inpstr[0] == ' ') inpstr++;
+	*/
+	if (!ustr[u].vis)
+        sprintf(mess,INVIS_DIREMOTE,INVIS_ACTION_LABEL,inpstr,INVIS_ACTION_LABEL);
+	else
+        sprintf(mess,INVIS_DIREMOTE,INVIS_ACTION_LABEL,inpstr,ustr[u].say_name);
+        }
+      else {
+	if (!ustr[u].vis)
+        sprintf(mess,INVIS_DIREMOTE,INVIS_ACTION_LABEL,inpstr,INVIS_ACTION_LABEL);
+	else
+        sprintf(mess,INVIS_DIREMOTE,INVIS_ACTION_LABEL,inpstr,ustr[u].say_name);
+	}
+    } /* end of !vis */
+  } /* end of if emote */
+else {
+  if (!ustr[u].vis)
+  sprintf(mess,VIS_DIRECTS,ustr[user].say_name,INVIS_ACTION_LABEL,inpstr);
+  else
   sprintf(mess,VIS_DIRECTS,ustr[user].say_name,ustr[u].say_name,inpstr);
   write_str(user,mess);
 
-  if (!ustr[user].vis)
+  if (!ustr[user].vis) {
+    if (!ustr[u].vis)
+    sprintf(mess,INVIS_DIRECTS,INVIS_TALK_LABEL,INVIS_ACTION_LABEL,inpstr);
+    else
     sprintf(mess,INVIS_DIRECTS,INVIS_TALK_LABEL,ustr[u].say_name,inpstr);
+    }
+}
 
   writeall_str(mess,1,user,0,user,NORM,SAY_TYPE,0);
 
@@ -18785,6 +19310,7 @@ if (ustr[user].tempsuper >= WIZ_LEVEL) {
    }
 
 sscanf(inpstr,"%s ",other_user2);
+other_user2[80]=0;
 
 /* plug security hole */
 if (check_fname(other_user2,user)) 
@@ -18950,10 +19476,20 @@ astr[area].conv_line = ( ++astr[area].conv_line ) % NUM_LINES;
 /*** emote func used for expressing emotional or visual stuff ***/
 void semote(int user, char *inpstr)
 {
-int u;
+int point=0,count=0,i=0,lastspace=0,lastcomma=0,gotchar=0;
+int point2=0,multi=0;
+int multilistnums[MAX_MULTIS];
+char multilist[MAX_MULTIS][ARR_SIZE];
+char multiliststr[ARR_SIZE];
+int u=-1;
 char prefix[25];
 char other_user[ARR_SIZE];
 char comstr[ARR_SIZE];
+char *other_input='\0';
+
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; multilistnums[i]=-1; }
+multiliststr[0]=0;
+i=0;
 
 if (ustr[user].gagcomm) {
    write_str(user,NO_COMM);
@@ -18967,37 +19503,141 @@ if (!strlen(inpstr))
   }
 
 sscanf(inpstr,"%s ",other_user);
+if (!strcmp(other_user,"-f")) {
+        other_user[0]=0;
+        for (i=0;i<MAX_ALERT;++i) {
+         if (strlen(ustr[user].friends[i])) {
+          strcpy(multilist[count],ustr[user].friends[i]);
+          count++;
+	  if (count==MAX_MULTIS) break;
+          }
+        }
+        if (!count) {
+                write_str(user,"You dont have any friends!");
+                return;
+        }
+        i=0;
+        remove_first(inpstr);
+  }
+else {
+other_user[0]=0;
+
+for (i=0;i<strlen(inpstr);++i) {
+        if (inpstr[i]==' ') {
+                if (lastspace && !gotchar) { point++; point2++; continue; }
+                if (!gotchar) { point++; point2++; }
+                lastspace=1;
+                continue;
+          } /* end of if space */
+        else if (inpstr[i]==',') {
+                if (!gotchar) {
+                        lastcomma=1;
+			point++;
+			point2++;
+			continue;
+                }
+                else {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+                count++;
+                }
+                point=i+1;
+                point2=point;
+                gotchar=0;
+                lastcomma=1;
+                continue;
+                }
+                
+        } /* end of if comma */
+        if ((inpstr[i-1]==' ') && (gotchar)) {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+                count++;
+                }
+                break;
+        }
+        gotchar=1;
+        lastcomma=0;
+        lastspace=0;
+        point2++;
+} /* end of for */
+midcpy(inpstr,multiliststr,i,ARR_SIZE);
+                
+if (!strlen(multiliststr)) {
+        /* no message string, copy last user */
+        midcpy(inpstr,multilist[count],point,point2);
+        count++;  
+        strcpy(inpstr,"");
+        }
+else {
+        strcpy(inpstr,multiliststr);
+        multiliststr[0]=0;
+     }          
+} /* end of friend else */
+
+if (!strlen(inpstr)) {
+	write_str(user,"What do you want to secret emote to them?");
+	return;
+   }
+
+i=0;
+point=0;
+point2=0;
+gotchar=0;
+
+if ((strstr(inpstr,"ARRIVING")) || (strstr(inpstr,"LEAVING")) ) {
+   write_str(user,"You cant semote that.");
+   for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; multilistnums[i]=-1; }
+   multiliststr[0]=0;
+   return;
+   }
+
+tells++;
+        
+if (count>1) multi=1;
+                
+/* go into loop and check users */
+for (i=0;i<count;++i) {
+
+strcpy(other_user,multilist[i]);
 
 /* plug security hole */
 if (check_fname(other_user,user)) 
   {
+   if (!multi) {
    write_str(user,"Illegal name.");
    return;
+   }
+   else continue;
   }
   
 strtolower(other_user);
-
-remove_first(inpstr);
 
 if ((u=get_user_num(other_user,user))== -1) 
   {
    if (!read_user(other_user)) {
       write_str(user, NO_USER_STR);
-      return;
+      if (!multi) return;
+      else continue;
       }
    not_signed_on(user,t_ustr.say_name);  
 if (user_wants_message(user,FAILS)) {
    sprintf(mess,"%s",t_ustr.fail);
    write_str(user,mess);
    }
-   return;
+	if (!multi) return;
+	else continue;
   }
 
-if (!gag_check(user,u,0)) return;
+if (!gag_check(user,u,0)) {
+	if (!multi) return;
+	else continue;
+  }
 
 if (ustr[u].pro_enter || ustr[u].vote_enter || ustr[u].roomd_enter) {
     write_str(user,IS_ENTERING);
-    return;
+    if (!multi) return;
+    else continue;
     }
 
 if (ustr[u].afk)
@@ -19023,9 +19663,58 @@ if (ustr[u].igtell && ustr[user].super<WIZ_LEVEL)
    sprintf(mess,"%s is ignoring tells and secret emotes",ustr[u].say_name);
    write_str(user,mess);
    if (user_wants_message(user,FAILS)) write_str(user,ustr[u].fail);
-   return;
+   if (!multi) return;
+   else continue;
   }
+
+/* check if this user is already in the list */
+/* we're gonna reuse some ints here          */
+for (point2=0;point2<MAX_MULTIS;++point2) {
+        if (multilistnums[point2]==u) { gotchar=1; break; }
+   }
+point2=0;
+if (gotchar) {
+  gotchar=0;
+  continue;
+  }
+
+/* it's ok to send the tell to this user, add them to the multistr */
+/* add this user to the list for our next loop */
+multilistnums[point]=u;
+point++;
+} /* end of user for */
+i=0;
   
+/* no multilistnums, must be all bad users */
+if (!point) {
+        return;
+  }
+
+/* loop to compose the messages and print to the users */
+for (i=0;i<point;++i) {
+
+u=multilistnums[i];
+
+count=0;
+point2=0;
+multiliststr[0]=0;
+/* make multi string to send to this user */
+for (point2=0;point2<point;++point2) {
+/* dont send recipients name to themselves */
+if (u==multilistnums[point2]) continue;
+else count++;
+if (count>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
+
+other_input='\0';
+other_input=inpstr;
+
 if ((ustr[u].monitor==1) || (ustr[u].monitor==3))
   {
     strcpy(prefix,"<");
@@ -19056,41 +19745,56 @@ else {
  }
 }
 else {
-if (ustr[user].frog) strcpy(inpstr,FROG_SEMOTE);
+if (ustr[user].frog) strcpy(other_input,FROG_SEMOTE);
 
 if (ustr[user].vis) {
-   comstr[0]=inpstr[0];
+   comstr[0]=other_input[0];
    comstr[1]=0;
    if (comstr[0] == '\'') {
-        inpstr[0] = ' ';
-        while(inpstr[0] == ' ') inpstr++;
-   	sprintf(mess,"--> %s\'%s", ustr[user].say_name, inpstr);
+        while(other_input[0] == '\'') { other_input++; }
+
+	if (!multi)
+   	 sprintf(mess,VIS_SEMOTES_P,ustr[user].say_name, other_input);
+	else
+   	 sprintf(mess,VIS_SEMOTE_MP,multiliststr,ustr[user].say_name,other_input);
        }
-   else
-   	sprintf(mess,"--> %s %s", ustr[user].say_name, inpstr);
+   else {
+	if (!multi)
+	 sprintf(mess,VIS_SEMOTES,ustr[user].say_name, other_input);
+	else
+	 sprintf(mess,VIS_SEMOTES_M,multiliststr,ustr[user].say_name,other_input);
+    }
    }
  else {
-   comstr[0]=inpstr[0];
+   comstr[0]=other_input[0];
    comstr[1]=0;
    if (comstr[0] == '\'') {
-      inpstr[0] = ' ';
-      while(inpstr[0] == ' ') inpstr++;
-      sprintf(mess,"%s --> %s\'%s",prefix,INVIS_ACTION_LABEL,inpstr);
+      while(other_input[0] == '\'') other_input++;
+      if (!multi)
+       sprintf(mess,INVIS_SEMOTES_P,prefix,INVIS_ACTION_LABEL,other_input);
+      else
+       sprintf(mess,INVIS_SEMOTE_MP,prefix,multiliststr,INVIS_ACTION_LABEL,other_input);
      }
-   else
-      sprintf(mess,"%s --> %s %s",prefix,INVIS_ACTION_LABEL,inpstr);
+   else {
+      if (!multi)
+       sprintf(mess,INVIS_SEMOTES,prefix,INVIS_ACTION_LABEL,other_input);
+      else
+       sprintf(mess,INVIS_SEMOTES_M,prefix,multiliststr,INVIS_ACTION_LABEL,other_input);
+   }
  }
 }
-
-if ((strstr(inpstr,"ARRIVING")) || (strstr(inpstr,"LEAVING")) ) {
-   write_str(user,"You cant semote that.");
-   return;
-   }
 
 if (ustr[u].beeps) {
  if (user_wants_message(u,BEEPS))
   strcat(mess,"\07");
  }
+
+/*-----------------------------------*/
+/* store the semote in the rev buffer*/
+/*-----------------------------------*/
+/* moved because of multi tells */
+strncpy(ustr[u].conv[ustr[u].conv_count],mess,MAX_LINE_LEN);
+ustr[u].conv_count = ( ++ustr[u].conv_count ) % NUM_LINES;
 
 if (ustr[u].hilite==2)
  write_str(u,mess);
@@ -19099,38 +19803,76 @@ else {
  write_hilite(u,mess);
  }
 
-/*-----------------------------------*/
-/* store the semote in the rev buffer*/
-/*-----------------------------------*/
+} /* end of message compisition for loop */
 
-strncpy(ustr[u].conv[ustr[u].conv_count],mess,MAX_LINE_LEN);
-ustr[u].conv_count = ( ++ustr[u].conv_count ) % NUM_LINES;
+if (multi) {
+point2=0;
+multiliststr[0]=0; 
+/* make multi string to send to this user */
+for (point2=0;point2<point;++point2) {
+/* dont send recipients name to themselves */
+if (point2>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */  
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
+} /* end of if multi */
 
 /* write to teller */
 if (strlen(inpstr)) {
-   if (comstr[0] == '\'') {
-    if (!ustr[user].vis)
-    sprintf(mess,"You posess-posed to %s: %s\'%s",ustr[u].say_name,INVIS_ACTION_LABEL,inpstr);
-    else
-    sprintf(mess,"You posess-posed to %s: %s\'%s",ustr[u].say_name,ustr[user].say_name,inpstr);
+   if (inpstr[0] == '\'') {
+      while(inpstr[0] == '\'') inpstr++;
+
+    if (!ustr[user].vis) {
+	if (!multi)
+    sprintf(mess,VISFROMSEMOTE_P,ustr[u].say_name,INVIS_ACTION_LABEL,inpstr);
+	else
+    sprintf(mess,VISFROMSEMOTE_P,multiliststr,INVIS_ACTION_LABEL,inpstr);
+    }
+    else {
+	if (!multi)
+    sprintf(mess,VISFROMSEMOTE_P,ustr[u].say_name,ustr[user].say_name,inpstr);
+	else
+    sprintf(mess,VISFROMSEMOTE_P,multiliststr,ustr[user].say_name,inpstr);
+    }
     }
    else {
-    if (!ustr[user].vis)
-    sprintf(mess,"You posed to %s: %s %s",ustr[u].say_name,INVIS_ACTION_LABEL,inpstr);
-    else
-    sprintf(mess,"You posed to %s: %s %s",ustr[u].say_name,ustr[user].say_name,inpstr);
+    if (!ustr[user].vis) {
+	if (!multi)
+    sprintf(mess,VISFROMSEMOTE,ustr[u].say_name,INVIS_ACTION_LABEL,inpstr);
+	else
+    sprintf(mess,VISFROMSEMOTE,multiliststr,INVIS_ACTION_LABEL,inpstr);
+    }
+    else {
+	if (!multi)
+    sprintf(mess,VISFROMSEMOTE,ustr[u].say_name,ustr[user].say_name,inpstr);
+	else
+    sprintf(mess,VISFROMSEMOTE,multiliststr,ustr[user].say_name,inpstr);
+    }
    }
  }
-else
+else {
+	if (!multi)
  sprintf(mess,"Telepathic message sent to %s.",ustr[u].say_name);
-
+	else
+ sprintf(mess,"Multi-Telepathic message sent to %s.",ustr[u].say_name);
+ }
 write_str(user,mess);
+
+if (!multi) {
+if (user_wants_message(user,SUCCS) && strlen(inpstr) && strlen(ustr[u].succ))
+write_str(user,ustr[u].succ);
+}
 
 strncpy(ustr[user].conv[ustr[user].conv_count],mess,MAX_LINE_LEN);
 ustr[user].conv_count = ( ++ustr[user].conv_count ) % NUM_LINES;
 
-if (user_wants_message(user,SUCCS) && strlen(inpstr) && strlen(ustr[u].succ))
-   write_str(user,ustr[u].succ);
+i=0;
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; }
+multiliststr[0]=0;
 
 }
 
@@ -19198,8 +19940,8 @@ for (area=0;area<NUM_AREAS;++area)
     else
      atm[0]=' ';
 
-   sprintf(mess,"%s%s %-15s : %-7s : %2d : %3d  ",  cbe,  atm,
-                                                  astr[area].name,
+   sprintf(mess,"%s%s %-*s : %-7s : %2d : %3d  ",  cbe,  atm,
+                                                  ROOM_LEN,astr[area].name,
                                                   pripub[astr[area].private],
                                                   i,astr[area].mess_num);
                                               
@@ -19253,7 +19995,7 @@ for (area=0;area<NUM_AREAS;++area)
    else
     atm[0]=' ';
 
-   sprintf(mess,"%15s(%s%s%3d) ",astr[area].name,cbe,atm,astr[area].mess_num);
+   sprintf(mess,"%*s(%s%s%3d) ",ROOM_LEN,astr[area].name,cbe,atm,astr[area].mess_num);
    mess[0]=toupper((int)mess[0]);
 
  if (!showhide) {   
@@ -19968,6 +20710,13 @@ signal(SIGTTOU,SIG_IGN);
 
 write_str(user,"Quitting users...");
 
+if (!treboot) {
+sprintf(mess,"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN Normal shutdown\nEND:\n\" > .tinfo",
+SYSTEM_NAME,(unsigned int)getpid());
+system(mess);
+system("mail tinfo@ncohafmuta.com < .tinfo");
+}
+
 if (treboot) {
 #if defined(WIN32) && !defined(__CYGWIN32__)
   GetStartupInfo(&s_info);
@@ -20102,6 +20851,13 @@ signal(SIGPIPE,SIG_IGN);
 signal(SIGTTIN,SIG_IGN);
 signal(SIGTTOU,SIG_IGN);
 #endif
+
+if (!treboot) {
+sprintf(mess,"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN Normal shutdown\nEND:\n\" > .tinfo",
+SYSTEM_NAME,(unsigned int)getpid());
+system(mess);
+system("mail tinfo@ncohafmuta.com < .tinfo");
+}
 
 if (treboot) {
 #if defined(WIN32) && !defined(__CYGWIN32__)
@@ -20265,6 +21021,13 @@ switch(error) {
    case 14: strcpy(message,"a failure to write to the system logs"); break;
    default: strcpy(message,"an unknown failure"); break;
   }
+
+if (!treboot) {
+sprintf(mess,"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN %s\nEND:\n\" > .tinfo",
+SYSTEM_NAME,(unsigned int)getpid(),message);
+system(mess);
+system("mail tinfo@ncohafmuta.com < .tinfo");
+}
 
 if (treboot) {
 #if defined(WIN32) && !defined(__CYGWIN32__)
@@ -21123,9 +21886,9 @@ if (atmos_on)
 /*
 write_str(user,"|                                                           |");
 */     
-write_str(user,"|        New quota        New today        New Per Day      |");
+write_str(user,"|        New Total        New Today        New Per Day      |");
 sprintf(mess,  "|           %3.3ld              %3.3ld               %3.3d          |",
-                                            system_stats.quota,
+                                            system_stats.new_since_start,
 system_stats.new_users_today, new_per_day);
 
 write_str(user,mess);
@@ -21139,9 +21902,9 @@ write_str(user,mess);
 /*
 write_str(user,"|                                                           |");
 */
-write_str(user,"|        New Total        Message Life     Total expired    |");
+write_str(user,"|        New Quota        Message Life     Total expired    |");
 sprintf(mess,  "|           %3.3ld              %3.3d days          %3.3ld          |",
-system_stats.new_since_start, MESS_LIFE, system_stats.tot_expired);
+system_stats.quota, MESS_LIFE, system_stats.tot_expired);
 write_str(user,mess);
 write_str(user,"|        Cache Hits       Cache Misses                      |");
 sprintf(mess,  "|           %4.4d             %4.4d                           |",
@@ -21155,7 +21918,6 @@ new_per_day=0;
 total_time=0;
 dec_hours=0;
 }
-
 
 
 /*** move user somewhere else ***/
@@ -21286,7 +22048,7 @@ ustr[user2].area=area;
 look(user2,"");
 
 /* to new area */
-sprintf(mess,MOVE_TONEW,tempstr);
+sprintf(mess,MOVE_TONEW,tempstr,"s");
 writeall_str(mess, 1, user2, 0, user, NORM, MOVE, 0);
 
    if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
@@ -21377,9 +22139,16 @@ if (!co) {
 	strcpy(line,"*** System is now closed to all further logins ***");
 	writeall_str(line, 0, user, 1, user, BOLD, NONE, 0);
 	sys_access=0;
+
+	if (WIZ_OFFSET!=0)
         wiz_access=0;
+
+	if (WHO_OFFSET!=0)
         who_access=0;
+
+	if (WWW_OFFSET!=0)
         www_access=0;
+
 	return;
        }
   if(!strcmp(inpstr,"main")) {
@@ -21391,6 +22160,10 @@ if (!co) {
 	return;
        }
   if(!strcmp(inpstr,"wiz")) {
+	if (WIZ_OFFSET==0) {
+	write_str(user,"The wizard port has been disabled in the code.");
+	return;
+	}
         sprintf(line,"WIZ PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
         sprintf(line,"%s: WIZ PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
@@ -21399,6 +22172,10 @@ if (!co) {
 	return;
        }
   if(!strcmp(inpstr,"who")) {
+	if (WHO_OFFSET==0) {
+	write_str(user,"The who port has been disabled in the code.");
+	return;
+	}
         sprintf(line,"WHO PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
         sprintf(line,"%s: WHO PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
@@ -21407,6 +22184,10 @@ if (!co) {
 	return;
        }
   if(!strcmp(inpstr,"www")) {
+	if (WWW_OFFSET==0) {
+	write_str(user,"The web port has been disabled in the code.");
+	return;
+	}
         sprintf(line,"WWW PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
         sprintf(line,"%s: WWW PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
@@ -21428,9 +22209,16 @@ else {
 	strcpy(line,"*** System is now open to all further logins ***");
 	writeall_str(line, 0, user, 1, user, BOLD, NONE, 0);
 	sys_access=1;
+
+	if (WIZ_OFFSET!=0)
         wiz_access=1;
+
+	if (WHO_OFFSET!=0)
         who_access=1;
+
+	if (WWW_OFFSET!=0)
         www_access=1;
+
 	return;
        }
   if(!strcmp(inpstr,"main")) {
@@ -21442,6 +22230,10 @@ else {
 	return;
        }
   if(!strcmp(inpstr,"wiz")) {
+	if (WIZ_OFFSET==0) {
+	write_str(user,"The wizard port has been disabled in the code.");
+	return;
+	}
         sprintf(line,"WIZ PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
         sprintf(line,"%s: WIZ PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
@@ -21450,6 +22242,10 @@ else {
 	return;
        }
   if(!strcmp(inpstr,"who")) {
+	if (WHO_OFFSET==0) {
+	write_str(user,"The who port has been disabled in the code.");
+	return;
+	}
         sprintf(line,"WHO PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
         sprintf(line,"%s: WHO PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
@@ -21458,6 +22254,10 @@ else {
 	return;
        }
   if(!strcmp(inpstr,"www")) {
+	if (WWW_OFFSET==0) {
+	write_str(user,"The web port has been disabled in the code.");
+	return;
+	}
         sprintf(line,"WWW PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
         sprintf(line,"%s: WWW PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
@@ -21595,7 +22395,7 @@ write_str(user,mess);
 void greet(int user, char *inpstr)
 {
 char pbuff[256];
-int slen,lc,c,i,j;
+int slen,lc,c,i,j,found=0;
 
 if (ustr[user].frog) return;
 
@@ -21608,6 +22408,15 @@ if (!slen)
   
 if (slen>10) slen=10;
 
+/* check for special characters in string */ 
+for (i=0;i<slen;++i) {
+        if (!isalpha((int)inpstr[i])) { found=1; break; }
+}
+if (found==1) {
+write_str(user,"Message cannot have special characters in it.");
+return;
+}       
+i=0;
 
 strcpy(mess,"");
 write_str(user,mess);
@@ -23332,43 +24141,21 @@ print_to_syslog(buf1);
 /*** Bring a user to you ***/
 void bring(int user, char *inpstr)
 {
-int user2,area=ustr[user].area;
+int point=0,count=0,i=0,lastspace=0,lastcomma=0,gotchar=0;
+int point2=0,multi=0;
+int multilistnums[MAX_MULTIS];
+char multilist[MAX_MULTIS][ARR_SIZE];
+char multiliststr[ARR_SIZE];
+int user2=-1,area=ustr[user].area;
 char other_user[ARR_SIZE];
 char tempstr[50];
 
+for (i=0;i<MAX_MULTIS;++i) { multilist[i][0]=0; multilistnums[i]=-1; }
+multiliststr[0]=0;
+i=0;
+
 if (!strlen(inpstr)) {
    write_str(user,"Bring who?");
-   return;
-   }
-
-sscanf(inpstr,"%s",other_user);
-if ((user2=get_user_num(other_user,user))== -1) {
-   not_signed_on(user,other_user);
-   return;
-   }
-
-if (user==user2) {
-   write_str(user,"You cant bring yourself!");
-   return;
-   }
-
- if ((!strcmp(ustr[user2].name,ROOT_ID)) || (!strcmp(ustr[user2].name,BOT_ID)
-      && strcmp(ustr[user].name,ROOT_ID))) {
-    write_str(user,"Yeah, right!");
-    return;
-    }
-
-/* Cant bring a master user */
-if (ustr[user2].super > ustr[user].tempsuper) {
-   write_str(user,"Hmm... inadvisable");
-   sprintf(mess,"%s thought about bringing you to the %s",ustr[user].say_name,astr[ustr[user].area].name);
-   write_str(user2,mess);
-   return;
-   }
-
-if (area==ustr[user2].area) {
-   sprintf(mess,"%s is already in this room!",ustr[user2].say_name);
-   write_str(user,mess);
    return;
    }
 
@@ -23376,6 +24163,170 @@ if (!strcmp(astr[area].name,HEAD_ROOM)) {
    write_str(user,"Noone can be .brung into this room  Hehe.");
    return;
    }
+
+sscanf(inpstr,"%s ",other_user);
+if (!strcmp(other_user,"-f")) {
+        other_user[0]=0; 
+        for (i=0;i<MAX_ALERT;++i) {
+         if (strlen(ustr[user].friends[i])) {
+          strcpy(multilist[count],ustr[user].friends[i]);
+          count++;
+	  if (count==MAX_MULTIS) break;
+          }
+        }
+        if (!count) {
+                write_str(user,"You dont have any friends!");
+                return;
+        }
+        i=0;
+        remove_first(inpstr);  
+  }
+else {
+other_user[0]=0;
+          
+for (i=0;i<strlen(inpstr);++i) {
+        if (inpstr[i]==' ') {
+                if (lastspace && !gotchar) { point++; point2++; continue; }
+                if (!gotchar) { point++; point2++; }
+                lastspace=1;
+                continue;
+          } /* end of if space */
+        else if (inpstr[i]==',') {
+                if (!gotchar) {
+                        lastcomma=1;
+                        point++;
+                        point2++;
+                        continue;
+                }
+                else {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+                count++;
+                }
+                point=i+1;
+                point2=point;
+                gotchar=0;
+                lastcomma=1;
+                continue;
+                }
+                        
+        } /* end of if comma */
+        if ((inpstr[i-1]==' ') && (gotchar)) {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+                count++;
+                }
+                break;
+        }
+        gotchar=1;
+        lastcomma=0;
+        lastspace=0;
+        point2++;
+} /* end of for */      
+midcpy(inpstr,multiliststr,i,ARR_SIZE);
+if (!strlen(multiliststr)) {
+        /* no message string, copy last user */
+        midcpy(inpstr,multilist[count],point,point2);
+        count++; 
+        strcpy(inpstr,"");
+        }
+else {
+        strcpy(inpstr,multiliststr);
+        multiliststr[0]=0;
+     }
+} /* end of friend else */
+
+i=0;
+point=0; 
+point2=0;
+gotchar=0;
+
+if (count>1) multi=1;
+
+/* go into loop and check users */
+for (i=0;i<count;++i) {
+
+strcpy(other_user,multilist[i]);
+
+/* plug security hole */
+if (check_fname(other_user,user))
+  { 
+   if (!multi) {
+   write_str(user,"Illegal name.");
+   return;
+   }
+   else continue;
+  }
+
+strtolower(other_user);
+
+
+if ((user2=get_user_num(other_user,user))== -1) {
+   not_signed_on(user,other_user);
+   if (!multi) return;
+   else continue;
+   }
+
+if (user==user2) {
+   write_str(user,"You cant bring yourself!");
+   if (!multi) return;
+   else continue;
+   }
+
+ if ((!strcmp(ustr[user2].name,ROOT_ID)) || (!strcmp(ustr[user2].name,BOT_ID)
+      && strcmp(ustr[user].name,ROOT_ID))) {
+    write_str(user,"Yeah, right!");
+    if (!multi) return;
+    else continue;
+    }
+
+/* Cant bring a master user */
+if (ustr[user2].super > ustr[user].tempsuper) {
+   write_str(user,"Hmm... inadvisable");
+   sprintf(mess,"%s thought about bringing you to the %s",ustr[user].say_name,astr[ustr[user].area].name);
+   write_str(user2,mess);
+   if (!multi) return;
+   else continue;
+   }
+
+if (area==ustr[user2].area) {
+   sprintf(mess,"%s is already in this room!",ustr[user2].say_name);
+   write_str(user,mess);
+   if (!multi) return;
+   else continue;
+   }
+
+/* check if this user is already in the list */
+/* we're gonna reuse some ints here          */
+for (point2=0;point2<MAX_MULTIS;++point2) {
+        if (multilistnums[point2]==user2) { gotchar=1; break; }
+   }
+point2=0;
+if (gotchar) {
+  gotchar=0;
+  continue;
+  }
+
+/* it's ok to send the tell to this user, add them to the multistr */
+/* add this user to the list for our next loop */
+multilistnums[point]=user2;
+point++;
+} /* end of user for */
+i=0;
+    
+/* no multilistnums, must be all bad users */
+if (!point) { 
+        return;
+  }
+
+/* loop to compose the messages and print to the users */
+for (i=0;i<point;++i) {
+
+user2=multilistnums[i];
+
+count=0;
+point2=0;
+multiliststr[0]=0;
 
 /** send output **/
 write_str(user2,MOVE_TOUSER);
@@ -23403,14 +24354,35 @@ if ((find_num_in_area(ustr[user2].area)<=PRINUM) && astr[ustr[user2].area].priva
 ustr[user2].area=area;
 look(user2,"");
 
-/* To new area */
-sprintf(mess,MOVE_TONEW,tempstr);
-writeall_str(mess, 1, user2, 0, user, NORM, MOVE, 0);
-
    if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
     sprintf(mess,"+++++ came in:%s", ustr[user2].say_name);
     write_bot(mess);
     }
+
+} /* end of message compisition for loop */
+
+/* make multi string to send to this user */
+if (multi) {
+point2=0;
+multiliststr[0]=0;
+for (point2=0;point2<point;++point2) {
+if (point2>0)
+ strcat(multiliststr,",");
+/* add their name to the output string */
+if (!ustr[multilistnums[point2]].vis)
+ strcat(multiliststr,INVIS_ACTION_LABEL);
+else
+ strcat(multiliststr,ustr[multilistnums[point2]].say_name);
+}
+} /* end of if multi */
+else strcpy(multiliststr,tempstr);
+
+/* To new area */
+sprintf(mess,MOVE_TONEW,multiliststr,multi == 1 ? "" : "s");
+if (!multi)
+ writeall_str(mess, 1, user2, 0, user, NORM, MOVE, 0);
+else
+ writeall_str(mess, 1, -1, 0, user, NORM, MOVE, 0);
 
 write_str(user,"Ok");
 }
@@ -23592,7 +24564,7 @@ else {
            (void) closedir(dirp); 
            return 1;
            }
-        else if (instr2(0,ustr[user].site,small_buff,0) != -1) {
+        else if (check_site(ustr[user].site,small_buff,1)) {
            sprintf(filename,"%s/%s.r",filerid,small_buff);
            if (!(fp=fopen(filename,"r"))) {
               write_str(user,"Cant open restrict file.");
@@ -23624,7 +24596,7 @@ else {
            (void) closedir(dirp); 
            return 1;
            }
-        else if (check_site(ustr[user].net_name,small_buff)) {
+        else if (check_site(ustr[user].net_name,small_buff,0)) {
            sprintf(filename,"%s/%s.r",filerid,small_buff);
            if (!(fp=fopen(filename,"r"))) {
               write_str(user,"Cant open restrict file.");
@@ -23690,7 +24662,7 @@ DIR  *dirp;
            (void) closedir(dirp); 
            return 1;
            }
-        else if (instr2(0,site,small_buff,0) != -1) {
+        else if (check_site(site,small_buff,1)) {
            sprintf(filename,"%s/%s.r",filerid,small_buff);
            if (!(fp=fopen(filename,"r"))) {
               return 1;
@@ -23720,7 +24692,7 @@ DIR  *dirp;
            (void) closedir(dirp); 
            return 1;
            }
-        else if (check_site(namesite,small_buff)) {
+        else if (check_site(namesite,small_buff,0)) {
            sprintf(filename,"%s/%s.r",filerid,small_buff);
            if (!(fp=fopen(filename,"r"))) {
               return 1;
@@ -23744,15 +24716,24 @@ DIR  *dirp;
 }
 
 
-/* check if site ends are the same (search starts from the end of string) */
-int check_site(char *str1, char *str2)
+/* check if site ends are the same (search starts from the end of string */
+/* for hostnames, beginning of string for ips)				 */
+int check_site(char *str1, char *str2, int mode)
 {
 int i,j=strlen(str1);
 
 if (j<strlen(str2)) return 0;
-                        
+
+if (!mode) {                        
+/* hostname check */
 for (i=strlen(str2)-1;i>=0;i--) if (str1[--j]!=str2[i]) return 0;
 return 1;
+}
+else {
+/* ip check */
+for (i=0;i<strlen(str2);++i) if (str1[i]!=str2[i]) return 0;
+return 1;
+}
 }
 
 
@@ -24075,8 +25056,9 @@ else {
 
 if ((fp2=fopen(filename,"r"))) {
     fclose(fp2);
-    sprintf(mess,"Comment/Reason added to site %s\n",site_name);
-    write_str(user,mess);
+    sprintf(mess,"Comment/Reason added to site %s by %s",site_name,ustr[user].say_name);
+    btell(user,mess);
+    sprintf(mess,"%s: Comment/Reason added to site %s by %s\n",get_time(0,0),site_name,ustr[user].say_name);
     print_to_syslog(mess);
    }  /* end of if */
 
@@ -24116,8 +25098,9 @@ else {
 
  sprintf(mess,"Site %s is now %s.",site_name, text_mess);
  write_str(user,mess);
- sprintf(mess,"%s site %s by %s\n", text_mess, site_name, ustr[user].say_name);
+ sprintf(mess,"%s: %s site %s by %s\n", get_time(0,0), text_mess, site_name, ustr[user].say_name);
  print_to_syslog(mess);
+ sprintf(mess,"%s site %s by %s", text_mess, site_name, ustr[user].say_name);
  btell(user,mess);
  }  /* end of else */
 }
@@ -24188,12 +25171,18 @@ sprintf(mess,"Site %s is ALLOWED ACCESS again.",inpstr);
 write_str(user,mess);
 
 if (type==ANY)
- sprintf(mess,"UNRESTRICT site %s by %s\n",inpstr,ustr[user].say_name);
+ sprintf(mess,"UNRESTRICT site %s by %s",inpstr,ustr[user].say_name);
 else
- sprintf(mess,"UNBANNEW site %s by %s\n",inpstr,ustr[user].say_name);
+ sprintf(mess,"UNBANNEW site %s by %s",inpstr,ustr[user].say_name);
+
+btell(user,mess);
+
+if (type==ANY)
+ sprintf(mess,"%s: UNRESTRICT site %s by %s\n",get_time(0,0),inpstr,ustr[user].say_name);
+else
+ sprintf(mess,"%s: UNBANNEW site %s by %s\n",get_time(0,0),inpstr,ustr[user].say_name);
 
 print_to_syslog(mess);
-btell(user,mess);
 }
 
 
@@ -25104,7 +26093,7 @@ strcpy(ustr[user].miscstr1, "NA");
 strcpy(ustr[user].miscstr2, "NA");
 strcpy(ustr[user].miscstr3, "NA");
 strcpy(ustr[user].miscstr4, "NA");
-ustr[user].miscnum1 =        0;
+ustr[user].pause_login =     1;
 ustr[user].miscnum2 =        0;
 ustr[user].miscnum3 =        0;
 ustr[user].miscnum4 =        0;
@@ -25269,7 +26258,7 @@ ustr[user].ttt_kills      =t_ustr.ttt_kills;
 ustr[user].ttt_killed     =t_ustr.ttt_killed;
 ustr[user].hang_wins      =t_ustr.hang_wins;
 ustr[user].hang_losses    =t_ustr.hang_losses;
-ustr[user].miscnum1       =t_ustr.miscnum1;
+ustr[user].pause_login    =t_ustr.pause_login;
 ustr[user].miscnum2       =t_ustr.miscnum2;
 ustr[user].miscnum3       =t_ustr.miscnum3;
 ustr[user].miscnum4       =t_ustr.miscnum4;
@@ -25408,7 +26397,7 @@ t_ustr.ttt_kills       =ustr[user].ttt_kills;
 t_ustr.ttt_killed      =ustr[user].ttt_killed;
 t_ustr.hang_wins       =ustr[user].hang_wins;
 t_ustr.hang_losses     =ustr[user].hang_losses;
-t_ustr.miscnum1        =ustr[user].miscnum1;
+t_ustr.pause_login     =ustr[user].pause_login;
 t_ustr.miscnum2        =ustr[user].miscnum2;
 t_ustr.miscnum3        =ustr[user].miscnum3;
 t_ustr.miscnum4        =ustr[user].miscnum4;
@@ -25446,6 +26435,8 @@ FILE *f;                 /* user file*/
 struct stat fileinfo;
 
 buff1[0]=0;
+
+if (!strlen(name)) return 0;
 
 sprintf(z_mess,"%s/%s",USERDIR,name);
 strncpy(filename,z_mess,FILE_NAME_LEN);
@@ -25514,7 +26505,7 @@ t_ustr.ttt_kills     = 0;
 t_ustr.ttt_killed    = 0;
 t_ustr.hang_wins     = 0;
 t_ustr.hang_losses   = 0;
-t_ustr.miscnum1      = 0;
+t_ustr.pause_login   = 0;
 t_ustr.miscnum2      = 0;
 t_ustr.miscnum3      = 0;
 t_ustr.miscnum4      = 0;
@@ -25742,7 +26733,7 @@ rbuf(t_ustr.miscstr1,10);	/* miscstr1 */
 rbuf(t_ustr.miscstr2,10);	/* miscstr2 */
 rbuf(t_ustr.miscstr3,10);	/* miscstr3 */
 rbuf(t_ustr.miscstr4,10);	/* miscstr4 */
-fscanf(f,"%d %d %d %d %d\n", &t_ustr.miscnum1, &t_ustr.miscnum2,
+fscanf(f,"%d %d %d %d %d\n", &t_ustr.pause_login, &t_ustr.miscnum2,
        &t_ustr.miscnum3, &t_ustr.miscnum4, &t_ustr.miscnum5);
 
 rbuf(buff1,-1);	/* ENDVER STRING */
@@ -25810,7 +26801,7 @@ if (t_ustr.ttt_kills > 32767     || t_ustr.ttt_kills < 0)       t_ustr.ttt_kills
 if (t_ustr.ttt_killed > 32767     || t_ustr.ttt_killed < 0)       t_ustr.ttt_killed =0;
 if (t_ustr.hang_wins > 32767     || t_ustr.hang_wins < 0)       t_ustr.hang_wins =0;
 if (t_ustr.hang_losses > 32767     || t_ustr.hang_losses < 0)       t_ustr.hang_losses =0;
-if (t_ustr.miscnum1 > 32767     || t_ustr.miscnum1 < 0)	t_ustr.miscnum1=0;
+if (t_ustr.pause_login > 32767     || t_ustr.pause_login < 0)	t_ustr.pause_login=0;
 if (t_ustr.miscnum2 > 32767     || t_ustr.miscnum2 < 0)	t_ustr.miscnum2=0;
 if (t_ustr.miscnum3 > 32767     || t_ustr.miscnum3 < 0)	t_ustr.miscnum3=0;
 if (t_ustr.miscnum4 > 32767     || t_ustr.miscnum4 < 0)	t_ustr.miscnum4=0;
@@ -25837,6 +26828,8 @@ FILE *f;                 /* user file */
 struct stat fileinfo;
 
 buff1[0]=0;
+
+if (!strlen(name)) return 0;
 
 sprintf(t_mess,"%s/%s",USERDIR,name);
 strncpy(filename,t_mess,FILE_NAME_LEN);
@@ -25907,7 +26900,7 @@ ustr[user].ttt_kills     = 0;
 ustr[user].ttt_killed    = 0;
 ustr[user].hang_wins     = 0;
 ustr[user].hang_losses   = 0;
-ustr[user].miscnum1      = 0;
+ustr[user].pause_login   = 0;
 ustr[user].miscnum2      = 0;
 ustr[user].miscnum3      = 0;
 ustr[user].miscnum4      = 0;
@@ -26136,7 +27129,7 @@ rbuf(ustr[user].miscstr1,10);       /* miscstr1 */
 rbuf(ustr[user].miscstr2,10);       /* miscstr2 */
 rbuf(ustr[user].miscstr3,10);       /* miscstr3 */
 rbuf(ustr[user].miscstr4,10);       /* miscstr4 */
-fscanf(f,"%d %d %d %d %d\n", &ustr[user].miscnum1, &ustr[user].miscnum2,       
+fscanf(f,"%d %d %d %d %d\n", &ustr[user].pause_login, &ustr[user].miscnum2,       
        &ustr[user].miscnum3, &ustr[user].miscnum4, &ustr[user].miscnum5);
 
 rbuf(buff1,-1);	/* ENDVER STRING */
@@ -26206,7 +27199,7 @@ if (ustr[user].ttt_kills > 32767 || ustr[user].ttt_kills < 0)  ustr[user].ttt_ki
 if (ustr[user].ttt_killed > 32767 || ustr[user].ttt_killed < 0)  ustr[user].ttt_killed =0;
 if (ustr[user].hang_wins > 32767 || ustr[user].hang_wins < 0)  ustr[user].hang_wins =0;
 if (ustr[user].hang_losses > 32767 || ustr[user].hang_losses < 0)  ustr[user].hang_losses =0;
-if (ustr[user].miscnum1  > 32767 || ustr[user].miscnum1 < 0)  ustr[user].miscnum1=0;
+if (ustr[user].pause_login  > 32767 || ustr[user].pause_login < 0)  ustr[user].pause_login=0;
 if (ustr[user].miscnum2  > 32767 || ustr[user].miscnum2 < 0) ustr[user].miscnum2=0;
 if (ustr[user].miscnum3  > 32767 || ustr[user].miscnum3 < 0) ustr[user].miscnum3=0;
 if (ustr[user].miscnum4  > 32767 || ustr[user].miscnum4 < 0) ustr[user].miscnum4=0;
@@ -26347,7 +27340,7 @@ wbuf(t_ustr.miscstr1);       /* miscstr1 */
 wbuf(t_ustr.miscstr2);       /* miscstr2 */
 wbuf(t_ustr.miscstr3);       /* miscstr3 */
 wbuf(t_ustr.miscstr4);       /* miscstr4 */
-fprintf(f,"%d %d %d %d %d\n", t_ustr.miscnum1, t_ustr.miscnum2,       
+fprintf(f,"%d %d %d %d %d\n", t_ustr.pause_login, t_ustr.miscnum2,       
        t_ustr.miscnum3, t_ustr.miscnum4, t_ustr.miscnum5);      
 
 /* tack on marker */
@@ -26890,7 +27883,7 @@ if (!strlen(inpstr))
       {
 	if (t_ustr.security[a]=='Y' && strlen(astr[a].name))
 	  {
-	   sprintf(mess,"%15s ",astr[a].name);
+	   sprintf(mess,"%*s ",ROOM_LEN,astr[a].name);
 	   fputs(mess,fp);
 	  }
 	if (!(j++%3) )
@@ -26908,7 +27901,7 @@ a=0;
       {
 	if (t_ustr.security[a]=='N' && strlen(astr[a].name))
 	  {
-	   sprintf(mess,"%15s ",astr[a].name);
+	   sprintf(mess,"%*s ",ROOM_LEN,astr[a].name);
 	   fputs(mess,fp);
 	  }
 	if (!(j++%3) )
@@ -27414,8 +28407,8 @@ sprintf(mess,"| Created:    %-25s  commands total: %-8.8li",
 write_str(user,mess);
 
 if (astr[ustr[i].area].hidden)
-sprintf(mess,"| Last room:                                 logins to date: %-5.5d",
-                           ustr[i].times_on);
+sprintf(mess,"| Last room:  %-16.16s           logins to date: %-5.5d",
+                           "",ustr[i].times_on);
 else
 sprintf(mess,"| Last room:  %-16.16s           logins to date: %-5.5d",
                            astr[ustr[i].area].name, 
@@ -27526,8 +28519,8 @@ sprintf(mess,"| Created:    %-25s  commands total: %-8.8li",
 write_str(user,mess);
 
 if (astr[t_ustr.area].hidden)
-sprintf(mess,"| Last room:                                 logins to date: %-5.5d",
-                           t_ustr.times_on);
+sprintf(mess,"| Last room:  %-16.16s           logins to date: %-5.5d",
+                           "",t_ustr.times_on);
 else
 sprintf(mess,"| Last room:  %-16.16s           logins to date: %-5.5d",
                            astr[t_ustr.area].name, 
@@ -27980,6 +28973,27 @@ void set_hidden(int user, char *inpstr)
 }
 
 /*------------------------------------------------*/
+/* set login pause                                */
+/*------------------------------------------------*/
+void set_pause(int user)
+{
+
+  if (ustr[user].pause_login)
+    {
+      write_str(user, "You will NOT get a pause when your login");
+      ustr[user].pause_login = 0;
+    }
+   else
+    {
+      write_str(user, "You WILL get a pause when your login");
+      ustr[user].pause_login = 1;
+    }
+    
+  copy_from_user(user);
+  write_user(ustr[user].login_name);
+}
+
+/*------------------------------------------------*/
 /* set break in who or not                        */
 /*------------------------------------------------*/
 void set_pbreak(int user, char *inpstr)
@@ -28411,6 +29425,15 @@ command[0]=0;
   else if (!strcmp("icq",command))
     {set_icq(user,inpstr);
     }
+  else if (!strcmp("pause",command))
+    {set_pause(user);
+    }
+  else if (!strcmp("autoread",command))
+    {set_autoread(user);
+    }
+  else if (!strcmp("autofwd",command))
+    {set_autofwd(user);
+    }
   else if (!strcmp("show",command)) {
    strcpy(onoff[0],"OFF");
    strcpy(onoff[1],"ON ");
@@ -28452,7 +29475,7 @@ command[0]=0;
    sprintf(mess,"Cariages: %s   Hilites : %s   Email_Hidden: %s",
     onoff[ustr[user].car_return],onoff[ustr[user].hilite],yesno[ustr[user].semail]);
    write_str(user,mess);
-   sprintf(mess,"Passhid : %s   Pbreak  : %s",onoff[ustr[user].passhid],onoff[ustr[user].pbreak]);
+   sprintf(mess,"Passhid : %s   Pbreak  : %s   Pause_Login : %s",onoff[ustr[user].passhid],onoff[ustr[user].pbreak],onoff[ustr[user].pause_login]);
    write_str(user,mess);
    sprintf(mess,"PrivBeep: %s   Color   : %s",
     onoff[ustr[user].beeps],onoff[ustr[user].color]);
@@ -28462,28 +29485,18 @@ command[0]=0;
   }
  else {
  write_str(user,"Valid options are: (help on these under ^.h set^)");
- write_str(user,"      email  - To set your email in your user profile");
- write_str(user,"      gender - To set your gender in your user profile");
- write_str(user,"      recap  - To change the capitalization for your name");
- write_str(user,"      home   - To set your home_room for .home");
- write_str(user,"      homepage - set your WWW homepage in your user profile");
- write_str(user,"      picurl - set the HTTP adddress where your picture can be found");
- write_str(user,"               (The actual picture file, not a .html file)");
- write_str(user,"      icq    - To set your ICQ number");
- write_str(user,"      rows   - set the number of rows on your screen (for scrolling)");
- write_str(user,"      cols   - set the number of columns (width) of your screen");
- write_str(user,"      abbrs  - do you want abbreviations on or off              (toggles)");
- write_str(user,"      beeps  - do you want beeps on private communications      (toggles)");
- write_str(user,"      space  - do you want leading whitespace removed           (toggles)");
- write_str(user,"      car    - need carriage returns?  (VAX/VMS etc.)           (toggles)"); 
- write_str(user,"      help   - which .help formatting style do you want?        (toggles)");
- write_str(user,"      hi     - does your terminal handle hilighting             (toggles)");
- write_str(user,"      hidden - do you want your password hidden on login        (toggles)");
- write_str(user,"      pbreak - do you want the who listing paged out            (toggles)");
- write_str(user,"      visemail - do you want your email address hidden          (toggles)");
- write_str(user,"      who    - which .who formatting style do you want?         (toggles)");
- write_str(user,"      color  - do you want ANSI coloring/colors?                (toggles)");
- write_str(user,"      show   - show your current settings");
+ write_str(user,"  cols               autoread (toggle)");
+ write_str(user,"  email              beeps    (toggle)");
+ write_str(user,"  gender             car      (toggle)");
+ write_str(user,"  home               color    (toggle)");
+ write_str(user,"  homepage           help     (toggle)");
+ write_str(user,"  icq                hi       (toggle)");
+ write_str(user,"  picurl             hidden   (toggle)");
+ write_str(user,"  recap              pause    (toggle)");
+ write_str(user,"  rows               pbreak   (toggle)");
+ write_str(user,"  show               space    (toggle)");
+ write_str(user,"  abbrs    (toggle)  visemail (toggle)");
+ write_str(user,"  autofwd  (toggle)  who      (toggle)");
  }
 }
 
@@ -30268,19 +31281,28 @@ if (i==0) {
  printf("   use port: %d\n",open_port);
  }
 else if (i==1) {   
- open_port = PORT + WIZARD_OFFSET;
+ if (WIZ_OFFSET != 0) {
+ open_port = PORT + WIZ_OFFSET;
  printf("Wizard port:\n\n");
  printf("   use port: %d\n",open_port);
  }
+ else { wiz_access=0; continue; }
+ }
 else if (i==2) {
+ if (WHO_OFFSET != 0) {
  open_port = PORT + WHO_OFFSET;
  printf("External WHO list port:\n\n");
  printf("   use port: %d\n",open_port);
  }
+ else { who_access=0; continue; }
+ }
 else if (i==3) {   
+ if (WWW_OFFSET != 0) {
  open_port = PORT + WWW_OFFSET;
  printf("Mini WWW port:\n\n");
  printf("   use port: %d\n",open_port);
+ }
+ else { www_access=0; continue; }
  }
 
 #if defined(__FreeBSD__)        

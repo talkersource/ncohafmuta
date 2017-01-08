@@ -16,9 +16,9 @@
 /*              exportation of encoding technology.                     */
 /*----------------------------------------------------------------------*/
 
-/* last modified: Apr 8th, 1999  Cygnus */
+/* last modified: Aug 4th, 1999  Cygnus */
 
-#define VERSION  "Ncohafmuta 1.2.1 by Cygnus"
+#define VERSION  "Ncohafmuta 1.2.1-pl3 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
@@ -86,7 +86,21 @@ extern int S_WRITE(int sock, char *str, int len);
 /*                                                                     */
 /* DO NOT USE A SINGLE QUOTE (') or DOUBLE QUOTE (") IN THE NAME       */
 /*---------------------------------------------------------------------*/
-#define SYSTEM_NAME "PinWHeeLs"
+#define SYSTEM_NAME "Test-Talker"
+
+/*------------------------------------------------------------*/
+/* Set this to a short description of the theme of the talker */
+/* This is only used on the info section of the talker list   */
+/* Please limit to around 45 characters                       */
+/*------------------------------------------------------------*/
+#define TTHEME        "A nice place to come and relax"
+
+/*------------------------------------------------------------------*/
+/* This defines whether this talker is only for people 18 years old */
+/* and older. Set this to 1 if it is. Set to 0 if it's not.         */
+/* This is only used on the info section of the talker list         */
+/*------------------------------------------------------------------*/
+#define EIGHTTPLUS    0
 
 /*------------------------------------------------*/
 /* Password encryption key                        */
@@ -186,6 +200,7 @@ extern int num_locks;
 #define NO_ROOM         "There is no such room!"
 #define NO_SINGSTR      "You forgot the words already?!"
 #define NO_COMM         "You can't do that in your current condition!"
+#define NO_MESS		"What do you want to say?"
 #define NO_SHOUT        "You can hardly make a sound."
 #define NO_SHOUT_SOS    "You have been naughty, wizards don't want to be bugged by you."
 #define NO_MATCH_SUIC   "The password you entered doesn't match your current password."
@@ -246,7 +261,7 @@ extern int num_locks;
 #define ANCHORED_DOWN   "Where do you think you're going stapled to the floor?"
 #define MOVE_TOUSER     "A force grabs you and pulls you into the beyond!!"
 #define MOVE_TOREST     "%s is pulled into the beyond!"
-#define MOVE_TONEW      "%s appears from nowhere!"
+#define MOVE_TONEW      "%s appear%s from nowhere!"
 #define ARREST_TOUSER   "A man in a white coat grabs you and throws you into a van!!"
 #define ARREST_TOREST   "A man in a white coat grabs %s and throws them into a van!!"
 #define ARREST_TOJAIL   "A group of white coats bring %s in!!"
@@ -308,12 +323,26 @@ extern int num_locks;
 /*            work unless you modify the bot's code.  Sorry.            */
 #define VIS_SAYS        "%s says \"%s@@\""
 #define INVIS_SAYS      "* %s says \"%s@@\""
-#define VIS_DIRECTS     "%s says ^(to %s)^ \"%s@@\""
-#define INVIS_DIRECTS   "* %s says ^(to %s)^ \"%s@@\""
+#define VIS_DIRECTS     "%s says ^HR(to %s)^ \"%s@@\""
+#define INVIS_DIRECTS   "* %s says ^HR(to %s)^ \"%s@@\""
+#define VIS_DIREMOTE    "%s%s@@ ^HR(to %s)^"
+#define INVIS_DIREMOTE  "* %s%s@@ ^HR(to %s)^"
 #define VIS_TELLS       "%s tells you: \"%s@@\""
+#define VIS_TELLS_M     "%s tells you%s: \"%s@@\""	/* multi */
 #define INVIS_TELLS     "%s tells you: \"%s@@\""
-#define VIS_FROMTELLS   " <priv-com %s>: %s"
-#define VIS_FROMLINK    " <priv-link %s>: %s"
+#define INVIS_TELLS_M   "%s tells you%s: \"%s@@\""	/* multi */
+#define VIS_FROMTELLS   " <priv-com %s>: %s"		/* to sender */
+#define VIS_FROMLINK    " <priv-link %s>: %s"		/* to sender */
+#define VIS_SEMOTES	"--> %s %s"
+#define VIS_SEMOTES_P	"--> %s\'%s"			/* possesive */
+#define VIS_SEMOTES_M	"--> (To you%s) %s %s"		/* multi */
+#define VIS_SEMOTE_MP	"--> (To you%s) %s\'%s"		/* multi-posses */
+#define INVIS_SEMOTES	"%s --> %s %s"
+#define INVIS_SEMOTES_P	"%s --> %s\'%s"			/* possesive */
+#define INVIS_SEMOTES_M	"%s --> (To you%s) %s %s"	/* multi */
+#define INVIS_SEMOTE_MP	"%s --> (To you%s) %s\'%s"	/* multi-posses */
+#define VISFROMSEMOTE	"You posed to %s: %s %s"	/* to sender */
+#define VISFROMSEMOTE_P	"You posess-posed to %s: %s\'%s"
 #define VIS_MUTTERS     "%s mutters \"%s@@\" (to everyone but %s)"
 #define INVIS_MUTTERS   "* %s mutters \"%s@@\" (to everyone but %s)" 
 #define VIS_MUTEMOTE    "%s%s@@ (behind %s's back)"
@@ -450,10 +479,13 @@ extern int num_locks;
                             /* and for .wlog for users                */
 #define ATMOS_LEN     161   /* 2 lines of text & a possible @ for newline */
 #define KILL_LEN      160   /* max message on a custom .kill          */
+#define ROOM_LEN      15    /* length of your longest room name       */
 
 #define PRO_LINES     15    /* max number of profile lines stored     */
 #define VOTE_LINES    10    /* max number of vote topic lines stored  */
 #define ROOM_DESC_LINES     10    /* max number of room desc lines    */
+#define MAX_MULTIS    10    /* max number of people you can multi-comm */
+			    /* at one specific time		       */
 #define MAX_ALERT     15    /* max users a person can be alerted of   */
 #define MAX_GAG       15    /* max users a person can gag             */
 #define MAX_GRAVOKES  15    /* max commands total you can grant to or */
@@ -513,11 +545,6 @@ extern int num_locks;
                            /* 7 lines.. 80 chars x 7 lines is 560    */   
 
 #define SHOW_HIDDEN     1
-
-#define PAUSE_LOGIN     1   /* set to 1 if you want users to have to   */
-			    /* hit enter after they see their login    */
-                            /* stats before entering the room, on      */
-                            /* login. If not, set to 0                 */
 
 #define AFK_NERF        0   /* set to 1 if you want users to be able to  */
                             /* go afk or bafk in the nerf_room */
@@ -632,8 +659,8 @@ extern int num_locks;
 #define NUM_WIZES           5
 #define MAX_WHO_CONNECTS    2
 #define MAX_WWW_CONNECTS    2
-#define MAX_INTERCONNECTS   10
-#define MAX_CYPHERCONNECTS  10
+#define MAX_INTERCONNECTS   3
+#define MAX_CYPHERCONNECTS  3
 #define MAX_USERS           NUM_USERS + NUM_WIZES 
 
 /*-------------------------------------------------------------------*/
@@ -726,6 +753,9 @@ extern int odds[];
 #define PROMOTE_TO_ABOVE 0   /* allow promotions to a higher level as promoter */
 #define DEMOTE_SAME      0   /* allows a wiz or higher to demote users */
                              /* same level as them */
+
+#define RANK_LEN	 8   /* length of your longest rank name. for formatting */
+			     /* in .who						 */
 
 #ifdef _DEFINING_CONSTANTS
 /*------------------------------*/
@@ -830,15 +860,18 @@ int gagged_types[]={ECHOM,PICTURE,
 /*-----------------------------------------------------------*/
 /* Port offsets (added) to the main port, which is           */
 /* defined in config/init_data.                              */
+/* If you set any offset to 0, that port wont bind/listen    */
+/* when the talker boots.				     */
+/* INTER and CRYPT currently dont work. for future use.      */
 /*-----------------------------------------------------------*/
-int WIZARD_OFFSET =  50;   /* wiz port for incoming          */
+int WIZ_OFFSET    =  50;   /* wiz port for incoming          */
 int WHO_OFFSET    =   1;   /* standard offset for who        */
 int WWW_OFFSET    =  30;   /* www offset                     */
 int INTER_OFFSET  =   2;   /* inter talker offset         DONT CHANGE   */
 int CRYPT_OFFSET  =   3;   /* offset for caller-id verify DONT CHANGE   */
 #else
 extern int gagged_types[];
-extern int WIZARD_OFFSET;
+extern int WIZ_OFFSET;
 extern int WHO_OFFSET;
 extern int WWW_OFFSET;
 extern int INTER_OFFSET;
@@ -1096,7 +1129,7 @@ struct profile {
 	char miscstr2[10];	/* 1.2.1 */
 	char miscstr3[10];	/* 1.2.1 */
 	char miscstr4[10];	/* 1.2.1 */
-	int miscnum1;		/* 1.2.1 */
+	int pause_login;	/* 1.2.1 */
 	int miscnum2;		/* 1.2.1 */
 	int miscnum3;		/* 1.2.1 */
 	int miscnum4;		/* 1.2.1 */

@@ -6,5 +6,5 @@ Results:  Forwards/sends/emails your current .smail file to either
           and that's located in your .ustat information.
    Note:  *If email address is invalid or non-existant, mail WILL bounce.
 
-See also: autofwd, set, smail, ustat
+See also: set_autofwd, set, smail, ustat
 

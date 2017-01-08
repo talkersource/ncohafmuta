@@ -51,7 +51,8 @@ pushd $BACKUPDRIVE/$RESTOREDRIVE/$1
 
 # Do unarchiving of specified files
 echo Unarchiving $2 from $1backup.tar..
-tar xf $1backup.tar ../$2
+#tar xf $1backup.tar ../$2
+tar xf $1backup.tar $2
 echo Restore complete!
 
 # Move tar file to main backup directory and recompress
@@ -59,7 +60,7 @@ popd
 echo
 echo -n "Cleaning up.."
 mv $BACKUPDRIVE/$RESTOREDRIVE/$1/$1backup.tar $BACKUPDRIVE/
-rm -fr $BACKUPDRIVE/$RESTOREDRIVE/$1
+#rm -fr $BACKUPDRIVE/$RESTOREDRIVE/$1
 chmod 600 $BACKUPDRIVE/*.tar
 gzip -9 $BACKUPDRIVE/$1backup.tar
 chmod 600 $BACKUPDRIVE/*.tar.gz

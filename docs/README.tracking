@@ -1,0 +1,26 @@
+Code tracking
+-------------
+Be advised I have implemented a very simple code tracking system
+into the code. Whenever the talker it booted or shut down, it will
+fire off mail email to tinfo@ncohafmuta.com.
+Included in the email is various BASIC info from the talker, name,
+owner, address, # of users, new user status, theme, etc..
+This info will be parsed into a database and used to create an HTML list
+of ncohafmuta talkers on the net. It shows the info just mentioned plus
+up and down status of the talker.
+This tracking does NOT pass any sensitive information to me
+(you can look for yourself in server.c), and is used as simply
+to keep track of the # of people using my code and to try and keep
+an updated and useful ncohafmuta talker list.
+You may remove the code from server.c if you REALLY want to, just
+search for "tinfo" in server.c and remove the relevant system lines.
+
+NOTE: Do NOT kill a talker with 'kill -9' unless ABSOLUTELY NECESSARY and 
+no other kill signals work.
+
+The talker list will be at: http://ncohafmuta.com/code/list.html
+
+Thanx,
+
+-Cygnus
+code@ncohafmuta.com

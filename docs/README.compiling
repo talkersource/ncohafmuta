@@ -2,6 +2,9 @@ This code was programmed in parallel with SunOS 4.1.4 and Linux 2.0.x
 (with libc5) It is made to compile on a variety of UNIXes.
 You can find out your type of system by running: uname -a
 
+NOTE: Do NOT kill a talker with 'kill -9' unless ABSOLUTELY NECESSARY and 
+no other kill signals work.
+
 ***** WINDOWS NT/95 COMPILING INFO *****
 
 see README.win95NT

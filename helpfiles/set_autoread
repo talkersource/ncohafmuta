@@ -1,6 +1,7 @@
- Syntax:  .autoread
+ Syntax:  .set autoread    (it's a toggle)
 
- Result:  Turns your autoreading feature on or off. This is a toggle command.
+Results:  Turns your autoreading feature on or off. This is a toggle 
+	  command.
           Autoreading is, when you have new mail, it will say you
           have new mail AND proceed to read your mail.
           The toggle options are:
@@ -16,4 +17,4 @@
 
           This setting is saved between logins.
 
-See also:  rmail, autofwd
+See also: rmail, set_autofwd

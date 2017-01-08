@@ -1,6 +1,5 @@
 
-const char *time_format_1(dt)
-long dt;
+const char *time_format_1(time_t dt)
 {
   register struct tm *delta;
   static char buf[64];
@@ -18,8 +17,7 @@ long dt;
   return buf;
 }
 
-const char *time_format_2(dt)
-long dt;
+const char *time_format_2(time_t dt)
 {
   register struct tm *delta;
   static char buf[64];

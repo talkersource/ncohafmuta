@@ -34,6 +34,7 @@ docs/README.socials    - File on howto add more socials
 docs/README.commandadd - File on howto add more commands
 docs/README.init_data  - File on how to configure config/init_data
 docs/README.solaris    - File with solutions for a solaris problem
+docs/README.tracking   - File explaining code tracking
 docs/README.utils      - File on utility programs included with the code.
 docs/README.webfiles   - File on how the web port works and what each file
 			 does
@@ -139,7 +140,7 @@ www/             - Directory containing a JAVA telnet client for the
                    talker if the server the talker is on is a www server.
 www/README       - Readme file for the java client, if you can use this.
 
-  -Cygnus  3-9-99  code@ncohafmuta.com
+  -Cygnus  7-7-99  code@ncohafmuta.com
 
 BASIC notes for other talkers using this code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

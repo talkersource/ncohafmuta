@@ -58,7 +58,7 @@ wanna :)
 
 7. ^HGHow do I use color?^
 
-Coloring inside the talker is by default turned off. The .color command 
+Coloring inside the talker is by default turned off. The ".set color" command 
 controls your options for color...the options are...
     .set color on      -  Turn your color on.
     .set color off     -  Turn your color off.
@@ -72,7 +72,7 @@ some computers. This is normal.
 
 These are the ansi codes used to make color. They are not meant to be
 seen. If you do see these, it means your computer/terminal is not color
-compatible. You can get rid of these, by typing --> .color off
+compatible. You can get rid of these, by typing --> .set color off
 If you use a modem program, you might be able to switch to ANSI/color
 In your program, find terminal emulation and see if you can change it 
 too "ANSI"  *Note: Remember when you leave PinWHeeLs you might have to 
@@ -92,13 +92,7 @@ There are sevaral commands to input personal info. they are...
                       and higher only)
     See .h <command> for more info.
 
-10. ^HGWhy is my screen messed up, with lines all over the place?^
-
-You might be connecting with a VAX/VMS system that does not recognize 
-the talker's line feeds. To remedy this, type --> .set car 1
-That should do it. If not, try to ask a wizard, they will help you.
-
-11. ^HGI changed my password, and now the talker wont let me back
+10. ^HGI changed my password, and now the talker wont let me back
     in to my account! What do I do??^
 
 You most likely used the wrong syntax for .password. It's

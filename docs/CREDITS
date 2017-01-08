@@ -7,11 +7,22 @@ Neil Robertson, for writing NUTS, which Iforms was originally based on.
 
 Arctic, for writing the auth_user code which is public domain.
 
-Jazzin for tons of input, code ideas, finding bugs, adding socials, adding
-code, bullshit work, and being a pain in the ass. ;-)
+Jazzin, for tons of input, code ideas, finding bugs, adding socials,
+adding code, bullshit work, and being a pain in the ass. ;-) but NOT for
+filling up the server disk with a dumb-ass CGI script!
+
+Joelie, for being the BIGGEST pain in the ass about bugs, glitches, adding
+new features, not releasing tons of patch levels, and for blaming me for
+everything that's not my fault.
 
 Calysto for doing bullshit (i.e. tedious) work regarding ANSI compliance
-and being a dork. ;-)
+and being a dork. ;-) He's the "Here's 1000 warnings, here's how to fix
+them..do it!" man.
+
+Rager, for joining me in the ritual sacrifice of sleep to help me test
+multi-commands and other things, for going through an endless number of
+reboots, for the races to log back into the talker after a reboot, and for
+being her natural wonderful freaky self.
 
 OliverJones (author of the TinyMUCK code) and Cynbe ru Taren (Chee Lan
 - muq author) for their help on an accept()/fork() problem.

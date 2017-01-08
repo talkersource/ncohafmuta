@@ -9,5 +9,5 @@ Results:  This setting allows you to set you email address shown (or
           The -c or clear option will set your address back to the
           unspecified default
 
-See also: set_visemail  autofwd  fmail
+See also: set_visemail, set_autofwd, fmail
 

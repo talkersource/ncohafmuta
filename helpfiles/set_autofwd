@@ -1,6 +1,6 @@
- Syntax:  .autofwd
+ Syntax:  .set autofwd    (it's a toggle)
 
- Result:  Turns your autoforwarding feature on or off. This is a toggle 
+Results:  Turns your autoforwarding feature on or off. This is a toggle 
           command and is saved between logins. 
           Autoforwarding toggle options are:
            1. off
@@ -12,14 +12,14 @@
               Forwards your new mail only when you're not online/on the
               talker.
 
-         Autoforwarding is the mailing of your NEW talker mail to your
-         email address (which you specify with .set email <email>)
-         If the address is not valid or you specified no address, the 
-         mail will bounce.
+          Autoforwarding is the mailing of your NEW talker mail to your
+          email address (which you specify with .set email <email>)
+          If the address is not valid or you specified no address, the 
+          mail will bounce.
 
    Notes: Just recently, a email per/day limit was imposed since some
           people were doing some bad things to the system. The current
           number of messages you can have auto-forwarded in a day to your
           email address is shown in .version
 
- See also: fmail, set
+See also: fmail, set, set_email
