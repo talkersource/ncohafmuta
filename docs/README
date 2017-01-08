@@ -3,11 +3,11 @@ of a good talker is its atmosphere, and you wont get that just by copying
 this code. You have to code hard, make it unique and be prepared to put in 
 major amounts of time and effort."
 
-README file for Ncohafmuta 1.2.2 Talker program
-http://ncohafmuta.com/code/
+README file for Ncohafmuta 1.2.3 Talker program
+http://www.asteroid-b612.org/ncohafmuta/
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This file is in the directory "ncohafmuta/docs/"
+This file is in the directory "docs/"
 
 Read docs/README.quickstart first for a quick guide on how to get your talker
 up and running.
@@ -16,12 +16,30 @@ MAKE SURE YOU READ docs/COPYING before doing ANYTHING to the distribution
 
 The following directories and files exist underneath the main dir...
 Makefile         - This file makes/compiles the talker code for unix types
-authuser.h       - Library code file (shouldn't have to be touched)
+
+srcfiles/	 - Directory containing the source code for the server
+objfiles/	 - Directory containing .o object files from compiling
+hdrfiles/	 - Directory containing header and library files
+
+In srcfiles:
+<name>.c         - Actual code file containing source related to <name> 
+                   (should only be edited by programmer)
+
+In hdrfiles:
 constants.h      - Library file containing setable system variables
 text.h           - Another Library file containing setable text messages
+resolver_clipon.h - Library file for the external resolver
+config.h         - OS dependent definitions created by ./configure
+authuser.h       - Library code file (shouldn't have to be touched)
 protos.h         - Function declarations (shouldn't have to be touched)
 telnet.h         - Telnet Options Library file (shouldn't be touched)
 netdb.h          - Network Resolution Library file (shouldn't be touched)
+resolv.h         - Network Resolution Library file (shouldn't be touched)
+nameser.h        - Network Resolution Library file (shouldn't be touched)
+includes.h       - Library code file (shouldn't have to be touched)
+snprintf.h       - Snprintf library code file (shouldn't have to be touched)
+osdefs.h         - OS dependent library code file
+
 bot              - Directory where all the robot files reside
 config           - Directory containg room descriptions, atmospheres, and
                    the talker INIT file.
@@ -39,15 +57,18 @@ docs/README.color      - File on howto use colors in the talker and code
 docs/README.converting - File on howto convert user files when upgrading
 docs/README.socials    - File on howto add more socials
 docs/README.commandadd - File on howto add more commands
+docs/README.debugging  - File on howto debug your talker
 docs/README.dns_resolving - File on how DNS resolution works/options
 docs/README.init_data  - File on how to configure config/init_data
 docs/README.openbsd    - File with notes on OpenBSD compiling
+docs/README.quickstart - File giving a primer on getting your talker set up.
 docs/README.solaris    - File with solutions for a solaris problem
 docs/README.tracking   - File explaining code tracking
+docs/README.upgrading  - File on howto upgrade the talker code.
 docs/README.utils      - File on utility programs included with the code.
 docs/README.webfiles   - File on how the web port works and what each file
 			 does
-docs/README.win95NT    - File with info specifically related to trying to
+docs/README.windows    - File with info specifically related to trying to
 			 run/compile the code on a win32 system
 docs/README.os2        - File with info specifically related to 
                          running/compiling the code on an OS/2 system
@@ -60,42 +81,13 @@ helpfiles        - Directory containing the talker's help files.
 helpfiles/TOP    - Script to update the helpfiles list. READ this.
 helpfiles/birthday - Birthday file for the month
 junk             - Directory used to hold temp storage files
-lastcommand      - File containing the last command before a crash.
 lib              - Directory containg the MOTD, FAQ, WIZLIST, etc..
-lib/motd0        - First random MOTD for main port
-lib/motd1        - Second random MOTD for main port
-lib/wizmotd0     - First random MOTD for wizard port
-lib/wizmotd1     - Second random MOTD for wizard port
-lib/faqfile      - FAQ file for users
-lib/mapfile      - Map file for the talker's .map
-lib/newsfile     - Talker news. File read for  .news
-lib/wizlist      - File users see when they use the .wlist command.
-lib/schedule     - File users see when they use the .schedule command.
-lib/downchat.txt - Text file shown during the "down" program
-lib/down         - Script that should be up/running when talker is down.
-lib/announce.c   - Program run from "down" script
-lib/make_announce- Script that compiles the announce program on your host
-lib/exempts      - File containing users exempt from .expire
-lib/namebans     - File containing names that are banned from use
-lib/agreefile    - File new users see before confirming their password.
-lib/rulesfile    - File users see when they use the .rules command.
-lib/sysfullfile  - File shown to connections when the talker is filled
 lib/activity     - File login activity is appended to by the talker at
                    the end of each day.
-lib/votefile     - File containing current vote issue for .vote
-Do a ".vote -c" as ROOT_ID to start or reset a vote. THEN do a
-.vote -d to enter the vote topic. Don't do it the other way around!
-Shouldn't touch the following 2 files.
-lib/votetallies  - File containing the tally of votes        (don't touch)
-lib/voteusers    - File containing the users that have voted (don't touch)
-lib/talkerlist   - Listing of other talkers. Created/Changed with .talker
-lib/hangman_words - List of words used by the .hangman command
-lib/nukewarn	 - File sent in an email to users who are ready to be
-		   expire-deleted
-lib/sitecash	 - File containing ips/hostnames that are being cached for
-		   DNS resolution (more details in README.dns_resolving)
-lib/sitecash.def - File containing ips/hostnames that are being
-		   permanently cached for DNS resolution.
+lib/agreefile    - File new users see before confirming their password.
+lib/announce.c   - Program run from "down" script
+lib/down         - Script that should be up/running when talker is down.
+lib/downchat.txt - Text file shown during the "down" program
 lib/emailver     - Directory containing files related to new user
                    registration by email
 lib/emailver/e-instruct1 -
@@ -113,8 +105,41 @@ lib/emailver/veritracking -
                    Text file created to keep track of users that
                    have been emailed a password to create their new user,
                    when new-user-email-verification is enabled.
+lib/exempts      - File containing users exempt from .expire
+lib/faqfile      - FAQ file for users
+lib/hangman_words - List of words used by the .hangman command
+lib/loginhelp    - File users see when they type "help" at the login prompt
+lib/make_announce- Script that compiles the announce program on your host
+lib/mapfile      - Map file for the talker's .map
+lib/motd0        - First random MOTD (Log-in title screen) for main port
+lib/motd1        - Second random MOTD (Log-in title screen) for main port
+lib/namebans     - File containing names that are banned from use
+lib/newsfile     - Talker news. File read for  .news
+lib/nukewarn	 - File sent in an email to users who are ready to be
+		   expire-deleted
+lib/rulesfile    - File users see when they use the .rules command.
+lib/schedule     - File users see when they use the .schedule command.
+lib/sitecash	 - File containing ips/hostnames that are being cached for
+		   DNS resolution (more details in README.dns_resolving)
+lib/sitecash.def - File containing ips/hostnames that are being
+		   permanently cached for DNS resolution.
+lib/sysfullfile  - File shown to connections when the talker is filled
+lib/talkerlist   - Listing of other talkers. Created/Changed with .talker
+lib/votefile     - File containing current vote issue for .vote
+Do a ".vote -c" as ROOT_ID to start or reset a vote. THEN do a
+.vote -d to enter the vote topic. Don't do it the other way around!
+Shouldn't touch the following 2 files.
+lib/votetallies  - File containing the tally of votes        (don't touch)
+lib/voteusers    - File containing the users that have voted (don't touch)
+lib/wizlist      - File users see when they use the .wlist command.
+lib/wizmotd0     - First random MOTD (Log-in title screen) for wizard port
+lib/wizmotd1     - Second random MOTD (Log-in title screen) for wizard port
 
 logfiles	 - Directory containing all talker-generated log files
+logfiles/lastcommand  - File containing the last command executed in the 
+                        talker.
+logfiles/lastcommand.CRASH  - File containing the last command executed 
+                              before a talker crash.
 logfiles/<date>	 - Directory containing backed up/archived log files
 maildir          - Directory containing users mail
 messboards       - Directory containging all rooms message boards
@@ -128,13 +153,6 @@ prodir           - Directory containing users profiles
 restart          - Script to restart the talker
 restrict         - Directory containing sites banned from all logins
 server           - Actual talker program that gets runned (cannot be edited)
-server.c         - Actual code file (should only be edited by programmer)
-resolve.c        - Actual code file (should only be edited by programmer)
-telopts.c        - Actual code file (should only be edited by programmer)
-datautils.c      - Actual code file (should only be edited by programmer)
-signals.c        - Actual code file (should only be edited by programmer)
-strfuncs.c       - Actual code file (should only be edited by programmer)
-whowww.c         - Actual code file (should only be edited by programmer)
 server.pid	 - Talker-generated file containing the process ID of the
 		   currently running talker.
 shutdown	 - Script to shut down the talker from the command line
@@ -145,11 +163,14 @@ utils/addstruct.c - Program to add a structure to end of all user files
 utils/backup     - Script to backup all data files.
 utils/backupd    - Where the backup archives reside
 utils/restore    - Script to restore all or partial files from a backup
+utils/no_make_compile - Script for compiling the talker on systems
+                        without the "make" command
 utils/code_fragments/  - Directory containing miscellaneous talker code
 utils/javaclient/ - Directory containing a JAVA telnet client for the
                     talker if the server the talker is on is a www server.
 utils/javaclient/README  - Readme file for the java client, if you can use
 			   this.
+utils/trace      - Script to run the strace program with a pid argument
 utils/trimbackups.c - Program to trim backups created with backup script
 wizinfo          - Directory containing wizard information (emails, etc..)
 warnings         - Directory containing logs for problem users (made from
@@ -159,5 +180,5 @@ webfiles	 - Directory containing files and config for the external
 
 
 -Cygnus
-code@ncohafmuta.com
-2-14-99
+ncohafmuta@asteroid-b612.org
+02-24-02

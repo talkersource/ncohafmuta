@@ -1,5 +1,7 @@
 To add new command, do the following (BASICALLY)..
 
+Go in srcfiles/command_funcs.c
+
 1. In the sys[]. commands structure where all the commands are defined,
    add a line for your command, in the following form..
    {"NAME", LEVEL, JUMP_LEVEL, TYPE, "ABBREVIAITON"},

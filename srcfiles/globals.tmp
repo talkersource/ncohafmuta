@@ -1,0 +1,109 @@
+
+/** Big Letter array map **/
+int biglet[26][5][5] =
+     {{{0,1,1,1,0},{1,0,0,0,1},{1,1,1,1,1},{1,0,0,0,1},{1,0,0,0,1}},
+      {{1,1,1,1,0},{1,0,0,0,1},{1,1,1,1,0},{1,0,0,0,1},{1,1,1,1,0}},
+      {{0,1,1,1,1},{1,0,0,0,0},{1,0,0,0,0},{1,0,0,0,0},{0,1,1,1,1}},
+      {{1,1,1,1,0},{1,0,0,0,1},{1,0,0,0,1},{1,0,0,0,1},{1,1,1,1,0}},
+      {{1,1,1,1,1},{1,0,0,0,0},{1,1,1,1,0},{1,0,0,0,0},{1,1,1,1,1}},
+      {{1,1,1,1,1},{1,0,0,0,0},{1,1,1,1,0},{1,0,0,0,0},{1,0,0,0,0}},
+      {{0,1,1,1,0},{1,0,0,0,0},{1,0,1,1,0},{1,0,0,0,1},{0,1,1,1,0}},
+      {{1,0,0,0,1},{1,0,0,0,1},{1,1,1,1,1},{1,0,0,0,1},{1,0,0,0,1}},
+      {{0,1,1,1,0},{0,0,1,0,0},{0,0,1,0,0},{0,0,1,0,0},{0,1,1,1,0}},
+      {{0,0,0,0,1},{0,0,0,0,1},{0,0,0,0,1},{1,0,0,0,1},{0,1,1,1,0}},
+      {{1,0,0,0,1},{1,0,0,1,0},{1,0,1,0,0},{1,0,0,1,0},{1,0,0,0,1}},
+      {{1,0,0,0,0},{1,0,0,0,0},{1,0,0,0,0},{1,0,0,0,0},{1,1,1,1,1}},
+      {{1,0,0,0,1},{1,1,0,1,1},{1,0,1,0,1},{1,0,0,0,1},{1,0,0,0,1}},
+      {{1,0,0,0,1},{1,1,0,0,1},{1,0,1,0,1},{1,0,0,1,1},{1,0,0,0,1}},
+      {{0,1,1,1,0},{1,0,0,0,1},{1,0,0,0,1},{1,0,0,0,1},{0,1,1,1,0}},
+      {{1,1,1,1,0},{1,0,0,0,1},{1,1,1,1,0},{1,0,0,0,0},{1,0,0,0,0}},
+      {{0,1,1,1,0},{1,0,0,0,1},{1,0,1,0,1},{1,0,0,1,1},{0,1,1,1,0}},
+      {{1,1,1,1,0},{1,0,0,0,1},{1,1,1,1,0},{1,0,0,1,0},{1,0,0,0,1}},
+      {{0,1,1,1,1},{1,0,0,0,0},{0,1,1,1,0},{0,0,0,0,1},{1,1,1,1,0}},
+      {{1,1,1,1,1},{0,0,1,0,0},{0,0,1,0,0},{0,0,1,0,0},{0,0,1,0,0}},
+      {{1,0,0,0,1},{1,0,0,0,1},{1,0,0,0,1},{1,0,0,0,1},{1,1,1,1,1}},
+      {{1,0,0,0,1},{1,0,0,0,1},{0,1,0,1,0},{0,1,0,1,0},{0,0,1,0,0}},
+      {{1,0,0,0,1},{1,0,0,0,1},{1,0,1,0,1},{1,1,0,1,1},{1,0,0,0,1}},
+      {{1,0,0,0,1},{0,1,0,1,0},{0,0,1,0,0},{0,1,0,1,0},{1,0,0,0,1}},
+      {{1,0,0,0,1},{0,1,0,1,0},{0,0,1,0,0},{0,0,1,0,0},{0,0,1,0,0}},
+      {{1,1,1,1,1},{0,0,0,1,0},{0,0,1,0,0},{0,1,0,0,0},{1,1,1,1,1}}};
+
+char *syserror="Sorry - a system error has occured";
+
+char area_nochange[MAX_AREAS]; 
+char mess[ARR_SIZE+25];    /* functions use mess to send output   */ 
+char t_mess[ARR_SIZE+25];  /* functions use t_mess as a buffer    */ 
+char t_inpstr[ARR_SIZE];  /* functions use t_mess as a buffer    */ 
+char l_mess[ARR_SIZE+25];  /* log functions use l_mess as buffer  */ 
+char bt_conv[NUM_LINES][MAX_LINE_LEN+1]; /* stores lines of conversation in wiztell buffer */
+char sh_conv[NUM_LINES][MAX_LINE_LEN+1]; /* store review shouts */
+char datadir[255];	/* config directory                       */
+char thishost[101];	/* FQDN were running on                   */
+char thisos[101];       /* operating system were running on       */
+char thisprog[255];	/* the binary the program is run as	  */
+char web_opts[11][64];	/* web configuration options from file    */
+
+time_t start_time;	/* startup time                           */
+
+int NUM_AREAS;		/* number of areas defined in config file */
+int num_of_users=0;	/* total number of users online           */
+int MESS_LIFE=0;	/* message lifetime in days               */
+
+int noprompt;		/* talker waiting for user input?         */
+int signl;
+int atmos_on;		/* all room atmospherics on?              */
+int syslog_on;		/* are we logging system stuff to a file  */
+int allow_new;		/* can new users be created?              */
+int dobackups;		/* are we archiving log files @ midnight? */
+int average_tells;	/* average tells                          */
+
+int tells;		/* tells in defined time period           */
+int commands;		/* total commands in defined time period  */
+int says;		/* says in defined time period            */
+int says_running;
+int tells_running;
+int commands_running;
+
+int shutd= -1;		/* talker waiting for confirm on a shutdown?    */
+int down_time=0;	/* countdown to an auto shutdown or auto reboot */
+int delete_sent=0;
+
+int sys_access=1;	/* is the system open for user connections?      */
+int wiz_access=1;	/* is the system open for wizard connections?    */
+int who_access=1;	/* is the system open for external who listings? */
+int www_access=1;	/* is the system open for external web requests? */
+
+int checked=0;		/* see if messages have been checked at midnight */
+int bt_count;		/* wiztell count in the buffer                   */
+int sh_count;		/* shout count in the buffer                     */
+int treboot=0;		/* is an auto-reboot started?                    */
+int autopromote = AUTO_PROMOTE; /* allowing users to promote themselves? */
+int autonuke    = NUKE_NOSET;	/* nuking users on quit without a desc.? */
+int autoexpire  = AUTO_EXPIRE;	/* expiring users at midnight on auto?   */
+int bot         = -5;           /* this will hold the bots user number   */
+int new_room;			/* room new users log into               */
+int debug	= 0;
+
+/*** END OF GLOBAL DELCARATIONS ***/
+
+/*** START OF MISC STRUCTURES ***/
+
+/* Terminal definitions for future implementation */
+struct {
+	char name[10];
+	char hion[10];
+	char hioff[10];
+	char cls[20];
+	} terms[] = {
+		{"xterm", "\033[1m", "\033[m", "\033[H\033[2J"},
+		{"vt220", "\033[1m", "\033[m", "\033[H\033[J"},
+		{"vt100", "\033[1m", "\033[m", "50\033[;H\0332J"},
+		{"vt102", "\033[1m", "\033[m", "50\033["},
+		{"ansi", "\033[1m", "\033[0m", "50\033[;H\0332J"},
+		{"wyse-30", "\033G4", "\033G0", ""},
+		{"tvi912", "\033l", "\033m", "\032"},
+		{"sun", "\033[1m", "\033[m", "\014"},
+   		{"adm", "\033)", "\033(", "1\032"},
+ 	  	{"hp2392", "\033&dB", "\033&d@", "\033H\033J"},
+   		{"", "", "", ""}
+		};

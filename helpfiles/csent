@@ -1,4 +1,4 @@
- Syntax:  .csent all   or   .csent <parameter>
+ Syntax:  .csent <parameter>
 
 Results:  Clears messages from your SENT mail file.  This command will work
           from any room on the system.
@@ -11,12 +11,14 @@ Results:  Clears messages from your SENT mail file.  This command will work
           mail file before it is erased, so don't panic if you type
           this command by mistake.
 
-Example:
-       To clear all messages from your file, type:             .csent all
-       To clear the first line type:                           .csent 
-       To clear line 10 from your mail, type:                  .csent 10
-       To clear all lines from the beginning to line 5, type:  .csent to 5
-       To clear all lines from line 8 to the end, type:        .csent from 8
-       To clear all lines except line 4 through 9, type:       .csent 4 9
+Example
+   To clear all messages from your file, type           : .csent all   
+   To clear the first line type                         : .csent   
+   To clear line 10 from your mail, type                : .csent 10   
+   To clear all lines from the beginning to line 5, type: .csent to 5 
+   To clear all lines from line 8 to the end, type      : .csent from 8     
+   To clear all lines from line 8 to line 10, type      : .csent from 8 to 10  
+   To clear all lines except line 4, type               : .csent except 4 
+   To clear all lines except line 4 through 9, type     : .csent except 4 to 9 
 
 See also:  rsent, cmail

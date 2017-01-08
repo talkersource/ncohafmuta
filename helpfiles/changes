@@ -1,4 +1,616 @@
                       /*** Ncohafmuta 1.2.* changes ***/
+Quick need-to-do?:
+* if user .hilite==2 multi-tells with a lot of colored names in it might
+cut off the recipients (because of the input socket limit imposed)
+* need to fix web port so you don't need to put a / after the port number
+in the URL to get it to work??
+
+ 03/11/2002 1.2.3 *
+* Added fopen checks in some resolve_funcs.c functions that didn't have them.
+* Changed list_last to use file_count_lines() and file_skip_lines() instead of
+  popen()ing to the tail program. I should be shot for waiting so long to
+  update such a kludge!
+* Added IAC case for TELOPT_ECHO, just so it doesn't say it's unrcognized
+* Added newline before printed status after login/password prompt.
+* Added extra delete option to cmail/csent/wipe/wwipe/gwipe/swipe functions.
+  To delete between lines. i.e. to delete from line 3 to line 6 you do:
+  .cmail from 3 to 6
+* Changed/Added "delete except lines" option for cmail/csent/wipe/wwipe/gwipe
+  /swipe functions.  Originally, to delete all lines, EXCEPT x to y, you 
+  would do:
+   .cmail 3 6  (so that would delete all lines except lines 3 through 6)
+  NOW, to do the same thing, it's changed to this format:
+   .cmail except 3 to 6
+  You can also delete all lines except 1, using this:
+   .cmail except 3  (delete all lines except line 3)
+  The FORMER ".cmail 3 6" format will not still work for exceptions, it will 
+  now process it as if you were doing ".cmail 3"
+* Rearranged some configure stuff so that doing a --help does not remove your 
+  current hdrfiles/config.h file
+
+ 03/04/2002
+* Renamed datautils.c to datautil_funcs.c, signals.c to signal_funcs.c, and
+  telopts.c to telopt_funcs.c
+* Moved some more specific functions from server.c to comm_cmds.c, fileutil_
+  funcs.c, and telopt_funcs.c
+* For LONGLOGIN_WHO, setting to 0 now disables "who" at the login prompt.
+  1 now does .swho, 2 does normal .who
+
+ 02/25/2002
+* Made the login process set the ROOT_ID to the highest level on every login.
+  This is in case the admin created their character before setting themselves 
+  as the ROOT_ID.
+* Rewrote ".h new" and wrote a set of tutorials for new users, under 
+  ".h tutorial". Thanx to Jazzin for writing a couple of these.
+
+ 02/24/2002
+* Moved the helpfiles "wizguide" and "newwiz" to "staffguide" and 
+  "newstaff", respectively. Updated them to be more generic for a talker.
+  Updated lib/newsfile with the new names.
+* Updated README, README.debugging, README.quickstart, and 
+  README.init_data in docs/
+* Updated utils/no_make_compile script
+
+ 02/20/2002 1.2.3b-pl5
+* Fixed bug of talker seg-faulting when a SMTP conversation failed, after the
+  free_sock()
+* Put new check in configure script to check if mkdir takes a mode argument.
+* Made fmail strip_color from the mailfile lines before it emails them out.
+  Thanx to Jazzin for finding this.
+* Fixed "demote" helpfile because it said that you can specify the level to 
+  demote to. This is not true. Fixed wrapping lines on "help" helpfile
+* Wrote out messages to user doing grant/revoke notifying them of such.
+  Thanx to Calysto for noticing this.
+* Put in main.c and resolver_clipon.c a default umask set of 066 for -rw------- 
+  permissions.
+* Made smtp conversation lines send \r\n because some cygwin implementations
+  don't like to flush lines to the remote host with just \n *boggle*
+  Thanx to Jazzin for figuring this combo out.
+* Moved .guess above .guru in the command list..assuming that .gu would be 
+  likely more used in hangman than as a shortcut for .guru
+* Changed resolver_clipon to read up to 3 nameservers from a 
+  /etc/resolv.conf file, as opposed to the previous behavior which was 
+  only 1. If a bad result is read (NOT an ip that doesn't resolve) or a 
+  resolution times out with a nameserver, the next will be tried. If it's 
+  configure that the fallback server should be the default, it will be put 
+  at the front of the nameserver list, to be tried first.
+
+ 11/29/2001 1.2.3b-pl4
+* Fixed bug of talker seg-faulting when wizport was turned off (WIZ_OFFSET set
+  to 0) and talker was soft-rebooted. Cause was an FD_ISSET check on a socket 
+  set to -1.
+* Stopped adding listening sockets to the readmask set if they are 0.
+* Fixed glitch where in get_mailqueue_file, if the first fileget try failed, 
+  the next fileget put the new file in the MAIN talker directory (bad sprintf)
+
+ 11/15/2001 1.2.3b-pl3
+* Fixed possibility of new rwho implementation using a struct slot it shouldn't
+* Fixed some typos
+* Moved socket creation out of debug check (Forgot about this when i moved 
+  stuff)
+* Added ability to use SMTP (instead of sendmail/mail) to do external email.
+  Mostly to allow external email to work on windows system, since sendmail/mail
+  isn't normally available..you can specify an mail server ip and port. MAKE 
+  SURE YOU CAN RELAY THROUGH THIS SERVER! (e.g. your isp mail server)
+  See comments for MAILPROG variable in hdrfiles/constants.h for more info.
+* Added smtp_funcs.c. Moved some alarm check_* funcs.c to check_funcs.c
+* Added --enable-smtp-debug flags to the configure program. Updated Makefile.in
+* Updated README.win95NT and renamed to README.windows
+
+ 10/28/2001 1.2.3b-pl2
+* Added EPIPE as ok to errno_ok()
+* Made resolver clipon only get suspend message when talker is set to use the
+  clipon
+* Made talker execute shutdown(sock, 2); on Cygwin systems, as close() does
+  not work. Created SHUTDOWN() function as a macro for whether to call the 
+  actual function or not.
+* In resolver_client, changed all close()s to CLOSE()
+* Changed tty detachment to do double-fork on Cygwin now, as it seems to be
+  fixed. Moved socket binding and stdin/out/err redirecting 'til after the
+  forks, as Cygwin would not bring up network the other way.
+* Changed header includes in our own resolv.h as using this on Cygwin tries
+  to include files that don't exist.
+* Changed resolver_clipon to define _res on Cygwin systems, as Cygwin does not
+  define it.
+* Change rwho implementation from fork() to select-on-socket non-blocking.
+  Uses miscconn[] structure
+
+ 09/13/2001 1.2.3b-pl1
+* In a accept() failure, do an errno check to new function errno_ok(),
+  Undocumented accept errors (such as ECONNRESET) may be non-fatal.
+* Update configure script to check for res_nmkquery in -lresolv
+* Update resolver_clipon.c for better portability
+* Make some unsigned longs just longs to satisfy a few compiler warnings.
+* Made talker REBOOT_A_CRASH now on non-signal fatals, such as select or
+  accept failures.
+* Made talker catch a SIGUSR2 signal and do a .reinit on it
+* Updated shutdown script. -c does .reinit
+
+ 08/22/2001
+* Made kill_resolver_clipon() set FROM_SERVER_READ nad FROM_SERVER_WRITE 
+  to -1, because in some screwy situation they would stay at a number and
+  then on a soft-reboot the clipon wouldn't get initalized/started.
+* Made a failed reboot remove the REBOOTFILE.
+* Added -l/listcache,-c/clearache options to the .resolve command so you
+  could look at the entries in the cache and their TTL or clear the cache,
+  from inside the talker.
+
+ 08/10/2001 1.2.3b
+* Added configure script to try and figure out what things we need to
+  compile with for OSes, what includes and functions it has, etc..
+  settings will be put in hdrfiles/config.h. Added a Makefile.in file 
+  which configure will use to create the Makefile.
+  Run "./configure --help" for a list of options you can pass to it.
+  Then run configure with the options you want (if any)
+  YOU MUST RUN CONFIGURE TO GET A Makefile TO COMPILE THE TALKER
+  Added an includes.h file to hdrfiles and now all C files include it 
+  and config.h
+* In a accept() failure, moved the FD_CLR() macro to inside the errno 
+  check statement..if we don't then it might modify errno and 
+  write_log() will contain innacurate info as to the reason for the 
+  accept failure
+* Fixed a glitch in the resolver clipon where a query that failed to 
+  start would return the result for a different slot than the one we
+  want. Rare to hit if the clipon is querying a valid DNS server, but
+  still possible.
+* Added our own snprintf function for systems that dont have it. SunOS
+  to name one. Added our own ctime() function for systems that like to
+  return corrupted time strings. OpenBSD to name one.
+
+ 07/16/2001 1.2.3a-pl1
+* Added additional code to check libc compatability for what we should
+  use for socket length, socklen_t or int. Defined a type, NET_SIZE_T,
+  which we set to whatever one we deem correct (or hope is correct).
+
+ 04/14/2001
+* Added a "help" keyword option to the login prompt. When entered at a
+  login prompt, the user will be presented with help on how to login
+  to the system, or create an account. Said text file path is defined in
+  LOGINFILE in hdrfiles/constants.h and defaults to lib/loginhelp
+
+ 04/10/2001 1.2.3a
+* Added a TTL field to the DNS cache entries. If you're upgrading from a
+  previous version, you MUST remove your cache file (lib/sitecash) first, 
+  so they'll use the TTL field right from the get-go. Added MAX_DNS_TTL 
+  #define to constants.h (TTL explained briefly here) and new 
+  del_from_resolver_cache() function.
+* Added some filename fopen() checks in resolver_funcs.c
+* Fixed a glitch in the resolver clip-on code which failed to retrieve
+  a valid resolution if a CNAME/A/UNKNOWN record was found before the 
+  resolution.
+
+ 01/24/2001 1.2.3draft-14
+* On shutdown/reboots, kill_resolver_clipon() was executing the kill
+  without checking what the value of resolver_clipon_pid was.
+  This is critical, because if the resolver wasn't turned on, the pid
+  would be set to -1, and kill() would execute on -1, which has the effect
+  of SIGTERMing every process the user owns, including shells, and
+  possibly other talkers the user has running. Fixed.
+* Added BIND_INTER #define to constants.h. This lets you bind to a
+  specific interface on a server with multiple interfaces. See constants.h
+  for info on use.
+
+ 01/09/2001 1.2.3draft-13
+* When grants/revokes were read in, any lines <= 3 characters were
+  disregarded as bad, but granting/revoking a single char command id, like
+  .quit (0) IS only 3 chars (0 -) so we make the check just < 3 now, to
+  fix this in read_user() and read_to_user().
+
+ 12/26/2000 1.2.3draft-12
+* Removed code from shutdown functions that tries to remove .pid file.
+  sysud() already does this for us.
+* Added write_log() of bad fopen(),opendir() to check_mess() and 
+  check_total_users(). Added also to abbrcount() and many other functions
+  that may exit() on startup and not leave a note of their failure. If
+  these failed on reboot for some strange reason, we would never see the
+  perror() because stderr is closed.
+* Put additional checks in shutdown functions' reboot code when trying to
+  dup() /dev/null and /dev/tty
+* Did a strip_color on the say_name in suname() notice message.
+* On soft-reboots, made talker ignore SIGALRM until new binary is started
+  If reboot took a long time, SIGALRM would interupt the reboot and muck
+  everything all up.
+* Made the RWHO: log entry log user who did the rwho and host:port tried
+  to retrieve
+
+ 12/05/2000 1.2.3draft-11
+* Added code to have talker let resolver clip-on know when we're soft-
+rebooting so clip-on doesn't exit if it catches a SIGPIPE (when it tries 
+to checkpoint with the talker and fails..thereby killing us all)
+
+ 12/04/2000
+* Added code to close user sockets before execing resolver clip-on in
+resolver_client.c. This fixes the condition of a user socket hanging on
+.quit if the clip-on was re-initialzed while they were online.
+* Added check_sockets() function to check status of sockets after reboot.
+This is to make sure they are still there and available, so select()
+doesn't die while reading a bad descriptor.
+
+ 12/02/2000
+* creply was writing the sender's message out to the receiver's tell buffer.
+  Fixed.
+
+ 12/01/2000
+* Found formatting glitch in resolver clip-on. Fixed.
+ 
+ 11/30/2000
+* If user inputed a seach string to .who, the string would not match names
+  with colors codes in them. Strip-colored the who lines before searching.
+* Added logging of pid with some log entries
+
+ 11/29/2000 1.2.3draft-10
+* Removed double at-sign stuff from code.
+  gender,desc,fail,succ,exitm,enterm,afkmsg,user_quit,constants.h comm
+  formats,www menu user changing. Added check to get_buf() to strip any
+  existing ones when userfiles are read in.
+
+ 11/27/2000
+* Removed the green color wrapper from MAILFROM_USER in constants.h
+  because colornames in there will be fine.
+* in bot_whoinfo() lowered the inpstr to compare it against .name instead
+  of strip_color()ing the say_name.
+* took off-the-wall check out of set_recap() that prevented sane checking
+  for an odd number of color carets.
+* dont strip_color() the bot log now
+
+ 11/22/2000 1.2.3draft-9
+* Seperated more code into smaller C files
+
+ 11/15/2000
+* Changed last_u() (.last) to check if person is invis and if doing
+  user has authority to see if they're online..before sending out
+  when they were last online/if they're online.
+
+ C files CHANGED: server.c
+
+ 11/10/2000
+* Changed PARSE_END_PUNC options/functionality a tad. Setting to 0 will
+return a blank reaction, for people that dont want the reaction in their
+comm string formatting at all. 1 will return the default SAY_REACTION for
+everything, and 2 will do the parsing and return the proper emotional
+_REACTION. Changed prototype and some code for get_reaction.
+
+ protos.h CHANGES:
+ Changed
+  char *get_reaction(char punc);
+	to
+  char *get_reaction(char *inpstr);
+
+ C files CHANGED: server.c comm_cmds.c get_funcs.c
+
+ 11/03/2000
+* Starting to break code into more, smaller C files to decrease compile
+times and organize better, into categories. Will go into details and
+files that have changed when finished.
+
+ 10/27/2000
+* in ttt_new_game() if player was ignoring NERFS, it would say you
+couldn't play because user was ignoring tic-tac-toes. should checks TTTs,
+not NERFSs. Fixed
+
+ C files CHANGED: server.c
+
+ 10/26/2000 1.2.3draft-8
+* Re-wrote bot to use select()/read() instead of ioctl()/read().
+Initialized more signals, signal handling, prototypes for functions.
+Created a write_log() function like the talker's
+* Added a "+++++ WELCOME" message to server.c, to be sent to the bot on
+log-in.
+* Added a shutdown script to the bot directory. Modified compile script.
+* Modified Makefile to make all directories in a "make dist" with
+permissions of mode 700
+
+ C files CHANGED: server.c bot/storybot.c
+
+ 10/25/2000
+* Added own strptime() function called my_strptime() since not all OSes
+have a strptime().
+* The bot's lastcommand wasn't going to the lastcommand file in the log
+directory, but the main directory. Fixed.
+* The talker wasn't sending the bot any further plus-messages after a
+soft-reboot. Failed to read his user number into the bot variable. Fixed.
+
+ protos.h CHANGES:
+ Added
+  char *my_strptime(char *buf, char *fmt, struct tm *tmStruct);
+
+ C files CHANGED: server.c strfuncs.c
+
+ 10/19/2000 1.2.3draft-7
+* Fixed Makefile so it would recognize changes to C files and recompile
+them. It wasn't doing this as of draft-6
+* Fixed the cutoff of messages in write_str() when cols were set < 256. We
+forgot to reget the strlen() of the string AFTER color codes were put in.
+* Made read_rebootdb malloc the macro and conv buffers for the read in 
+users. read_to_user() would crash the talker on soft-reboot otherwise.
+* Fixed writeall_str to clear out the str2 variable in the user loop.
+str2 used to be set once, but we changed it and put it in the user loop,
+but forgot to clear it out every time..as of draft-5
+* Added code for the "NEW" '.set who' type. I was bored. We'll see how
+people like it. Added functions time_format_1() and time_format_2() to
+strfuncs.c
+
+ protos.h CHANGES:
+ Added
+  char *time_format_1(time_t dt);
+  char *time_format_2(time_t dt);
+
+ C files CHANGED: server.c strfuncs.c
+
+ 10/16/2000 1.2.3draft-6
+* Moved source (.c) files to new directory srcfiles/
+* Moved header (.h) files to new directory hdrfiles/
+* Changed objs/ directory to objfiles/
+* Changed Makefiles to take in account new locations of source files
+* Changes source files #include statements to take in account new
+locations of header files
+* Put macros in protos.h to try and use sys_errlist on systems that don't
+have strerror()
+* Removed calls to 'ad' and 'cd' variables of a DNS HEADER structure. They are not present in all
+BIND/DNS server versions. It's futile for us to check version numbers, since these variables really
+aren't needed by us.
+* Updated documentation in docs/
+
+ protos.h CHANGES:
+ Added
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+/* nothing */
+#else
+#if !defined(_LP64)
+#if (defined(sun) && !defined(SVR4)) || defined(macII)
+#if !defined(strerror)
+extern char *sys_errlist[];
+extern int sys_nerr;
+#define strerror(n) \
+    (((n) >= 0 && (n) < sys_nerr) ? sys_errlist[n] : "unknown error")
+#endif /* no strerror defined */
+#endif /* not SYSV or mac */
+#endif /* not _LP64 */
+#endif /* not windows */
+
+ C files CHANGED: all
+
+ 10/10/2000 1.2.3draft-5
+* Added timestamp to writing of bot last command
+* Changed set_recap to take color codes in recaps. Expanded say_name user
+structure to length of SAYNAME_LEN, which is defaulted to 150. You
+shouldn't need to change this. extended mutter user structure to length of
+SAYNAME_LEN too.
+* Add ".ignore colornames" functionality
+* Modified comm. functions say() say_to_user(), to parse ending
+puncutation of inpstr if PARSE_END_PUNC is defined as >= 1. i.e. ? at end
+will put "<user> asks". reaction is gotten with new function
+get_reaction(). Added to constants.h
+#defines PARSE_END_PUNC, SAY_REACTION, QUESTION_REACTION,
+EXCLAMATION_REACTION.
+* Added #defines VIS_SHEMOTE,VIS_SHEMOTE_P,INVIS_SHEMOTE, and
+INVIS_SHEMOTE_P for .shemote formatting
+* Now send non-colored names to bot, except for +++++ logon: and _who
+Changed bot code to pick these up, and also to use its internal user list
+more, rather than the names passed to it in the inbuf.
+* Fixed a bug in .pcreate that would segfault the talker in
+copy_from_user (present in draft-2 and up)
+* Made log entries of fork failures report the errno.
+* Updated helpfiles for .listen, .ignore, and .set recap
+
+ protos.h CHANGES:
+ Added
+  char *get_username_from_delims(char *str, int pos);
+  char *get_reaction(char punc);
+
+ constants.h CHANGES:
+ Changed
+  #define NUM_IGN_FLAGS 24
+	to
+  #define NUM_IGN_FLAGS 25
+ In user structure:
+  char mutter[45];
+	to
+  char mutter[SAYNAME_LEN];
+  char say_name[NAME_LEN];   /* 1.1.0 */
+	to
+  char say_name[SAYNAME_LEN];   /* 1.1.0 - updated for color in 1.2.3 */
+ In comm formats:
+  #define VIS_SAYS        "%s says \"%s@@\""
+  #define INVIS_SAYS      "* %s says \"%s@@\""
+  #define VIS_DIRECTS     "%s says ^HR(to %s)^ \"%s@@\""
+  #define INVIS_DIRECTS   "* %s says ^HR(to %s)^ \"%s@@\""
+  #define VIS_DIREMOTE    "%s%s@@ ^HR(to %s)^"
+  #define INVIS_DIREMOTE  "* %s%s@@ ^HR(to %s)^"
+	to
+  #define VIS_SAYS        "%s %s \"%s@@\""
+  #define INVIS_SAYS      "* %s %s \"%s@@\""
+  #define VIS_DIRECTS     "%s %s ^HG(^to %s^HG)^ \"%s@@\""
+  #define INVIS_DIRECTS   "* %s %s ^HG(^to %s^HG)^ \"%s@@\""
+  #define VIS_DIREMOTE    "%s%s@@ ^HG(^to %s^HG)^"
+  #define INVIS_DIREMOTE  "* %s%s@@ ^HG(^to %s^HG)^"
+
+Added
+  {"colornames"},  to flag_names_type flag_names[NUM_IGN_FLAGS+1]
+  #define COLORNAME 24  /* colornames */
+  #define VIS_SHEMOTE   "& %s %s "
+  #define VIS_SHEMOTE_P "& %s\'%s "                     /* possesive */
+  #define INVIS_SHEMOTE "& %s %s "
+  #define INVIS_SHEMOTE_P       "& %s\'%s "                     /*
+   possesive */
+  #define SAYNAME_LEN   150   /* max username length with color codes   */
+  #define PARSE_END_PUNC        1
+  #define SAY_REACTION          "says"
+  #define QUESTION_REACTION     "asks"
+  #define EXCLAMATION_REACTION  "exclaims"
+
+ C files CHANGED: server.c strfuncs.c datautils.c whowww.c
+
+ 9/27/2000 1.2.3draft-4
+* Made arrest require you to be a rank greater than the user you're 
+arresting, or the ROOT_ID. Made sure gag_comm, muzzle, frog_user, and
+anchor_user operated like this too.
+* We now allow partial room names for .move
+* Now if you RE-LOGIN (not a NORMAL log off/log on, when you log into
+the talker when you're already on/hung) and you were in a private room, it
+will not reset the room back to public and it will put you back in there
+too.
+
+ C files CHANGED: server.c
+
+ 9/1/2000
+* Updated resolver_clipon.c to do DNS recursion. Also to print out more
+  query/answer debugging output.
+
+ C files CHANGED: resolver_clipon.c
+
+ 8/31/2000
+* Added some more platform checks for setpgrp and glibc socklen_t
+* We include sys/types.h before sys/socket.h now to make FreeBSD happy.
+* Removed arpa/inet.h call from resolve.c and replaced with netinet/in.h
+* Made ctime and localtime prototypes in protos.h happier for FreeBSD
+
+ protos.h CHANGES:
+ Changed
+  char *ctime();
+	to
+  char *ctime(const time_t *);
+  struct tm *localtime();
+	to
+  struct tm *localtime(const time_t *);
+
+ C files CHANGED: server.c resolve.c resolver_clipon.c
+
+ 8/21/2000 1.2.3draft-3
+* Added some prototypes for sunos/solaris
+* Added checks for function and macro existance to resolver_clipon code.
+  Code would not compile on systems that already had certain macros or
+  functions defined in the system include libs.
+* Updated README.solaris, README.quickstart, README.compiling,
+  README.utils, and README
+* Fixed number of arguments passed to S_WRITE in resolver_clipon code.
+* Added USE_FALLBACK_AS_DEFAULT define to resolver_clipon.h. If set to 1,
+  we'll use the fallback dns server instead of the local one to us.
+* Created a no_make_compile script in utils/ directory, to be able to
+  compile the code on systems that don't have 'make' installed (ick)
+
+ protos.h CHANGES:
+ Added
+  void tzset(void);
+  char *strptime(const char *buf, const char *format, struct tm *tm);
+
+ resolver_clipon.h CHANGES:
+ Added
+  #define USE_FALLBACK_AS_DEFAULT	0
+
+ C files CHANGED: resolver_clipon.c
+
+
+ 8/16/2000 1.2.3draft-2
+* Fixed a glitch in read_resolver_reply() in the way resolver clip-on
+  output was read. This caused answers from the clip-on to sporadically
+  not get parsed into the users
+* Made area conversation buffers malloc()ed structures instead of static.
+  This will save quite a bit of memory on talkers that dont have a lot of
+  rooms, since memory will only be allocated for the number of rooms
+  defined in init_data, instead of MAX_AREAS.
+* Made user Macros buffers malloc()ed structures instead of static.
+  This will save quite a bit of memory since memory will only be allocated
+  for a user when logged in.
+* Changed user Macro structure. Instead of using multiple structure
+  instances containing single arrays, we now use a single structure
+  containing multiple arrays.
+* conv_mem_get and user_mem_get now takes a mode argument to calculate
+  allocated and used memory.
+* in read_init_data() added code to cleanup rooms that are not used when a
+  .reinit is done for less rooms that were being used. i.e. if 10 rooms
+  were in use and then admin defined only 5 rooms and did .reinit, we now
+  cleanup rooms 6-10. We also kick users in previous rooms, back to main
+  room, since they no longer exist!
+* changed the email address for code tracking to tinfo@asteroid-b612.org
+
+ protos.h CHANGES:
+ Added
+  void addto_conv_buffer(ConvPtr buf, char *str);
+  void init_conv_buffer(ConvPtr buf);
+  void write_conv_buffer(int user, ConvPtr buf);
+  void init_macro_buffer(MacroPtr buf);
+ Changed
+  long conv_mem_get(void)
+	to
+  long conv_mem_get(int mode)
+  long user_mem_get(void)
+	to
+  long user_mem_get(int mode)
+
+ constants.h CHANGES:
+ Added #define macro
+	#define MY_SIZE(buf,mode) (mode==0?strlen(buf):sizeof(buf))
+ Added area conversation buffer structure
+	typedef struct
+	{
+        	int count;
+	        char conv[NUM_LINES][MAX_LINE_LEN+1];
+	} ConvBuffer;
+	typedef ConvBuffer* ConvPtr;
+ Added "ConvPtr conv;" to astr[] structure
+ Changed "Macro Macros[NUM_MACROS];" to "MacroPtr Macros;"  for ustr[]
+ strcuture
+ Changed user macro buffer structure to
+	typedef struct
+	{
+        	char name[NUM_MACROS][12];
+		char body[NUM_MACROS][MACRO_LEN+1];
+	} MacroBuffer;
+	typedef MacroBuffer *MacroPtr;
+
+ C files CHANGED: server.c datautils.c strfuncs.c
+
+ 8/11/2000
+* kill_resolver_clipon() now resets resolver_clipon_pid to -1
+* added RESOLVER_DEBUG define to Makefile
+* updated README.dns_resolving
+
+ 8/1/2000 1.2.3draft-1
+* draft refers to a draft release. It's not even alpha. It'd just
+the latest development stuff.
+* add prototypes for resolver_client.c to protos.h
+* removed request_cache_lookup from resolve.c and protos.h
+* removed SITE_WIDE* stuff from resolve.c and constants.h
+* moved nonblock search code from server.c to constants.h
+* added code to server.c and resolve.c where /* CYGRESOLVE */ comments are
+in main select scan and where resolving commands are for new connections
+* added resolver_clipon.h header file
+* modified Makefile to compile in resolver_client.c
+* modified Makefile to compile in resolver_server.c clip-on
+* modified Makefile to hold default HAVE_NAMESER, HAVE_RESOLV and HAVE_NETDB defines
+* changed server.c to not use bzero anymore since it's a deprecated function
+* included nameser.h and resolv.h includes into the distribution for resolver_server.c in case
+operating system doesn't have them (dunno if this will remedy on all systems)
+* changed resolve option in constants.h to have the site-wide cache option be the
+clip-on resolver option now (I've decided not to pursue the site-wide option anymore)
+* added SYS_LOOK_PENDING to constants.h
+* updated docs/README.init_data for new resolve option
+* redefined HEADER in constants.h as YES_HEADER so we can include constants.h into
+resolver_clipon.c without declaration problems. updated whowww.c to reflect change
+* NEED to update docs/README.dns_resolving
+
+
+ 7/21/2000
+* Put a few lines in to make min and idl variables 0 even if they
+calculate to < 0 (which they shouldn't :))
+
+ C files CHANGED: server.c
+
+ 7/14/2000
+* Changed ctime() calls in t_who() to get_time(0,1) so carriage return in
+time didn't mess up text if admin decided to put text after it.
+
+ C files CHANGED: server.c
+
+ 7/13/2000
+* Changed get_user_num() call to get_user_num_exact() in .kill to prevent
+sub-string user matches so user's can't echo substring usernames to the
+bot and get it to .kill people with obsenities
+* added errno info to bad read() in the bot's own code.
+
+ C files CHANGED: server.c bot/storybot.c
+
  6/21/2000 1.2.2
 * Removed commented/phased out code and released as final 1.2.2 version
 

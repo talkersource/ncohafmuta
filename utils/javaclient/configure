@@ -1,6 +1,6 @@
 #!/bin/csh -f
 # -Cygnus
-# code@ncohafmuta.com
+# ncohafmuta@asteroid-b612.org
 
 echo "Configuring.."
 chmod 644 *.class README *.prof Makefile java.gif index.html

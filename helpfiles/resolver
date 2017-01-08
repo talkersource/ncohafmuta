@@ -1,6 +1,0 @@
-Syntax:  .resolver     (it's a toggle)
-
-Results:  Resolves ip addresses into alpha hostnames in the .site listing.
-          Example:  134.48.22.24   resolves to   vinny.csd.mu.edu
-
-

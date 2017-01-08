@@ -2,11 +2,12 @@
 	  .bring <user,user,user>
 	  .bring -f
 
- Result:  Brings one or more users on the board to the room that you are in, where
-          <user> is that person or <user,user,user> are the people.  Works like a
-	  .move, only the person is automatically brought to the room you are in.
-	  If you use the -f syntax above, all your friends on your .alert list will be
-	  brought into your current room. 
+ Result:  Brings one or more users on the talker to the room that you are in, 
+          where <user> is that person or <user,user,user> are the people.
+          Works like .move, only the person is automatically brought to the
+          room you are in.
+	  If you use the -f syntax above, all your friends on your .alert list
+          will be brought into your current room. 
           Oh, and user must be of same rank or lower, Artemis! :-)
 
   NOTES:  Spaces can be placed in between user combinations w/commas.

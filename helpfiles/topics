@@ -2,203 +2,210 @@
 ------------ ---------- Type .help <topic> for more details!
 Last Changed HELP Topic
 ------------ ----------
-Jun 19 23:22 changes -> ../docs/CHANG
-May 31 14:57 permission
-May  4 17:34 who
-May  4 08:43 credits
-Apr 24 08:40 nerf
-Mar 27 12:55 whois
-Feb 28 08:41 color
-Feb 25 21:12 vote
-Feb 10 13:37 coloruse
-Jan 19 14:53 readlog
-Jan 18 17:48 backup
-Jan 16 12:19 help
-Jan 16 12:04 shutdown
-Dec  1  1999 cline
-Dec  1  1999 site
-Nov 27  1999 auto
-Nov 27  1999 bafk
-Nov 27  1999 banname
-Nov 27  1999 bannew
-Nov 27  1999 bbcast
-Nov 27  1999 bcast
-Nov 27  1999 beep
-Nov 27  1999 birthday
-Nov 27  1999 bring
-Nov 27  1999 call
-Nov 27  1999 cbuff
-Nov 27  1999 clients
-Nov 27  1999 clist
-Nov 27  1999 close
-Nov 27  1999 cls
-Nov 27  1999 cmail
-Nov 27  1999 creply
-Nov 27  1999 csent
-Nov 27  1999 cygnus
-Nov 27  1999 delatmos
-Nov 27  1999 demote
-Nov 27  1999 desc
-Nov 27  1999 descroom
-Nov 27  1999 disclaimer
-Nov 27  1999 echo
-Nov 27  1999 emote
-Nov 27  1999 entermsg
-Nov 27  1999 entpro
-Nov 27  1999 etiquette
-Nov 27  1999 examine
-Nov 27  1999 exitmsg
-Nov 27  1999 expire
-Nov 27  1999 fail
-Nov 27  1999 femote
-Nov 27  1999 fight
-Nov 27  1999 find
-Nov 27  1999 finger
-Nov 27  1999 fmail
-Nov 27  1999 follow
-Nov 27  1999 force
-Nov 27  1999 friends
-Nov 27  1999 frog
-Nov 27  1999 ftell
-Nov 27  1999 gag
-Nov 27  1999 gagcomm
-Nov 27  1999 gardener
-Nov 27  1999 get_together
-Nov 27  1999 go
-Nov 27  1999 grant
-Nov 27  1999 greet
-Nov 27  1999 gripe
-Nov 27  1999 guess
-Nov 27  1999 guru
-Nov 27  1999 gwipe
-Nov 27  1999 hangman
-Nov 27  1999 hide
-Nov 27  1999 home
-Nov 27  1999 ignore
-Nov 27  1999 invite
-Nov 27  1999 kill
-Nov 27  1999 knock
-Nov 27  1999 last
-Nov 27  1999 levels
-Nov 27  1999 listatmos
-Nov 27  1999 listen
-Nov 27  1999 log
-Nov 27  1999 look
-Nov 27  1999 macros
-Nov 27  1999 memory
-Nov 27  1999 meter
-Nov 27  1999 monitor
-Nov 27  1999 move
-Nov 27  1999 mutter
-Nov 27  1999 muzzle
-Nov 27  1999 new
-Nov 27  1999 news
-Nov 27  1999 newwiz
-Nov 27  1999 nslookup
-Nov 27  1999 nuke
-Nov 27  1999 open
-Nov 27  1999 password
-Nov 27  1999 pcreate
-Nov 27  1999 picture
-Nov 27  1999 preview
-Nov 27  1999 private
-Nov 27  1999 promote
-Nov 27  1999 ptell
-Nov 27  1999 public
-Nov 27  1999 quit
-Nov 27  1999 quota
-Nov 27  1999 quote
-Nov 27  1999 ranks
-Nov 27  1999 read
-Nov 27  1999 reinit
-Nov 27  1999 reload
-Nov 27  1999 resolve
-Nov 27  1999 resolver
-Nov 27  1999 restrict
-Nov 27  1999 review
-Nov 27  1999 revoke
-Nov 27  1999 rmail
-Nov 27  1999 rooms
-Nov 27  1999 rsent
-Nov 27  1999 rules
-Nov 27  1999 samesite
-Nov 27  1999 say
-Nov 27  1999 schedule
-Nov 27  1999 search
-Nov 27  1999 semote
-Nov 27  1999 set
-Nov 27  1999 set.old
-Nov 27  1999 set_abbrs
-Nov 27  1999 set_autofwd
-Nov 27  1999 set_autoread
-Nov 27  1999 set_beeps
-Nov 27  1999 set_car
-Nov 27  1999 set_color
-Nov 27  1999 set_cols
-Nov 27  1999 set_email
-Nov 27  1999 set_gender
-Nov 27  1999 set_help
-Nov 27  1999 set_hi
-Nov 27  1999 set_hidden
-Nov 27  1999 set_home
-Nov 27  1999 set_homepage
-Nov 27  1999 set_icq
-Nov 27  1999 set_pause
-Nov 27  1999 set_pbreak
-Nov 27  1999 set_picurl
-Nov 27  1999 set_recap
-Nov 27  1999 set_rows
-Nov 27  1999 set_space
-Nov 27  1999 set_visemail
-Nov 27  1999 set_who
-Nov 27  1999 shemote
-Nov 27  1999 shout
-Nov 27  1999 show
-Nov 27  1999 shthink
-Nov 27  1999 sing
-Nov 27  1999 smail
-Nov 27  1999 socials
-Nov 27  1999 sos
-Nov 27  1999 sthink
-Nov 27  1999 succ
-Nov 27  1999 suggest
-Nov 27  1999 suicide
-Nov 27  1999 suname
-Nov 27  1999 supass
-Nov 27  1999 swho
-Nov 27  1999 swipe
-Nov 27  1999 system
-Nov 27  1999 talker
-Nov 27  1999 tell
-Nov 27  1999 think
-Nov 27  1999 time
-Nov 27  1999 to
-Nov 27  1999 topic
-Nov 27  1999 ttt
-Nov 27  1999 unarrest
-Nov 27  1999 unbannew
-Nov 27  1999 unmuzzle
-Nov 27  1999 unrestrict
-Nov 27  1999 users
-Nov 27  1999 ustat
-Nov 27  1999 vaxhelp
-Nov 27  1999 wipe
-Nov 27  1999 with
-Nov 27  1999 wizards
-Nov 27  1999 wizguide
-Nov 27  1999 wiztell
-Nov 27  1999 wlist
-Nov 27  1999 wlog
-Nov 27  1999 wnote
-Nov 27  1999 write
-Nov 27  1999 wwipe
-Nov 27  1999 xcomm
-Nov 27  1999 abbrs
-Nov 27  1999 addatmos
-Nov 27  1999 afk
-Nov 27  1999 alert
-Nov 27  1999 allow_new
-Nov 27  1999 anchor
-Nov 27  1999 arrest
-Nov 27  1999 atmos
+ Apr  6 12:16 changes -> ../docs/CHAN
+ Mar 11 17:50 csent
+ Mar 11 17:49 cmail
+ Mar 11 17:47 gwipe
+ Mar 11 17:47 swipe
+ Mar 11 17:46 wwipe
+ Mar 11 17:45 wipe
+ Mar  6 00:40 tutorial
+ Mar  6 00:39 ranktutor
+ Mar  6 00:37 settutor
+ Mar  6 00:33 infotutor
+ Mar  4 20:04 gentutor
+ Mar  4 20:04 mailtutor
+ Mar  4 20:04 commtutor
+ Mar  4 20:04 basictutor
+ Mar  4 20:04 jointutor
+ Mar  4 20:03 movetutor
+ Mar  4 20:03 introtutor
+ Mar  4 20:03 new
+ Feb 24 19:45 levels
+ Feb 24 19:41 staffguide
+ Feb 24 19:41 newstaff
+ Feb 24 19:37 cygnus
+ Jan 25 15:49 help
+ Jan 25 15:46 demote
+ Nov 10 15:31 bring
+ Nov 10 15:30 xcomm
+ Nov 10 15:29 gagcomm
+ Nov 10 15:28 frog
+ Nov 10 15:25 nerf
+ Aug 22  2001 resolve
+ Apr 25  2001 think
+ Apr 25  2001 time
+ Apr 25  2001 to
+ Apr 25  2001 topic
+ Apr 25  2001 ttt
+ Apr 25  2001 unarrest
+ Apr 25  2001 unbannew
+ Apr 25  2001 unmuzzle
+ Apr 25  2001 unrestrict
+ Apr 25  2001 users
+ Apr 25  2001 ustat
+ Apr 25  2001 vaxhelp
+ Apr 25  2001 vote
+ Apr 25  2001 who
+ Apr 25  2001 whois
+ Apr 25  2001 with
+ Apr 25  2001 wizards
+ Apr 25  2001 wiztell
+ Apr 25  2001 wlist
+ Apr 25  2001 wlog
+ Apr 25  2001 wnote
+ Apr 25  2001 write
+ Apr 25  2001 shout
+ Apr 25  2001 show
+ Apr 25  2001 shthink
+ Apr 25  2001 shutdown
+ Apr 25  2001 sing
+ Apr 25  2001 site
+ Apr 25  2001 smail
+ Apr 25  2001 socials
+ Apr 25  2001 sos
+ Apr 25  2001 sthink
+ Apr 25  2001 succ
+ Apr 25  2001 suggest
+ Apr 25  2001 suicide
+ Apr 25  2001 suname
+ Apr 25  2001 supass
+ Apr 25  2001 swho
+ Apr 25  2001 system
+ Apr 25  2001 talker
+ Apr 25  2001 tell
+ Apr 25  2001 quota
+ Apr 25  2001 quote
+ Apr 25  2001 ranks
+ Apr 25  2001 read
+ Apr 25  2001 readlog
+ Apr 25  2001 reinit
+ Apr 25  2001 reload
+ Apr 25  2001 restrict
+ Apr 25  2001 review
+ Apr 25  2001 revoke
+ Apr 25  2001 rmail
+ Apr 25  2001 rooms
+ Apr 25  2001 rsent
+ Apr 25  2001 rules
+ Apr 25  2001 samesite
+ Apr 25  2001 say
+ Apr 25  2001 schedule
+ Apr 25  2001 search
+ Apr 25  2001 semote
+ Apr 25  2001 set
+ Apr 25  2001 set_abbrs
+ Apr 25  2001 set_autofwd
+ Apr 25  2001 set_autoread
+ Apr 25  2001 set_beeps
+ Apr 25  2001 set_car
+ Apr 25  2001 set_color
+ Apr 25  2001 set_cols
+ Apr 25  2001 set_email
+ Apr 25  2001 set_gender
+ Apr 25  2001 set_help
+ Apr 25  2001 set_hi
+ Apr 25  2001 set_hidden
+ Apr 25  2001 set_home
+ Apr 25  2001 set_homepage
+ Apr 25  2001 set_icq
+ Apr 25  2001 set.old
+ Apr 25  2001 set_pause
+ Apr 25  2001 set_pbreak
+ Apr 25  2001 set_picurl
+ Apr 25  2001 set_recap
+ Apr 25  2001 set_rows
+ Apr 25  2001 set_space
+ Apr 25  2001 set_visemail
+ Apr 25  2001 set_who
+ Apr 25  2001 shemote
+ Apr 25  2001 gag
+ Apr 25  2001 gardener
+ Apr 25  2001 go
+ Apr 25  2001 grant
+ Apr 25  2001 greet
+ Apr 25  2001 gripe
+ Apr 25  2001 guess
+ Apr 25  2001 guru
+ Apr 25  2001 hangman
+ Apr 25  2001 hide
+ Apr 25  2001 home
+ Apr 25  2001 ignore
+ Apr 25  2001 invite
+ Apr 25  2001 kill
+ Apr 25  2001 knock
+ Apr 25  2001 last
+ Apr 25  2001 listatmos
+ Apr 25  2001 listen
+ Apr 25  2001 log
+ Apr 25  2001 look
+ Apr 25  2001 macros
+ Apr 25  2001 memory
+ Apr 25  2001 meter
+ Apr 25  2001 monitor
+ Apr 25  2001 move
+ Apr 25  2001 mutter
+ Apr 25  2001 muzzle
+ Apr 25  2001 news
+ Apr 25  2001 nslookup
+ Apr 25  2001 nuke
+ Apr 25  2001 open
+ Apr 25  2001 password
+ Apr 25  2001 pcreate
+ Apr 25  2001 permission
+ Apr 25  2001 picture
+ Apr 25  2001 preview
+ Apr 25  2001 private
+ Apr 25  2001 promote
+ Apr 25  2001 ptell
+ Apr 25  2001 public
+ Apr 25  2001 close
+ Apr 25  2001 cls
+ Apr 25  2001 color
+ Apr 25  2001 coloruse
+ Apr 25  2001 credits
+ Apr 25  2001 creply
+ Apr 25  2001 delatmos
+ Apr 25  2001 desc
+ Apr 25  2001 descroom
+ Apr 25  2001 disclaimer
+ Apr 25  2001 echo
+ Apr 25  2001 emote
+ Apr 25  2001 entermsg
+ Apr 25  2001 entpro
+ Apr 25  2001 etiquette
+ Apr 25  2001 examine
+ Apr 25  2001 exitmsg
+ Apr 25  2001 expire
+ Apr 25  2001 fail
+ Apr 25  2001 femote
+ Apr 25  2001 fight
+ Apr 25  2001 find
+ Apr 25  2001 finger
+ Apr 25  2001 fmail
+ Apr 25  2001 follow
+ Apr 25  2001 force
+ Apr 25  2001 friends
+ Apr 25  2001 ftell
+ Apr 25  2001 abbrs
+ Apr 25  2001 addatmos
+ Apr 25  2001 afk
+ Apr 25  2001 alert
+ Apr 25  2001 allow_new
+ Apr 25  2001 anchor
+ Apr 25  2001 arrest
+ Apr 25  2001 atmos
+ Apr 25  2001 auto
+ Apr 25  2001 backup
+ Apr 25  2001 bafk
+ Apr 25  2001 banname
+ Apr 25  2001 bannew
+ Apr 25  2001 bbcast
+ Apr 25  2001 bcast
+ Apr 25  2001 beep
+ Apr 25  2001 birthday
+ Apr 25  2001 call
+ Apr 25  2001 cbuff
+ Apr 25  2001 cline
+ Apr 25  2001 clist
 ------------ ----------

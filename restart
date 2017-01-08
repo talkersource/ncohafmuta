@@ -1,6 +1,6 @@
 #!/bin/sh
 # by Cygnus
-# cygnus@ncohafmuta.com
+# ncohafmuta@asteroid-b612.org
 #
 
 # The name of the talker binary or program
@@ -11,7 +11,7 @@ CONFIG=$1
 CONFIG2=$2
 
 # Set to 0 if you dont want it to try and boot the robot
-BOTON=1
+BOTON=0
 
 # Link changes helpfile to CHANGES file in lib directory
 echo "Linking changes..."

@@ -1,8 +1,10 @@
 #!/bin/sh
 # by Cygnus
-# code@ncohafmuta.com
+# ncohafmuta@asteroid-b612.org
 #
 
+# The name of the storybot binary or program
+BINARY="storybot"
 
 #  This next part copies over the log file to a backup,
 
@@ -14,10 +16,10 @@
          touch botlog
 	fi
 
-if test -f "storybot"
+if test -f "$BINARY"
 then
 echo -n "Starting the storybot..."
-./storybot
+./$BINARY
 echo "Done"
 echo "See log file for details"
 else

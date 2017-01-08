@@ -2,26 +2,27 @@ Code tracking
 -------------
 Be advised I have implemented a very simple code tracking system  
 into the code. Whenever the talker it booted or shut down, it will
-fire off mail email to tinfo@ncohafmuta.com.
+fire off mail email to tinfo@asteroid-b612.org.
 Included in the email is various BASIC info from the talker, name,  
 owner, address, # of users, new user status, theme, etc..
-This info will be parsed into a database and used to create an HTML list
-of ncohafmuta talkers on the net. It shows the info just mentioned plus
-up and down status of the talker.
+This info will be used for a database to create an HTML list
+of ncohafmuta talkers on the net and/or for me to assist new admins on 
+their new talker or monitor crashes from their talkers (to offer assistance).
+It shows the info just mentioned plus up and down status of the talker.
 This tracking does NOT pass any sensitive information to me
-(you can look for yourself in server.c), and is used as simply
-to keep track of the # of people using my code and to try and keep
-an updated and useful ncohafmuta talker list.
-You may remove the code from server.c if you REALLY want to, just
-search for "tinfo" in server.c and remove the relevant system lines.
+(you can look for yourself in server.c).
+You may remove the relevant code from srcfiles/*.c if you REALLY want to, just
+comment out (/* */) any call to do_tracking in the C files.
 
 NOTE: Do NOT kill a talker with 'kill -9' unless ABSOLUTELY NECESSARY and 
-no other kill signals work.
+no other kill signals are effective in shutting down the talker.
+(You should be using the ./shutdown script anyway)
 
-The talker list will be at: http://ncohafmuta.com/code/list.html
+The talker list, if available, will be at:
+http://asteroid-b612.org/ncohafmuta/list.html
 
 Thanx,
 
 -Cygnus
-code@ncohafmuta.com
+ncohafmuta@asteroid-b612.org
 

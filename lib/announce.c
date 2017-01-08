@@ -5,7 +5,8 @@
  *	Usage:	announce [port] < message_file
  *
  *	Author:	Lawrence Brown <lpb@cs.adfa.oz.au> 	Aug 90
- *	Cleaned up and optimized by Cygnus <cygnus@ncohafmuta.com> Feb 99
+ *	Cleaned up and optimized 
+ *	by Cygnus <ncohafmuta@asteroid-b612.org> Feb 99
  *
  *	Bits of code are adapted from the Berkeley telnetd sources
  */

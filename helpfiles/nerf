@@ -1,5 +1,5 @@
  Syntax:  When you want to start/fire at a user  :  .nerf <user>
-          To see nerf stats for you or another   :  .nstat [<user>]
+          To see nerf stats for you or another   :  .ustat [<user>]
 
 Results:  The nerf command allows two users to fight until one user is
           nerfed to death. This is done by hitting the other user so many

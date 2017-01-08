@@ -1,22 +1,8 @@
-                                Welcome to......  
+                                 -===--------===-
+             This is the 2nd Title Screen (MOTD) for the main login port
 
-******                 **      ** **   **                   **
-**    **  ###          **      ** **   **                   **
-**    **  ### ######## **      ** **   **  ######   ######  **      ######   
-**    **      ######## **  **  ** ******* ##    ## ##    ## **     ## 
-*******   ### ##   ###  ********  ******* ######## ######## **       ###
-**        ### ##   ###   ******   **   ** ##       ##       **          ##
-**        ### ##   ###    *  *    **   **  ######   ######  ******* ###### 
+                         You can change this in lib/motd1
 
-People                    Who      Hate                       Lag 
-
-             ** Harassment of any kind will _NOT_ be tolerated **
-       **   Email comments, problems to --> pw@ncohafmuta.com     **
-
-    \\ External who port is at 5001 // \\ News last updated: 5-5-98  //
-     \\ New users after logging in, PLEASE type --> .faq and .h new //
-
-                \\ WEB PAGE: http://pw.ncohafmuta.com:5030 //
-
-         Type "who" to see who's logged in, "quit" to abort login.
+          \\ New users after logging in, PLEASE type --> .h new //
+ Type "who" to see who's online, "quit" to abort login, "help" for login help
 

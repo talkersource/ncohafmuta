@@ -1,0 +1,170 @@
+
+in 1 minute check..
+
+MAIL SOCKET MANAGEMENT
+count number of mail connections (miscconn[user].sock!=-1 && miscconn[user].type==2)
+ if less than MAX_MAIL_CONNECTIONS
+  while ((count_current_mail_connections < MAX_MAIL_CONNECTIONS) && (tries <= 2))
+	find free mail slot
+		if there is one
+			do_mail_connect()
+				if bad connect, increase tries, continue through while
+				if good, tries = 0
+		if not ABORT
+ if not less than MAIL_CONNECTIONS or over # of tries
+	ABORT
+
+MAIL CONNECTION MANAGEMENT:
+if (do_smtp_mail) {
+do directory read of maildir/outgoing/ counting (need_connections) up to
+MAX_MISC_CONNECTS;
+
+
+in main while() loop..
+
+if socket readable
+	get input
+	if (stage==0 && input contains banner)
+		stage=1 ready=1
+	if (stage==1 && input contains good helo reply)
+		stage=2 ready=1
+	if (stage==2 && input contains good sender reply)
+		stage=3 ready=1
+	if (stage==3 && input contains good recipient reply)
+		stage=4 ready=1
+	if (stage==4 && input contains good DATA reply)
+		stage=5 ready=1
+	if (stage==5 && input contains good message reply)
+		stage=2 ready=1
+		remove queue file
+		reset file fd,queuename
+	continue through readacble sockets
+
+if socket writeable
+	if (ready) {
+		if (stage==1) {
+		write helo
+		ready=0
+		}
+		if (stage==2) {
+		readdir outgoing/ for first queue file
+		if no queue file exists, close connection, continue;
+		else rename/move first queue file to outgoing_active/
+		fopen queue file
+		fd=FILEHANDLE
+		queuename=FILENAME
+		read first line
+		write out sender
+		if write fails
+			close file
+			move queuename back to outgoing/
+			close connection
+		ready=0;
+		}
+		if (stage==3) {
+		read next line
+		write out recipient
+		if write fails
+			close file
+			move queuename back to outgoing/
+			close connection
+		ready=0;
+		}
+		if (stage==4) {
+		write out "DATA"
+		if write fails
+			close file
+			move queuename back to outgoing/
+			close connection
+		ready=0;
+		}
+		if (stage==5) {
+		reading next line from file
+		write out body line
+		if write fails
+			close file
+			move queuename back to outgoing/
+			close connection
+		else loop read/write till end
+		ready=0;
+		}
+	}
+
+
+
+MAIL COMPOSITION
+
+FILE *get_mailqueue_file(void) {
+time_t tm;
+int subtime=0;
+static FILE *tfp;
+
+	tm=time(0);
+
+	sprintf(filename,"%s/%s%ld.%d",OUTGOING_MAILDIR,(long)tm,subtime);
+	while ((tfp=fopen(filename,"r")) && subtime != 100) {
+		fclose(tfp);
+		subtime++;
+		sprintf(filename,"%ld.%d",(long)tm,subtime);
+	}
+	if (subtime==100) {
+		write_log(ERRORLOG,YESTIME,"Could not open a new queue file in fmail()\n");
+		return NULL;
+	}
+	else {
+	 if (!(tfp=fopen(filename,"w"))) {
+		write_log(ERRORLOG,YESTIME,"Could not open the new queue file %s in fmail()
+		\n",filename);
+		return NULL;
+	 }
+	 else return tfp;
+	}
+
+	return NULL;
+}
+
+	if (!(wfp=get_mailqueue_file())) {
+		error
+	}
+
+	fprintf(wfp,"%s\n",SYSTEM_EMAIL);
+	fprintf(wfp,"%s\n",mail_addr);
+	/* start body */
+
+	fclose(wfp);
+
+
+SMTP CONVERSATION:
+
+220 stevenjude2.compustrat.com ESMTP Postfix
+HELO stevenjude2.compustrat.com
+250 stevenjude2.compustrat.com
+MAIL FROM: joe@blow.com
+250 Ok
+RCPT TO: receiver@blow.com
+250 Ok
+DATA
+354 End data with <CR><LF>.<CR><LF>
+
+BAD HELO:
+HELO
+501 Syntax: HELO hostname
+
+BAD FROM:
+MAIL FROM:
+500 Error: bad syntax
+
+BAD RCPT:
+RCPT TO:
+501 Syntax: RCPT TO: <address>
+
+
+FUNCTIONS:
+void check_smtp(void);
+int do_smtp_connect(void);
+FILE *get_mailqueue_file(void);
+int queuetoactive_smtp(int user);
+int write_smtp_data(int user, int type);
+void requeue_smtp(int user);
+void check_misc_connects(void);
+int find_queue_slot(char *inpstr);

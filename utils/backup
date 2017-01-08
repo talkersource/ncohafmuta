@@ -1,12 +1,12 @@
 #!/bin/csh -f
 # by Cygnus
-# code@ncohafmuta.com
+# ncohafmuta@asteroid-b612.org
 
 setenv BFILE backup.tar
 setenv BACKUPDRIVE backupd
 
 echo /--------------------------------------/
-echo / Ncohafmuta 1.2.2 Data Backup Utility  /
+echo / Ncohafmuta 1.2.3 Data Backup Utility  /
 echo /--------------------------------------/
 
 if (-e $BFILE) then
@@ -54,7 +54,7 @@ echo -n '             documentation..'
 tar uf $BFILE ../docs
 echo                              DONE!
 echo -n '             code..'
-tar uf $BFILE ../*.h ../*.c ../restart ../shutdown ../Makefile ../tzinfo
+tar uf $BFILE ../hdrfiles/* ../srcfiles/* ../restart ../shutdown ../Makefile ../tzinfo
 echo                              DONE!
 echo Done archiving
 echo Compressing archive to.. $BACKUPDRIVE/`/bin/date '+%m%d%y'`$BFILE.gz

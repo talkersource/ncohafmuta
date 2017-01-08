@@ -10,5 +10,7 @@ Results:  Makes it so a troublesome user cannot do any private
           user will be gagcommed until you or someone else ungagcomms
           them. Otherwise, the talker will auto-ungagcomm them after they
           have served <time> online.
+          This is a toggle, when used on a user. i.e. if the user is gagcommed
+          gagcomming them again, will un-gagcomm them.
 
 See also: arrest, muzzle, frog, xcomm

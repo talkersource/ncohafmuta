@@ -2,10 +2,17 @@
 
 if test -f "storybot"
 then
-echo -n "Backing up old storybot program.."
+echo "Backing up old storybot program.."
 cp storybot storybot.old
 echo "Done"
 fi
-echo 'gcc -O3 -o storybot storybot.c'
-gcc -O3 -o storybot storybot.c
+
+echo "Compiling.."
+echo 'gcc -O3 -Wall -DHAVE_CONFIG_H -o storybot storybot.c'
+#
+# Uncomment the HAVE_CONFIG_H line if you want to use the configure-includes
+# from the talker. This is the preferred and DEFAULT method.
+#
+#gcc -O3 -Wall -DHAVE_NETDB_H -o storybot storybot.c
+gcc -O3 -Wall -DHAVE_CONFIG_H -o storybot storybot.c
 

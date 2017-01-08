@@ -1,5 +1,7 @@
 To add new socials, do the following..
 
+Go in srcfiles/command_funcs.c
+
 1. In the sys[]. commands structure where all the commands are defined,
    add a line for your social command just like you were adding any other
    command.. in the following form..

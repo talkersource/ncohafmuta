@@ -12,6 +12,6 @@ Example:  To ignore shout messages, type --> .ignore shouts
 
   Types:  all afks says logs shouts knocks messages topics kills
           bcasts moves echos greets picture fights atmos wiztells
-          succs fails nerfs roomdescs beeps
+          succs fails nerfs roomdescs beeps tictactoes tells colornames
 
 See also: listen

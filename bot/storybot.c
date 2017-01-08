@@ -1,5 +1,5 @@
 /* Copyright 1990 by John Ockerbloom.
-   Derivative for talker by Cygnus (code@ncohafmuta.com), 1996
+   Derivative for talker by Cygnus (ncohafmuta@asteroid-b612.org), 1996
 
   Permission to copy this software, to redistribute it, and to use it
   for any purpose is granted, subject to the following restrictions and
@@ -30,46 +30,79 @@
 
 */
 
-/* Last changed: May 13th 2000 */
-/* Version 1.3 */
+/* Last changed: Jul 16th 2001 */
+#if defined(HAVE_CONFIG_H)
+
+#include "../hdrfiles/config.h"
+#include "../hdrfiles/includes.h"
+#include "../hdrfiles/osdefs.h"
+
+#else
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <signal.h>
 #include <dirent.h>
 #include <ctype.h>
-#include <varargs.h>
+#include <stdarg.h>             /* for va_start(),va_arg(),va_end() */
+/* #include <varargs.h> */
 #include <time.h>
 #include <sys/time.h>
+#if defined(HAVE_NETDB_H)
 #include <netdb.h>
+#else
+#include "../hdrfiles/netdb.h"
+#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
+/* BSD 4.2 and maybe some others need these defined */
+#if !defined(FD_ZERO)
+#define fd_set int
+#define FD_ZERO(p)       (*p = 0)
+#define FD_SET(n,p)      (*p |= (1<<(n)))
+#define FD_CLR(n,p)      (*p &= ~(1<<(n)))
+#define FD_ISSET(n,p)    (*p & (1<<(n)))
+#endif
+#if !defined(INVALID_SOCKET)
+#define INVALID_SOCKET	-1
+#endif
+#define SOCKET_ERROR	-1
+
+#endif
+
+#define VERSION	"1.61"
+#define YES		1
+#define NO		0
+#define YESTIME         1       /* timestamp log entries */
+#define NOTIME          0       /* don't timestamp log entries */
 
 /*** CONFIGURATION SECTION ***/
 
 /* REPLACE THIS with the host the robot will be connecting to */
-char *host = "ncohafmuta.com";
+char *host = "127.0.0.1";
 
 /* REPLACE THIS with the talker's main login port */
 int   port = 1900;
 
-/* BOT_NAME and ROOT_ID must be all lowercase */
+/* BOT_NAME must be all lowercase */
 /* REPLACE THIS with the bot's name */
 #define BOT_NAME      "spokes"
 
 /* REPLACE THIS with the bot's login sequence. The default here is */
-/* bot_username <carriage-return> bot_password                     */
-/* YOU DO NOT NEED TO END THIS STRING WITH \n's OR \r's		   */
+/* bot_name <carriage-return> bot_password                         */
+/* YOU DO NOT NEED TO *END* THIS STRING WITH \n's OR \r's	   */
 /* THE PROGRAM AUTOMATICALLY SENDS 2 OF THEM TO FINISH THE LOGIN   */
-#define CONNMSG       "\n spokes \n maple2"
+#define CONNMSG       "\n %s \n botpassword"
 
+/* ROOT_ID must be all lowercase */
 /* REPLACE THIS with the username of the bot's owner */
 #define ROOT_ID       "cygnus"
 
@@ -88,7 +121,7 @@ int   port = 1900;
 #define MAIN_ROOM     "front_gate"
 
 /* REPLACE THIS with the room the bot will go to when he first logs in */
-/* ..usually where he will live */
+/* ..usually where he will live - changeable online */
 #define HOME_ROOM     "pond"
 
 /* REPLACE THIS with the directions the bot will give to get to him */
@@ -103,15 +136,31 @@ int   port = 1900;
 /* stuff to */
 #define BOTLOG_FILE      "botlog"
 
+/* the default for paragraph formatting - changeable online		*/
+#define FORMATTED	NO
+
+/* the default for the bot .kill-ing a user who swears at him or her	*/
+/* changeable online							*/
+#define KILLSWEAR	YES
+
+/* the default for conversation logging to file - changeable online	*/
+/* WARNING: you should not turn this on all the time, else		*/
+/* the file may get really big!						*/
+#define CONVOLOG	NO
+
 /* Should be set same as in the talker's constants.h */
 #define NAME_LEN	21
+#define SAYNAME_LEN	150
 #define MAX_USERS	40
 
-/* the directory the bot's sotries will go in. dont change normally */
+/* the directory the bot's stories will go in. dont change normally */
 #define STORYDIR      "Stories"
 
 /* dont change */
 #define DIRECTORY     "."
+
+/* should not need to change unless you change in the talker code */
+char *our_delimiters="!|";
 
 /*** END OF CONFIGURATION SECTION ***/
 
@@ -125,6 +174,10 @@ int   port = 1900;
 #define TOKSIZ     1024
 #define MSGSIZ     512
 #define BIGBUF     4096
+
+#define ARR_SIZE   9700
+#define MAX_CHAR_BUFF	2000
+#define FILE_NAME_LEN	256
 
 /* The storystate structure gives us info about where we are in the story */
 
@@ -143,7 +196,7 @@ struct storystate {
 
 struct {
 	char name[NAME_LEN];
-	char say_name[NAME_LEN];
+	char say_name[SAYNAME_LEN];
 	char room[NAME_LEN];
 	int vis;
 	int logon;
@@ -158,10 +211,6 @@ struct {
 #define SHEMOTE 4
 #define SEMOTE  5
 
-/* Misc constants */
-
-#define YES 1
-#define NO 0
 
 /* For matching strings from users that are not part of story handling */
 /* Results from star matcher */
@@ -170,58 +219,77 @@ char res5[BUFSIZ], res6[BUFSIZ], res7[BUFSIZ], res8[BUFSIZ];
 char *result[] = { res1, res2, res3, res4, res5, res6, res7, res8 };
 # define MATCH(D,P)     smatch ((D),(P),result)
 
-void load_user();
-void add_user();
+void load_user(void);
+void add_user(void);
 void read_next(char *author, struct storystate *story);
 void read_previous(struct storystate *story);
 void read_paragraph(struct storystate *story);
 void get_paragraph(struct storystate *story);
 void read_titles(char *bitmatch, int mode);
-void give_help(char *playername, char *lowername, struct storystate *story);
-void wlog(char *str);
-void robot();
-void quit_robot();
-void sync_bot();
-void reboot_robot();
-void clear_all_users();
+void give_help(int user, struct storystate *story);
+void init_talker_stuff(void);
+void quit_robot(void);
+void sync_bot(void);
+void reboot_robot(void);
+void clear_all_users(void);
 void clear_user(int user);
-void listen_to_people();
 void remove_first(char *inpstr);
 void strtolower(char *str);
 void midcpy(char *strf, char *strt, int fr, int to);
-void crash_n_burn(char *string);
+void crash_n_burn(void);
 void handle_page(char *pageline);
-int handle_action(char *playername, char *lowername, char *command, int volume);
+void sysud(int ud);
+void handle_sig(int sig);
+void write_log(int wanttime, char *str, ...);
+void sendchat(char *fmt, ...);
+void process_input(char *inbuf);
+void terminate(char *str);
+int handle_action(int user, char *command, int volume);
 int smatch (register char *dat, register char *pat, register char **res);
-int find_free_slot();
-int connect_robot();
-int charsavail();
+int find_free_slot(void);
+int connect_robot(void);
 int get_user_num(char *name);
-int handle_page2(char *pageline, char *playername, char *lowername);
+int handle_page2(int user, char *pageline);
 int setup_directory(struct storystate *story);
-int save_para(struct storystate *story, char *playername, char *lowername);
-char *getline();
-char *getinput();
-char *resolve_title();
+int save_para(struct storystate *story, int user);
+int get_input(void);
+char *getline(char *inbuf, FILE *fp);
+char *resolve_title(char *prefix, char *buffer, int acceptprefix);
 char *get_error(void);
-struct storystate *start_story(), *finish_story(), 
-                  *handle_command(), *handle_writing(), *abort_writing();
+char *get_time(time_t ref,int mode);
+char *strip_color(char *str);
+struct storystate *start_story(char *title, struct storystate *story);
+struct storystate *finish_story(struct storystate *story);
+struct storystate *handle_command(int user, char *command, int volume, struct storystate *story);
+struct storystate *handle_writing(int user, char *command, struct storystate *story);
+struct storystate *abort_writing(struct storystate *story);
+struct storystate *ourstory;    /* Ptr to main story structure           */
 
 /* A couple of global vars (Bad code style! Bad code style!) */
 
-int FORMATTED;           /* If YES, paras are formatted to 64 lines */
-int bs;                  /* bot's connection socket */
-int logging=0;		 /* logging flag */
-char directions[256];
-char mess[9000];
+int g_FORMATTED=FORMATTED;		/* are paras formatted to 64 lines? */
+int g_CONVOLOG=CONVOLOG;		/* conversation logging flag */
+int g_KILLSWEAR=KILLSWEAR;		/* .kill people swearing at me? */
+int bs;					/* bot's connection socket */
+char *g_HOME_ROOM=HOME_ROOM;		/* the bot's home room */
+char thisprog[FILE_NAME_LEN];
+char directions[FILE_NAME_LEN];
+char t_inpstr[ARR_SIZE];  /* functions use t_mess as a buffer    */
+char mess[ARR_SIZE];
+fd_set    readmask;        /* bitmap read set                */
+fd_set    writemask;       /* bitmap write set               */
 FILE *log_fp;		 /* file pointer for log file */
 
 
 /* The main program spawns the child process, sets up the socket */
 /* to the talker and then calls robot().                         */
-int main(void)
+int main(int argc, char **argv)
 {
-  int fd;
+  int	fd;
+  int	retval=0;
+  static int nfds=0;
+  char	inpstr[ARR_SIZE];  /* functions use t_mess as a buffer    */
+  struct timeval sel_timeout;  /* how much time to give select() */
 
    /*-------------------------------------------------*/
    /* Redirect stdin, stdout, and stderr to /dev/null */
@@ -247,10 +315,10 @@ int main(void)
 
   switch(fork())
      {
-        case -1:    wlog("FORK 1 FAILED");
+        case -1:    write_log(YESTIME,"FORK 1 FAILED! %s\n",get_error());
                     exit(1);
 
-#if defined(__OpenBSD__) || defined(__OSF__) || defined(__osf__) || defined(__bsdi__)
+#if defined(__OpenBSD__) || defined(__OSF__) || defined(__osf__) || defined(__bsdi__) || defined(__FreeBSD__) || defined(__NetBSD__)
         case 0:     setpgrp(0,0);
 #else
         case 0:     setpgrp();
@@ -266,7 +334,7 @@ int main(void)
 
   switch(fork())
      {
-        case -1:    wlog("FORK 2 FAILED");
+        case -1:    write_log(YESTIME,"FORK 2 FAILED! %s\n",get_error());
                     exit(2);
     
         case 0:     break;  /* child becomes server */
@@ -276,95 +344,179 @@ int main(void)
 
 #endif
 
+/* Copy the program binary name to memory */
+strcpy(thisprog,argv[0]);
+
     clear_all_users();
 
-    wlog("Bot starting...");
+    write_log(YESTIME,"Bot \"%s\" starting...\n",BOT_NAME);
+
+/* initialize some signals */
+signal(SIGTERM,handle_sig);
+signal(SIGSEGV,handle_sig);
+signal(SIGILL,handle_sig);
+signal(SIGBUS,handle_sig);
+signal(SIGPIPE,handle_sig);
+signal(SIGINT,SIG_IGN);
+signal(SIGABRT,SIG_IGN);
+signal(SIGFPE,SIG_IGN);
+signal(SIGTSTP,SIG_IGN);
+signal(SIGCONT,SIG_IGN);
+signal(SIGHUP,SIG_IGN);
+signal(SIGQUIT,SIG_IGN);
 
     bs = connect_robot();
     if (bs < 0) {
-      sprintf(mess,"Connect failed to %s %d, exiting! %s",host,port,get_error());
-      wlog(mess);
+      write_log(YESTIME,"Connect failed to %s %d, exiting! %s\n",host,port,get_error());
       exit(-1);
      }
 
-    signal(SIGTERM, quit_robot);
-    sprintf(mess,"Bot started with PID %d", getpid());
-    wlog(mess);
-    robot();
-    sprintf(mess, "Bot broke out of main robot loop, exiting!");
-    wlog(mess);
+    /* log our existance */
+    sysud(1);
+
+    /* send login info to the talker */
+    sprintf(mess,CONNMSG,BOT_NAME);
+    sendchat("%s\n\n", mess);
+
+ourstory = NULL;
+
+/*--------------------------*/
+/**** Main program loop *****/
+/*--------------------------*/
+while(1)
+   {
+        /*-----------------------------------------------------------*/
+        /* Set up bitmap readmask and writemask by clearing them out */
+        /*-----------------------------------------------------------*/
+        FD_ZERO(&readmask);
+        FD_ZERO(&writemask);
+        nfds = 0;
+
+        /*----------------------------------*/
+        /* Set up timeout for select()      */
+        /* what is really a good number???? */
+        /*----------------------------------*/
+        sel_timeout.tv_sec  = 0;   /* number of seconds      */
+        sel_timeout.tv_usec = 0;   /* number of microseconds */
+
+	if (bs != -1) {
+		FD_SET(bs,&readmask);
+/*
+		if (alloced_size)
+			FD_SET(bs,&writemask);
+*/
+		if (bs >= nfds)
+			nfds = bs + 1;
+	}
+
+        /*--------------------------------------------------------------*/
+        /* Wait for input on the ports                                  */
+        /*                                                              */
+        /* We declare the args as (void*) because HP/UX for example has */
+        /* a select() prototype declaring the args as (int*) rather     */
+        /* than (fd_set*), POSIX or no POSIX. By casting to (void*) we  */
+        /* avoid compiletime warnings about these args                  */
+        /*--------------------------------------------------------------*/
+        if (select(nfds, (void *) &readmask, (void *) &writemask, (void *) 0, 0) == SOCKET_ERROR) {
+         if (errno != EINTR) {
+                write_log(YESTIME,"Select failed with error %s\n",get_error());
+                break;
+           }
+         else continue;
+        }
+
+                retval=get_input();
+                strcpy(inpstr,t_inpstr);
+                if (retval < 0) {
+                switch(retval) {
+                case -1: quit_robot(); /* socket doesnt exist - just in case */ break;
+                case -6: /* buffer overload */ break;
+                case -7: quit_robot(); /* fatal read error */ break;
+                default: break;
+                } /* end of switch */
+                        continue;
+                } /* end of if retval */
+
+		process_input(inpstr);
+
+   } /* end of main while loop */
+
+    write_log(YESTIME,"Bot broke out of main robot loop, exiting!\n");
+    crash_n_burn();
     quit_robot();
 
 return 0;
 }
 
 /* This connect_robot function sets up a socket for the bot to the talker */
-int connect_robot()
+int connect_robot(void)
 {
- struct sockaddr_in sin;
+ struct sockaddr_in raddr;
+ int size=sizeof(struct sockaddr_in);
+ unsigned long   f;
  struct hostent *hp;
  int cs;
 
- bzero((char *) &sin, sizeof(sin));
- sin.sin_port = htons(port);
- 
+ /* Zero out memory for address */
+ memset((char *)&raddr, 0, size);
+
  /* Handle numeric or host name addresses */
-  if (isdigit (*host))
-  { sin.sin_addr.s_addr = inet_addr (host);
-    sin.sin_family = AF_INET;
+  if (isdigit((int)*host))
+  { 
+                if((f = inet_addr(host)) == -1L) {
+		write_log(YESTIME,"Can't get net address for ip %s\n",host);
+		return -1;
+		}
+    (void)bcopy((char *)&f,(char *)&raddr.sin_addr,sizeof(f));
   }
   else
-  { if ((hp = gethostbyname(host)) == 0) return (-1);
-
-    bcopy(hp->h_addr, (char *) &sin.sin_addr, hp->h_length);
-    sin.sin_family = hp->h_addrtype;
+  {
+		if((hp = gethostbyname(host)) == (struct hostent *)0) {
+		write_log(YESTIME,"Can't get net address for host %s\n",host);
+		return -1;
+		}
+    (void)bcopy(hp->h_addr,(char *)&raddr.sin_addr,hp->h_length);
   }
-  
-  cs = socket(AF_INET, SOCK_STREAM, 0);
-  if (cs < 0) {
-	sprintf(mess,"socket() creation failed for %s %d! %s",host,port,get_error());
-	wlog(mess);
+
+ raddr.sin_port = htons((unsigned short)port);
+ raddr.sin_family = AF_INET;
+   
+  if ((cs = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+	write_log(YESTIME,"socket() creation failed for %s %d! %s\n",host,port,get_error());
 	return -1;
    }
-  if (connect(cs,(struct sockaddr *) &sin, sizeof(sin)) < 0) {
-	sprintf(mess,"connect() failed for %s %d! %s",host,port,get_error());
-	wlog(mess);
+  if (connect(cs,(struct sockaddr *) &raddr, sizeof(raddr)) == SOCKET_ERROR) {
+	write_log(YESTIME,"connect() failed for %s %d! %s\n",host,port,get_error());
 	return -1;
   }
   return cs;
 }
 
 /* We are exiting now */
-void quit_robot()
+void quit_robot(void)
 {
- time_t tm;
 
  shutdown(bs, 2);
  close(bs);
  
+ sysud(0);
+
  /* Close log file if open */
  fclose(log_fp);
 
- time(&tm);
- sprintf(mess,"QUIT: %s is quitting at %s",BOT_NAME,ctime(&tm));
- mess[strlen(mess)-1]=0;
- wlog(mess);
  exit(0);
 }
 
 /* We are rebooting now */
-void reboot_robot()
+void reboot_robot(void)
 {
  int fd;
- time_t tm;
  char *args[]={ "./restart",NULL };
 
  shutdown(bs, 2);
  close(bs);
  
- time(&tm);
- sprintf(mess,"REBOOT: %s is rebooting at %s",BOT_NAME,ctime(&tm));
- wlog(mess);
+ write_log(YESTIME,"REBOOT: %s is rebooting\n",BOT_NAME);
 
  /* Sleep for some time to make sure talker is up so we can login */
  sleep(10);
@@ -390,111 +542,164 @@ void reboot_robot()
         close(0);
         close(1);
         close(2);
- time(&tm);
- sprintf(mess,"REBOOT: Reboot failed at %s",ctime(&tm));
- wlog(mess);
+
+ write_log(YESTIME,"REBOOT: Reboot for %s failed\n",BOT_NAME);
 
 }
 
-/* Wait for input on the socket */
-char *getinput()
+/* Read user input from a socket */
+int get_input(void)
 {
- long len;
- static char buf[BUFSIZ], rbuf[4];
- register char *s=buf, *tail=buf+MSGSIZ+1;
+int len=0;
+int complete_line;
+int gotcr=0;
+int buff_size;
+char *dest;
+char astring[ARR_SIZE];
+unsigned char inpchar[2];   /* read() data from socket into this */
+int char_buffer_size = 0;
+char char_buffer[MAX_CHAR_BUFF];
 
- /* No input waiting */
-  if (!charsavail (bs)) return (NULL);
- 
-  /* Read one line, save printing chars only */
-  while ((len = read (bs, rbuf, 1)) > 0)
-  { if (*rbuf == '\n')                  break;
-    if (isprint (*rbuf) && s < tail)    *s++ = *rbuf;
-  }
-  *s = '\0';
+char_buffer[0]=0;
+t_inpstr[0]=0;
 
-  /* Check for error */ 
-  if (len < 0)
-  { 
-    sprintf(mess, "Error %ld reading from talker", len);
-    wlog(mess);
-    quit_robot();
-  }
+if (bs==-1) return -1;
+if (!FD_ISSET(bs,&readmask)) return -2;
 
-  return (s = buf);
-}
+               /*--------------------------------------------*/
+               /* reset the user input space                 */
+               /*--------------------------------------------*/
+                 astring[0]  = 0;
+                 inpchar[0]  = 0;
+                 dest        = astring;
 
-/* Check for input available from socket */
-int charsavail(int fd)
-{
- long n;
- long retc;
+len = read(bs, inpchar, 1);
 
-   if ((retc = ioctl (fd, FIONREAD, &n)))
-     {
-      sprintf(mess, "Ioctl returns %ld, n=%ld.", retc, n);
-      wlog(mess);
-      quit_robot();
-     }
-  
-  return ((int) n);
+                if (!len) {
+		 write_log(YESTIME,"get_input: Read NULL length in read()!\n");
+                 return -7;
+                } /* end of if */
+                else if (len==SOCKET_ERROR) {
+                 if (errno!=EAGAIN && errno!=EINTR) {
+		 	write_log(YESTIME,"get_input: Fatal bad read()! %s\n",get_error());
+                        return -7;
+			}
+                 else {
+			 write_log(YESTIME,"get_input: Bad read()! %s\n",get_error());
+                        return -3;
+			}
+                } /* end of else if */
 
-}
+
+                 /*-------------------------------------------*/
+                 /* if there is input pending, read it        */
+                 /*  (stopping on <cr>, <EOS>, or <EOF>)      */
+                 /*-------------------------------------------*/
+                 complete_line = 0;
+
+                 while ((inpchar[0] != 0)  &&
+                        (len != EOF)       &&
+                        (len != -1)        &&
+                        (complete_line ==0 )  )
+                   {
+                    /*----------------------------------------------*/
+                    /* process input                                */
+                    /*----------------------------------------------*/
+		char_buffer[char_buffer_size++] = inpchar[0];
+
+                    if (inpchar[0] == '\015') {
+                        gotcr=1;
+                    }
+                    if (inpchar[0] == '\012')
+                        {
+                         complete_line = 1;
+                         if (gotcr) gotcr=0;
+                         char_buffer[char_buffer_size++] = 0;
+                        }
+                      else
+                        {
+                         if (char_buffer_size > (MAX_CHAR_BUFF-4) )
+                           {
+                  char_buffer[char_buffer_size++] = '\n';
+                  char_buffer[char_buffer_size++] = 0;
+                            complete_line = 1;
+                           }
+                        }
+
+               inpchar[0]=0;
+                    if (complete_line == 0)
+                      {
+                       len = read(bs, inpchar, 1);
+                        if (len==-1 && gotcr==1) {
+                        /* this is just a CR line termination */
+                                complete_line = 1;
+                                gotcr=0;
+                                char_buffer[char_buffer_size++] = 0;
+                        }
+                      }
+                   } /* end of while */
+
+                /*--------------------------------------*/
+                /* terminate the line                   */
+                /*--------------------------------------*/
+
+		char_buffer[char_buffer_size] = 0;
+
+                /*------------------------------------------------*/
+                /* check for complete line (terminated by \n)     */
+                /*------------------------------------------------*/
+                if (!complete_line)
+                 {
+                   return -4;
+                 }
+
+                /*--------------------------------------------*/
+                /* copy the user buffer to the input string   */
+                /*--------------------------------------------*/
+                strcpy(astring, char_buffer);
+                buff_size = strlen(astring);
+                char_buffer_size = 0;
+
+                if (buff_size > 8000) {
+			write_log(YESTIME,"get_input: Possible flood!\n");
+			return -6;
+		}
+
+terminate(astring);
+strcpy(t_inpstr,astring);
+return 0;
+} /* end */
+
 
 /* Send string down the socket */
-void sendchat (fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
-char *fmt;
-int a1, a2, a3, a4, a5, a6, a7, a8, a9, a10;
+void sendchat(char *fmt, ...)
 {
   int len;
   char buf[BIGBUF];
- 
-  if (!fmt) {
-     wlog("Null fmt in sendchat");
-     quit_robot();
-    }
+  va_list args;
 
-  sprintf (buf, fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10);
-  /* strcat (buf, "\n"); */
+  buf[0]=0;
+  va_start(args,fmt);
+  vsprintf(buf,fmt,args);
+  va_end(args);
+ 
   len = strlen (buf);
 
   if (write(bs, buf, len) != len)
     {
-     sprintf(mess,"Write failed: %s %s",buf,get_error());
-     wlog(mess);
+     write_log(YESTIME,"Write failed: %s %s\n",buf,get_error());
      quit_robot();
     }
 
 }
 
-void wlog(char *str)
-{
- char timebuf[30];
- char filename[256];
- char mess2[9030];
- time_t tm;
- FILE *fp;
-
- strcpy(filename,BOTLOG_FILE);
- fp=fopen(filename,"a");
-
- time(&tm);
- strcpy(timebuf, ctime(&tm));
- timebuf[strlen(timebuf)-6]=0;
- sprintf(mess2,"%s: %s\n",timebuf,str);
- fputs(mess2,fp);
- fclose(fp);
-}
-
-
 /* The robot routine takes care of the initial setup required for startup */
-void robot()
+void init_talker_stuff(void)
 {
 
   /* Set bots directions */
   sprintf(directions,UNKNOWNDIRS,HOME_ROOM);
 
-  sendchat("%s\n\n", CONNMSG);
   sync_bot();
   sendchat(";has just rebooted.\n");
   sendchat(".desc %s\n", IDLEMSG);
@@ -502,13 +707,9 @@ void robot()
   sendchat(".home\n");
   sendchat(".shout I'm baaaaack!\n");
   sendchat("_who\n");
-  listen_to_people();
-  sendchat(".go\n");
-  sendchat("%s\n", DCONMSG);           /* should never reach here */
-  return;
 }
 
-/* The listen_to_people routine is the main loop of the program.
+/* The process_input routine is the main parser of the program.
    It keeps track of the goings-on in the room, and processes 
    the various requests from people.  
 
@@ -516,34 +717,19 @@ void robot()
    commands need to be said out loud, and StoryBot will sometimes
    say or whisper different messages depending on their type.           */
 
-void listen_to_people()
+void process_input(char *inbuf)
 {
-   char *inbuf;                    /* Raw buffer of what came in */
-   char *playername;               /* Name of player associated w/ last cmd */
-   char *lowername;                /* Name of player associated w/ last cmd */
    char *command;                  /* Points to command player gave         */
    char command2[100];             /* Points to command player gave         */
    int volume;                     /* Was cmd a SAY or a WHISPER?           */
    int chance2;
-   struct storystate *ourstory;    /* Ptr to main story structure           */
    int u,vis;
    char room[NAME_LEN];
+   char playername[ARR_SIZE];      /* Name of player associated w/ last cmd */
 
-   ourstory = NULL;
-   FORMATTED = NO;
-   playername = (char *) malloc(MAXSTRLEN * sizeof(char));
-   lowername = (char *) malloc(MAXSTRLEN * sizeof(char));
-   
-   for (;;) {
-        /* Get input from talker */
-        inbuf = getinput();
+   /* playername = (char *) malloc(MAXSTRLEN * sizeof(char)); */
 
-        if (inbuf == NULL) {
-        /* wlog("Couldn't read any input from getinput"); */
-        /* quit_robot(); */
-        sleep(1);
-        continue;
-        }
+/* write_log(YESTIME,"Got inbuf: \"%s\"\n",inbuf); */
 
 	if (!strncmp(inbuf,"+++++ command:",14)) {
 	  remove_first(inbuf);
@@ -552,10 +738,15 @@ void listen_to_people()
 	  command2[strlen(command2)-1]=0;
 	  if (!strcmp(command2,"who")) {
 		remove_first(inbuf);
-		u=find_free_slot();
+		/* read in name */
+		sscanf(inbuf,"%s ",playername);
+		if (!strncmp(playername,our_delimiters,2)) midcpy(playername,playername,2,strlen(playername)-2);
+		/* see if we already have this user in our list */
+		u=get_user_num(playername);
+		if (u==-1) u=find_free_slot();
 		/* get name */
-		sscanf(inbuf,"%s ",ustr[u].say_name);
-		strcpy(ustr[u].name,ustr[u].say_name);
+		strcpy(ustr[u].say_name,playername);
+		strcpy(ustr[u].name,strip_color(ustr[u].say_name));
 		strtolower(ustr[u].name);
 		/* get room */
 		remove_first(inbuf);
@@ -563,52 +754,48 @@ void listen_to_people()
 		/* get vis status */
 		remove_first(inbuf);
 		sscanf(inbuf,"%d",&ustr[u].vis);
-        sprintf(mess, "Read in user %s (%s) (%d)", ustr[u].say_name,ustr[u].room,ustr[u].vis);
-        wlog(mess);
+        write_log(YESTIME,"Read in user %s (cn: %s) (rm: %s) (vs: %d)\n", strip_color(ustr[u].say_name),ustr[u].say_name,ustr[u].room,ustr[u].vis);
 	    } /* end of _who command line read */
 	}
      else if ( (sscanf(inbuf, "+++++ came in:%s", playername)) == 1) {
-        sprintf(mess, "%s recorded as arrived.", playername);
-        wlog(mess);
-        strcpy(lowername,playername);
-        strtolower(lowername);
+        write_log(YESTIME,"%s recorded as arrived.\n", playername);
+	u=get_user_num(playername);
         if (ourstory && ourstory->numkids > 0)
         sendchat(".tell %s Hello, %s.\n.t %s I'm in the middle of telling a story.\n",
-               playername, playername, playername);
+               ustr[u].name, ustr[u].say_name, ustr[u].name);
         else if (ourstory && ourstory->writing)
         sendchat(".tell %s Hello, %s.\n.t %s I'm busy listening to %s's story.\n",
-               playername, playername, playername, ourstory->author);
+               ustr[u].name, ustr[u].say_name, ustr[u].name, ourstory->author);
         else
         sendchat(".tell %s Hello, %s.\n.t %s I'm glad to have some company.\n",
-               playername, playername, playername);
+               ustr[u].name, ustr[u].say_name, ustr[u].name);
 
         if ((ourstory == NULL) || !(ourstory->writing))
-          sendchat(".tell %s Say 'help' to see commands I recognize.\n",playername);
+          sendchat(".tell %s Say 'help' to see commands I recognize.\n",ustr[u].name);
      }
      else if ( (sscanf(inbuf, "+++++ logon:%s %s %d", playername,room,&vis)) == 3) {
 	/*
 	if (!load_user(playername))
 	  add_user(playername);
 	*/
-        strcpy(lowername,playername);
-        strtolower(lowername);
+	if (!strncmp(playername,our_delimiters,2)) midcpy(playername,playername,2,strlen(playername)-2);
+	u=get_user_num(playername);
+	if (u==-1) u=find_free_slot();
 
-	u=find_free_slot();
-
-	strcpy(ustr[u].name,lowername);
 	strcpy(ustr[u].say_name,playername);
+	strcpy(ustr[u].name,strip_color(playername));
+	strtolower(ustr[u].name);
 	strcpy(ustr[u].room,room);
 	ustr[u].vis=vis;
 	ustr[u].logon=1;
 
 	vis=0;
 	room[0]=0;
-        sprintf(mess, "%s recorded as logged on.", playername);
-        wlog(mess);
+        write_log(YESTIME,"%s recorded as logged on.\n", strip_color(ustr[u].say_name));
         chance2 = rand() % 3;
-        if (chance2==1) sendchat(".tell %s Hiya %s!\n",playername,playername);
-        else if (chance2==2) sendchat(".tell %s Hola %s!\n",playername,playername);
-        else sendchat(".tell %s Howdy %s!\n",playername,playername);
+        if (chance2==1) sendchat(".tell %s Hiya %s!\n",ustr[u].name,ustr[u].say_name);
+        else if (chance2==2) sendchat(".tell %s Hola %s!\n",ustr[u].name,ustr[u].say_name);
+        else sendchat(".tell %s Howdy %s!\n",ustr[u].name,ustr[u].say_name);
      }
      else if ( (sscanf(inbuf, "+++++ logoff:%s", playername)) == 1) {
 	u=get_user_num(playername);
@@ -619,8 +806,7 @@ void listen_to_people()
          ourstory = finish_story(ourstory);
          sendchat(".desc %s\n", IDLEMSG);
        }
-        sprintf(mess, "%s recorded as logged off.", ustr[u].say_name);
-        wlog(mess);
+        write_log(YESTIME,"%s recorded as logged off.\n", strip_color(ustr[u].say_name));
 
 	/* Clear structure */
 	clear_user(u);
@@ -628,8 +814,8 @@ void listen_to_people()
      else if ( (sscanf(inbuf, "+++++ left:%s", playername)) == 1) {
 	u=get_user_num(playername);
 
-       sprintf(mess, "%s recorded as left.", ustr[u].say_name);
-       wlog(mess);
+       write_log(YESTIME,"%s recorded as left.\n", strip_color(ustr[u].say_name));
+
        if (ourstory && ourstory->writing &&
            !strcmp(ustr[u].name, ourstory->author)) {
          sendchat(";has finished listening to %s's story.\n",ourstory->author); 
@@ -640,26 +826,29 @@ void listen_to_people()
      else if (!strcmp(inbuf, "+++++ SHUTDOWN")) {
         sendchat(".desc %s\n", SHUTMSG); /* shut down bot! */
         sendchat("%s\n", DCONMSG);
-        wlog("Got talker shutdown message.");
+        write_log(YESTIME,"Got talker shutdown message.\n");
         quit_robot();
      } 
      else if (!strcmp(inbuf, "+++++ REBOOT")) {
         sendchat(".desc %s\n", SHUTMSG); /* reboot bot! */
         sendchat("%s\n", DCONMSG);
-        wlog("Got talker reboot message.");
+        write_log(YESTIME,"Got talker reboot message.\n");
         reboot_robot();
      }
      else if (!strcmp(inbuf, "+++++ QUIT")) {
-        wlog("Got talker quit message.");
+        write_log(YESTIME,"Got talker quit message.\n");
         quit_robot();
+     }
+     else if (!strcmp(inbuf, "+++++ WELCOME")) {
+        write_log(YESTIME,"Got talker welcome message.\n");
+        init_talker_stuff();
      }
      else if (sscanf(inbuf, "+++++ comm_say:%s %*s", playername) == 1) {
 	u=get_user_num(playername);
-        strcpy(lowername,playername);
-        strtolower(lowername);
 
+if (!strcmp(ustr[u].name,BOT_NAME)) return;
          command = inbuf+strlen(playername)+16;
-	 if (logging==1) {
+	 if (g_CONVOLOG==YES) {
 	  if (strcmp(ustr[u].name,BOT_NAME)) {
 		fputs(inbuf,log_fp);
 		fputs("\n",log_fp);
@@ -667,120 +856,113 @@ void listen_to_people()
 	  }
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
-         sprintf(mess,"SAY: \"%s\" \"%s\"",playername,command);
-         wlog(mess);
+         write_log(YESTIME,"SAY: \"%s\" \"%s\"\n",strip_color(ustr[u].say_name),command);
 
          volume = SAY;
      if (ourstory && ourstory->writing) {
-       ourstory = handle_command(playername, lowername, command, volume, ourstory);
+       ourstory = handle_command(u, command, volume, ourstory);
        }
      else {
-       if (handle_action(playername, lowername, command, volume) == 1)
-        ourstory = handle_command(playername, lowername, command, volume, ourstory);
+       if (handle_action(u, command, volume) == 1)
+        ourstory = handle_command(u, command, volume, ourstory);
        else { }
       }
      }
      else if (sscanf(inbuf, "+++++ comm_tell:%s %*s", playername) == 1) {
-        strcpy(lowername,playername);
-        strtolower(lowername);
+	u=get_user_num(playername);
+
+if (!strcmp(ustr[u].name,BOT_NAME)) return;
          command = inbuf+strlen(playername)+17;
 
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
-         sprintf(mess,"TELL: \"%s\" \"%s\"",playername,command);
-         wlog(mess);
+         write_log(YESTIME,"TELL: \"%s\" \"%s\"\n",strip_color(ustr[u].say_name),command);
 
          volume = WHISPER;
      if (ourstory && ourstory->writing) {
-         if (strcmp(lowername,ourstory->author)) {
-          sendchat(".tell %s I can't talk to you now, I'm busy listening to %s's story.\n", lowername, ourstory->author);
-          continue;
+         if (strcmp(ustr[u].name,ourstory->author)) {
+          sendchat(".tell %s I can't talk to you now, I'm busy listening to %s's story.\n", ustr[u].name, ourstory->author);
+          return;
          } /* end of if strcmp */
-       ourstory = handle_command(playername, lowername, command, volume, ourstory);
+       ourstory = handle_command(u, command, volume, ourstory);
        }
      else {
-       if (handle_action(playername, lowername, command, volume) == 1)
-        ourstory = handle_command(playername, lowername, command, volume, ourstory);
+       if (handle_action(u, command, volume) == 1)
+        ourstory = handle_command(u, command, volume, ourstory);
        else { }
       }
      }
 
      else if (sscanf(inbuf, "+++++ comm_shout:%s %*s", playername) == 1) {
-        strcpy(lowername,playername);
-        strtolower(lowername);
+	u=get_user_num(playername);
+
+if (!strcmp(ustr[u].name,BOT_NAME)) return;
          command = inbuf+strlen(playername)+18;
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
-         sprintf(mess,"SHOUT: \"%s\" \"%s\"",playername,command);
-         wlog(mess);
+         write_log(YESTIME,"SHOUT: \"%s\" \"%s\"\n",strip_color(ustr[u].say_name),command);
 
          volume = SHOUT;
-       handle_action(playername, lowername, command, volume);
+       handle_action(u, command, volume);
      }
 
      else if (sscanf(inbuf, "+++++ comm_semote:%s %*s", playername) == 1) {
-        strcpy(lowername,playername);
-        strtolower(lowername);
+	u=get_user_num(playername);
+
+if (!strcmp(ustr[u].name,BOT_NAME)) return;
          command = inbuf+strlen(playername)+19;
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
-         sprintf(mess,"SEMOTE: \"%s\" \"%s\"",playername,command);
-         wlog(mess);
+         write_log(YESTIME,"SEMOTE: \"%s\" \"%s\"\n",strip_color(ustr[u].say_name),command);
 
              volume = SEMOTE;
-             handle_action(playername, lowername, command, volume);
+             handle_action(u, command, volume);
          }
 
      else if (sscanf(inbuf, "+++++ comm_shemote:%s %*s", playername) == 1) {
-          if (strstr(inbuf,"Spokes") || strstr(inbuf,"spokes")) {
-        strcpy(lowername,playername);
-        strtolower(lowername);
+	u=get_user_num(playername);
+
+if (!strcmp(ustr[u].name,BOT_NAME)) return;
          command = inbuf+strlen(playername)+20;
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
-         sprintf(mess,"SHEMOTE: \"%s\" \"%s\"",playername,command);
-         wlog(mess);
+         write_log(YESTIME,"SHEMOTE: \"%s\" \"%s\"\n",strip_color(ustr[u].say_name),command);
 
              volume = SHEMOTE;
-             handle_action(playername, lowername, command, volume);
-             }
+             handle_action(u, command, volume);
          }
-
      else if (sscanf(inbuf, "+++++ comm_emote:%s %*s", playername) == 1) {
-        strcpy(lowername,playername);
-        strtolower(lowername);
+	u=get_user_num(playername);
+
+if (!strcmp(ustr[u].name,BOT_NAME)) return;
              command = inbuf+strlen(playername)+18;
              volume = EMOTE;
 
-	 if (logging==1) {
-	  if (strcmp(lowername,BOT_NAME)) {
+	 if (g_CONVOLOG==YES) {
+	  if (strcmp(ustr[u].name,BOT_NAME)) {
 		fputs(inbuf,log_fp);
 		fputs("\n",log_fp);
 		}
 	  }
 
-             handle_action(playername, lowername, command, volume);
+             handle_action(u, command, volume);
          }
 
-   }
 }
 
 /* This function handle all commands sent to the bot that */
 /* aren't related to story functions */
-int handle_action(char *playername, char *lowername, char *command, int volume)
+int handle_action(int user, char *command, int volume)
 {
 char command2[800];
 char comstr[50];
-char namestr[22];
+char namestr[SAYNAME_LEN];
 int chance=0;
-int u;
 
 comstr[0]=0;
 namestr[0]=0;
 
-if (!strcmp(lowername,BOT_NAME)) goto ENDING;
-
-u=get_user_num(playername);
+if (!strcmp(ustr[user].name,BOT_NAME)) goto ENDING;
 
 /* Copy the original command line to another buffer so we can */
 /* lowercase it */
@@ -790,15 +972,20 @@ strtolower(command2);
 /* SAY part */
 if (volume==SAY) {
  if (!strcmp(command2,BOT_NAME)) {
-   sendchat("What do you want, %s? ;-)\n",playername);
+   sendchat("What do you want, %s? ;-)\n",ustr[user].say_name);
    goto ENDING;
    }
  if (strstr(command2,BOT_NAME)) {
    if (strstr (command2, "fuck you" ) ||
        strstr (command2, "screw you" )) {
-       sendchat(".tell %s Sorry, I don't do requests.\n",playername);
-       sendchat(".shemote sings to %s \"Na na na na, na na na na, hey hey hey, goodbye!\"\n",playername);
-        sendchat(".kill %s\n",playername);
+       sendchat(".say Sorry, I don't do requests.\n");
+	if (g_KILLSWEAR==YES) {
+        sendchat(".shemote sings to %s \"Na na na na, na na na na, hey hey hey, goodbye!\"\n",ustr[user].say_name);
+        sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".say Don't make me do a lorena bobbit on that tootsie roll!\n");
+	}
         goto ENDING;
       }
    else if (strstr (command2, "how are you" ) ||
@@ -807,18 +994,18 @@ if (volume==SAY) {
             strstr (command2, "how be you" ) ||
             strstr (command2, "how be ya" ) ||
             strstr (command2, "how goes it" )) {
-        sendchat(".say I'm good %s, how are you?\n",playername);
+        sendchat(".say I'm good %s, how are you?\n",ustr[user].say_name);
         goto ENDING;
       }
    else if (strstr (command2, "what is up" ) ||
             strstr (command2, "what's up" )) {
-        sendchat(".say An adverb, %s.\n",playername);
+        sendchat(".say An adverb, %s.\n",ustr[user].say_name);
         sendchat(".emote rolls his eyes\n");
         goto ENDING;
       }
    else if (strstr (command2, "what is goin down" ) ||
             strstr (command2, "what's goin down" )) {
-        sendchat(".say No %s, what's goin up!?\n",playername);
+        sendchat(".say No %s, what's goin up!?\n",ustr[user].say_name);
         goto ENDING;
       }
    else if (strstr (command2, "que pasa" ) ||
@@ -826,7 +1013,7 @@ if (volume==SAY) {
             strstr (command2, "what are you doin" ) ||
             strstr (command2, "whatcha doin" ) ||
             strstr (command2, "what's happenin" )) {
-        sendchat(".say Not much %s, you?\n",playername);
+        sendchat(".say Not much %s, you?\n",ustr[user].say_name);
         goto ENDING;
       }
    else if (strstr (command2, "you suck" ) ||
@@ -880,7 +1067,7 @@ if (volume==SAY) {
         else if (chance==2)
          sendchat(".say NO!!! Anything but that!!\n");
 	else
-         sendchat(".say Really %s? Sucks bein' you!\n",playername);
+         sendchat(".say Really %s? Sucks bein' you!\n",ustr[user].say_name);
 
         sendchat(".emote hides\n");
         goto ENDING;
@@ -909,8 +1096,14 @@ if (volume==SAY) {
 	    strstr (command2, "v-m-s" ) ||
 	    strstr (command2, "v_m_s" ) ||
 	    strstr (command2, "vms" )) {
+	if (g_KILLSWEAR==YES) {
         sendchat(".say Such language cannot go unpunished!\n");
-        sendchat(".kill %s\n",playername);
+        sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".emote gasps and back-hands %s across the face!\n",ustr[user].say_name);
+	sendchat(".say Don't ever disrespect the family like that!\n");
+	}
 	goto ENDING;
 	}
 
@@ -919,13 +1112,13 @@ if (strstr(command2,BOT_NAME)) {
             strstr (command2, "hello" ) ||
             strstr (command2, "yo" ) ||
             MATCH (command2, "re *" )) {
-	if (!ustr[u].logon) {
+	if (!ustr[user].logon) {
         chance = rand() % 3;
-        if (chance==1) sendchat(".say Hiya %s!\n",playername);
-        else if (chance==2) sendchat(".say Hola %s!\n",playername);
-        else sendchat(".say Howdy %s!\n",playername);
+        if (chance==1) sendchat(".say Hiya %s!\n",ustr[user].say_name);
+        else if (chance==2) sendchat(".say Hola %s!\n",ustr[user].say_name);
+        else sendchat(".say Howdy %s!\n",ustr[user].say_name);
 	}
-	else ustr[u].logon=0;
+	else ustr[user].logon=0;
 
         goto ENDING;
       }
@@ -934,9 +1127,9 @@ if (strstr(command2,BOT_NAME)) {
             strstr (command2, "cya" ) ||
             strstr (command2, "adios" )) {
         chance = rand() % 3;
-        if (chance==1) sendchat(".say Bye %s!\n",playername);
-        else if (chance==2) sendchat(".say Adios %s!\n",playername);
-        else sendchat(".say Ciao, %s!\n",playername);
+        if (chance==1) sendchat(".say Bye %s!\n",ustr[user].say_name);
+        else if (chance==2) sendchat(".say Adios %s!\n",ustr[user].say_name);
+        else sendchat(".say Ciao, %s!\n",ustr[user].say_name);
         goto ENDING;
       }
 
@@ -949,9 +1142,14 @@ if (strstr(command2,BOT_NAME)) {
 if (volume==WHISPER) {
      if (MATCH (command2, "fuck you*" ) ||
          MATCH (command2, "screw you*" )) {
-       sendchat(".tell %s Sorry, I don't do requests.\n",playername);
-       sendchat(".shemote sings to %s \"Na na na na, na na na na, hey hey hey, goodbye!\"\n",playername);
-       sendchat(".kill %s\n",playername);
+       sendchat(".tell %s Sorry, I don't do requests.\n",ustr[user].name);
+	if (g_KILLSWEAR==YES) {
+       sendchat(".shemote sings to %s \"Na na na na, na na na na, hey hey hey, goodbye!\"\n",ustr[user].say_name);
+       sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".tell %s Don't make me do a lorena bobbit on that tootsie roll!\n",ustr[user].name);
+	}
        goto ENDING;
       }
    else if (strstr (command2, "how are you" ) ||
@@ -960,18 +1158,18 @@ if (volume==WHISPER) {
             strstr (command2, "how are u" ) ||
             strstr (command2, "how be ya" ) ||
             strstr (command2, "how goes it" )) {
-        sendchat(".tell %s I'm good, how are you?\n",playername);
+        sendchat(".tell %s I'm good, how are you?\n",ustr[user].name);
         goto ENDING;
       }
    else if (strstr (command2, "what is up" ) ||
             strstr (command2, "what's up" )) {
-        sendchat(".tell %s An adverb, %s.\n",playername,playername);
-        sendchat(".semote %s rolls his eyes\n",playername);
+        sendchat(".tell %s An adverb, %s.\n",ustr[user].name,ustr[user].say_name);
+        sendchat(".semote %s rolls his eyes\n",ustr[user].name);
         goto ENDING;
       }
    else if (strstr (command2, "what is goin down" ) ||
             strstr (command2, "what's goin down" )) {
-        sendchat(".tell %s No, what's goin up!?\n",playername);
+        sendchat(".tell %s No, what's goin up!?\n",ustr[user].name);
         goto ENDING;
       }
    else if (strstr (command2, "que pasa" ) ||
@@ -979,7 +1177,7 @@ if (volume==WHISPER) {
             strstr (command2, "what are you doin" ) ||
             strstr (command2, "whatcha doin" ) ||
             strstr (command2, "what's happenin" )) {
-        sendchat(".tell %s Not much, you?\n",playername);
+        sendchat(".tell %s Not much, you?\n",ustr[user].name);
         goto ENDING;
       }
    else if (strstr (command2, "you suck" ) ||
@@ -1019,33 +1217,33 @@ if (volume==WHISPER) {
             strstr (command2, "i am alright" ) ||
             strstr (command2, "im alright" )) {
         chance = rand() % 2;
-        if (chance==1) sendchat(".semote %s nods\n",playername);
-        else sendchat(".tell %s I see\n",playername);
+        if (chance==1) sendchat(".semote %s nods\n",ustr[user].name);
+        else sendchat(".tell %s I see\n",ustr[user].name);
         goto ENDING;
       }
    else if (strstr (command2, "lag" )) {
         chance = rand() % 3;
         if (chance==1)
-         sendchat(".tell %s Where?? WHERE!?!?\n",playername);
+         sendchat(".tell %s Where?? WHERE!?!?\n",ustr[user].name);
         else if (chance==2)
-         sendchat(".tell %s NO!!! Anything but that!!\n",playername);
+         sendchat(".tell %s NO!!! Anything but that!!\n",ustr[user].name);
 	else
-         sendchat(".say Really %s? Sucks bein' you!\n",playername);
+         sendchat(".say Really %s? Sucks bein' you!\n",ustr[user].say_name);
 
-        sendchat(".semote %s hides\n",playername);
+        sendchat(".semote %s hides\n",ustr[user].name);
         goto ENDING;
       }
    else if (MATCH (command2, "re *" ) ||
-            MATCH (command2, "hello *" ) ||
+            strstr (command2, "hello" ) ||
             MATCH (command2, "yo *" ) ||
             MATCH (command2, "hi*" )) {
-	if (!ustr[u].logon) {
+	if (!ustr[user].logon) {
         chance = rand() % 3;
-        if (chance==1) sendchat(".tell %s Hiya %s!\n",playername,playername);
-        else if (chance==2) sendchat(".tell %s Hola %s!\n",playername,playername);
-        else sendchat(".tell %s Howdy %s!\n",playername,playername);
+        if (chance==1) sendchat(".tell %s Hiya %s!\n",ustr[user].name,ustr[user].say_name);
+        else if (chance==2) sendchat(".tell %s Hola %s!\n",ustr[user].name,ustr[user].say_name);
+        else sendchat(".tell %s Howdy %s!\n",ustr[user].name,ustr[user].say_name);
 	}
-	else ustr[u].logon=0;
+	else ustr[user].logon=0;
        goto ENDING;
       }
    else if (MATCH (command2, "bye *" ) ||
@@ -1053,9 +1251,9 @@ if (volume==WHISPER) {
             MATCH (command2, "cya *" ) ||
             MATCH (command2, "adios *" )) {
         chance = rand() % 3;
-        if (chance==1) sendchat(".tell %s Bye %s!\n",playername,playername);
-        else if (chance==2) sendchat(".tell %s Adios %s!\n",playername,playername);
-        else sendchat(".tell %s Ciao, %s!\n",playername,playername);
+        if (chance==1) sendchat(".tell %s Bye %s!\n",ustr[user].name,ustr[user].say_name);
+        else if (chance==2) sendchat(".tell %s Adios %s!\n",ustr[user].name,ustr[user].say_name);
+        else sendchat(".tell %s Ciao, %s!\n",ustr[user].name,ustr[user].say_name);
        goto ENDING;
       }
    else if (strstr (command2, "vax" ) ||
@@ -1066,8 +1264,14 @@ if (volume==WHISPER) {
 	    strstr (command2, "v-m-s" ) ||
 	    strstr (command2, "v_m_s" ) ||
 	    strstr (command2, "vms" )) {
-        sendchat(".tell %s Such language cannot go unpunished!\n",playername);
-        sendchat(".kill %s\n",playername);
+	if (g_KILLSWEAR==YES) {
+        sendchat(".tell %s Such language cannot go unpunished!\n",ustr[user].name);
+        sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".semote %s gasps and back-hands you across the face!\n",ustr[user].name);
+	sendchat(".tell %s Don't ever disrespect the family like that!\n",ustr[user].name);
+	}
 	goto ENDING;
 	}
 
@@ -1081,9 +1285,14 @@ else if (volume==SHOUT) {
   if (strstr(command2, BOT_NAME)) {
      if (strstr (command2, "fuck you*" ) ||
          strstr (command2, "screw you*" )) {
-       sendchat(".shout Sorry %s, I don't do requests.\n",playername);
-       sendchat(".shemote sings to %s \"Na na na na, na na na na, hey hey hey, goodbye!\"\n",playername);
-       sendchat(".kill %s\n",playername);
+       sendchat(".shout Sorry %s, I don't do requests.\n",ustr[user].say_name);
+	if (g_KILLSWEAR==YES) {
+       sendchat(".shemote sings to %s \"Na na na na, na na na na, hey hey hey, goodbye!\"\n",ustr[user].say_name);
+       sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".shout Don't make me do a lorena bobbit on that tootsie roll!\n");
+	}
        goto ENDING;
       }
    else if (strstr (command2, "how are you" ) ||
@@ -1092,18 +1301,18 @@ else if (volume==SHOUT) {
             strstr (command2, "how are u" ) ||
             strstr (command2, "how be ya" ) ||
             strstr (command2, "how goes it" )) {
-        sendchat(".shout I'm good %s, how are you?\n",playername);
+        sendchat(".shout I'm good %s, how are you?\n",ustr[user].say_name);
         goto ENDING;
       }
    else if (strstr (command2, "what is up" ) ||
             strstr (command2, "what's up" )) {
-        sendchat(".shout An adverb, %s.\n",playername);
+        sendchat(".shout An adverb, %s.\n",ustr[user].say_name);
         sendchat(".shemote rolls his eyes\n");
         goto ENDING;
       }
    else if (strstr (command2, "what is goin down" ) ||
             strstr (command2, "what's goin down" )) {
-        sendchat(".shout No %s, what's goin up!?\n",playername);
+        sendchat(".shout No %s, what's goin up!?\n",ustr[user].say_name);
         goto ENDING;
       }
    else if (strstr (command2, "que pasa" ) ||
@@ -1111,7 +1320,7 @@ else if (volume==SHOUT) {
             strstr (command2, "what are you doin" ) ||
             strstr (command2, "whatcha doin" ) ||
             strstr (command2, "what's happenin" )) {
-        sendchat(".shout Not much %s, you?\n",playername);
+        sendchat(".shout Not much %s, you?\n",ustr[user].say_name);
         goto ENDING;
       }
    else if (strstr (command2, "you suck" ) ||
@@ -1126,20 +1335,6 @@ else if (volume==SHOUT) {
             strstr (command2, "hush" ) ||
             strstr (command2, "be quiet" )) {
         sendchat(".shout And who's gonna make me? You? HAH!\n");
-        goto ENDING;
-      }
-   else if (strstr (command2, "taxes" )) {
-         sendchat(".shemote hops on his little soapbox.\n");
-	 sleep(2);
-         sendchat(".shout Citizens!  Are you as tired as I am of these damned sales taxes?\n");
-	 sleep(2);
-	 sendchat(".shout If you elect me as your leader, I'll eliminate ALL unjust taxes in this realm!\n");
-	 sleep(2);
-	 sendchat(".shemote pauses and blinks brightly...\n");
-	 sleep(3);
-	 sendchat(".shout Read my lips, No New Taxes!\n");
-	 sleep(2);
-	 sendchat(".shemote leaps down from his soapbox.\n");
         goto ENDING;
       }
    else if (strstr (command2, "i'm good" ) ||
@@ -1173,13 +1368,13 @@ else if (volume==SHOUT) {
            strstr (command2, "hello" ) ||
            strstr (command2, "yo" ) ||
            strstr (command2, "hi" )) {
-	if (!ustr[u].logon) {
+	if (!ustr[user].logon) {
         chance = rand() % 3;
-        if (chance==1) sendchat(".shout Hiya %s!\n",playername);
-        else if (chance==2) sendchat(".shout Hola %s!\n",playername);
-        else sendchat(".shout Howdy %s!\n",playername);
+        if (chance==1) sendchat(".shout Hiya %s!\n",ustr[user].say_name);
+        else if (chance==2) sendchat(".shout Hola %s!\n",ustr[user].say_name);
+        else sendchat(".shout Howdy %s!\n",ustr[user].say_name);
 	}
-	else ustr[u].logon=0;
+	else ustr[user].logon=0;
 
       goto ENDING;
    }
@@ -1188,9 +1383,9 @@ else if (volume==SHOUT) {
            strstr (command2, "cya" ) ||
            strstr (command2, "adios" )) {
         chance = rand() % 3;
-        if (chance==1) sendchat(".shout Bye %s!\n",playername);
-        else if (chance==2) sendchat(".shout Adios %s!\n",playername);
-        else sendchat(".shout Ciao, %s!\n",playername);
+        if (chance==1) sendchat(".shout Bye %s!\n",ustr[user].say_name);
+        else if (chance==2) sendchat(".shout Adios %s!\n",ustr[user].say_name);
+        else sendchat(".shout Ciao, %s!\n",ustr[user].say_name);
       goto ENDING;
    }
  } /* end of if name check */
@@ -1202,9 +1397,35 @@ else if (volume==SHOUT) {
         else if (chance==2)
          sendchat(".shout NO!!! Anything but that!!\n");
 	else 
-         sendchat(".say Really %s? Sucks bein' you!\n",playername);
+         sendchat(".say Really %s? Sucks bein' you!\n",ustr[user].say_name);
 
         sendchat(".shemote hides\n");
+        goto ENDING;
+      }
+   else if (strstr (command2, "taxes" )) {
+         sendchat(".shemote hops on his little soapbox.\n");
+	 sleep(2);
+         sendchat(".shout Citizens!  Are you as tired as I am of these damned sales taxes?\n");
+	 sleep(2);
+	 sendchat(".shout If you elect me as your leader, I'll eliminate ALL unjust taxes in this realm!\n");
+	 sleep(2);
+	 sendchat(".shemote pauses and blinks brightly...\n");
+	 sleep(3);
+	 sendchat(".shout Read my lips, No New Taxes!\n");
+	 sleep(2);
+	 sendchat(".shemote leaps down from his soapbox.\n");
+        goto ENDING;
+      }
+   else if (strstr (command2, "jazzin" )) {
+         sendchat(".shout Hmm? Jazzin!?\n");
+	 sleep(2);
+         sendchat(".shemote kicks things around\n");
+	 sleep(2);
+         sendchat(".shout If i ever see that no-good penis wrinkle..he'll pay big!\n");
+        goto ENDING;
+      }
+   else if (strstr (command2, "scupper" )) {
+         sendchat(".shout mmm, sugar-nipples..\n");
         goto ENDING;
       }
    else if (strstr (command2, "vax" ) ||
@@ -1215,8 +1436,14 @@ else if (volume==SHOUT) {
 	    strstr (command2, "v-m-s" ) ||
 	    strstr (command2, "v_m_s" ) ||
 	    strstr (command2, "vms" )) {
+	if (g_KILLSWEAR==YES) {
         sendchat(".shout Such language cannot go unpunished!\n");
-        sendchat(".kill %s\n",playername);
+        sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".shemote gasps and back-hands %s across the face!\n",ustr[user].say_name);
+	sendchat(".shout Don't ever disrespect the family like that!\n");
+	}
 	goto ENDING;
 	}
 
@@ -1228,23 +1455,23 @@ else if (volume==SHOUT) {
 else if (volume==EMOTE) {
  if (strstr(command2,BOT_NAME)) {
   if (MATCH (command2, "kicks *" )) {
-       sendchat("; kicks %s back!\n",playername);
+       sendchat("; kicks %s back!\n",ustr[user].say_name);
       goto ENDING;
       }
   if (MATCH (command2, "smacks *" )) {
-       sendchat("; smacks %s back!\n",playername);
+       sendchat("; smacks %s back!\n",ustr[user].say_name);
       goto ENDING;
       }
   if (MATCH (command2, "pounds *" )) {
-       sendchat("; gets up and thumbs his probiscus at %s\n",playername);
+       sendchat("; gets up and thumbs his probiscus at %s\n",ustr[user].say_name);
       goto ENDING;
       }
   else if (MATCH (command2, "licks *" )) {
-       sendchat("; ewwwwwsss, %s cooties!\n",playername);
+       sendchat("; ewwwwwsss, %s cooties!\n",ustr[user].say_name);
       goto ENDING;
       }
   else if (MATCH (command2, "kisses *" )) {
-       sendchat("; blushes and kisses %s back on the cheek.\n",playername);
+       sendchat("; blushes and kisses %s back on the cheek.\n",ustr[user].say_name);
       goto ENDING;
       }
   else if (MATCH (command2, "hug* *" )) {
@@ -1252,7 +1479,7 @@ else if (volume==EMOTE) {
       goto ENDING;
       }
   else if (MATCH (command2, "pokes *" )) {
-       sendchat("; pokies %s in some choice spots.\n",playername);
+       sendchat("; pokies %s in some choice spots.\n",ustr[user].say_name);
       goto ENDING;
       }
   }  /* end of name check */
@@ -1267,7 +1494,7 @@ else if (volume==EMOTE) {
       }
   if (strstr (command2, "giggles" ) ||
       strstr (command2, "gigglz" )) {
-      sendchat("; pinches %s's cheeks, you're so cute!\n",playername);
+      sendchat("; pinches %s's cheeks, you're so cute!\n",ustr[user].say_name);
       goto ENDING;
      }
   if (strstr (command2, "vax" ) ||
@@ -1278,8 +1505,14 @@ else if (volume==EMOTE) {
 	    strstr (command2, "v-m-s" ) ||
 	    strstr (command2, "v_m_s" ) ||
 	    strstr (command2, "vms" )) {
+	if (g_KILLSWEAR==YES) {
         sendchat(".say Such language cannot go unpunished!\n");
-        sendchat(".kill %s\n",playername);
+        sendchat(".kill %s\n",ustr[user].name);
+	}
+	else {
+	sendchat(".emote gasps and back-hands %s across the face!\n",ustr[user].say_name);
+	sendchat(".say Don't ever disrespect the family like that!\n");
+	}
 	goto ENDING;
 	}
 
@@ -1289,12 +1522,12 @@ else if (volume==EMOTE) {
 /* SEMOTE or SHEMOTE part */
 else if ((volume==SEMOTE) || (volume==SHEMOTE)) {
   if (volume==SEMOTE) {
-    sprintf(comstr,".semote %s",playername);
+    sprintf(comstr,".semote %s",ustr[user].name);
     strcpy(namestr,"you");
     }
   else if (volume==SHEMOTE) {
     strcpy(comstr,".shemote");
-    strcpy(namestr,playername);
+    strcpy(namestr,ustr[user].say_name);
     }
 
   if (strstr (command2, "kicks" )) {
@@ -1401,49 +1634,44 @@ int smatch (register char *dat, register char *pat, register char **res)
    doesn't make sense as a command, we ignore it if it was said
    (assuming it was meant for someone else in the room).          */
 
-struct storystate *handle_command(playername, lowername, command, volume, story)
-char *playername, *lowername, *command;
-int volume;
-struct storystate *story;
+struct storystate *handle_command(int user, char *command, int volume, struct storystate *story)
 {
   char buffer[MAXSTRLEN];
   char buffer2[MAXSTRLEN];
-  char dirbuf[256];
-  char titlebuf[256];
-  char author[22];
-  int i,u,found=0;
+  char dirbuf[FILE_NAME_LEN];
+  char titlebuf[FILE_NAME_LEN];
+  char author[NAME_LEN+1];
+  int i,found=0;
   struct dirent *dp;
   FILE *fp;
   FILE *tfp;
   DIR *dirp;
   time_t tm;
 
-  u=get_user_num(lowername);
-
   if (!strcasecmp(command, "help")) 
-    give_help(playername, lowername, story);
+    give_help(user, story);
   else if (story && story->writing) {
-    if (strcmp(lowername, story->author) && strcmp(lowername,ROOT_ID))
+    if (strcmp(ustr[user].name, story->author) && strcmp(ustr[user].name,ROOT_ID))
     { 
       if (volume == WHISPER) 
         sendchat(".tell %s Sorry, I'm busy listening to %s's story just now...\n",
-                playername, story->author);
+                ustr[user].name, story->author);
     }
     else {
-      story = handle_writing(playername, lowername, command, story);
+      story = handle_writing(user, command, story);
     }
   }
   else {
     if (volume == WHISPER) {
-       if (!handle_page2(command,playername,lowername))
-       sendchat(".tell %s I can't hear you! :-P\n", playername);
+       if (!handle_page2(user, command))
+       sendchat(".tell %s I can't hear you! :-P\n", ustr[user].name);
        }
     else if (!strncasecmp(command, "delete ", 7)) {
       if (story && story->numkids > 0) {
         sendchat(".tell %s I'm already in the middle of reading a story, %s.\n",
-               playername, playername);
+               ustr[user].name, ustr[user].say_name);
         sendchat(".tell %s Say 'stop' to abort reading this story first.\n",
-               playername);
+               ustr[user].name);
       }
       else {
          /* Quick way to separate a spaced title into one array */
@@ -1460,9 +1688,9 @@ struct storystate *story;
           dirp=opendir((char *)buffer2);
 
           if (dirp == NULL) {
-            sendchat(".tell %s Can't open the story directory to delete your story\n",playername);
-            sendchat(".tell %s Please tell %s about this.\n",playername,ROOT_ID);
-            wlog("d1: Can't open story directory");
+            sendchat(".tell %s Can't open the story directory to delete your story\n",ustr[user].name);
+            sendchat(".tell %s Please tell %s about this.\n",ustr[user].name,ROOT_ID);
+            write_log(YESTIME,"d1: Can't open story directory\n");
             story = NULL;
             goto END;
             }
@@ -1476,9 +1704,9 @@ struct storystate *story;
 
         /* this if should never prove true if user typed it in full */
          if (!found) {
-            sendchat(".tell %s I can't find that story to delete! Sorry.\n",playername);
-            sendchat(".tell %s Make sure you type the title in full with proper capitalization\n",playername);
-            wlog("d2: Can't find story to delete");
+            sendchat(".tell %s I can't find that story to delete! Sorry.\n",ustr[user].name);
+            sendchat(".tell %s Make sure you type the title in full with proper capitalization\n",ustr[user].name);
+            write_log(YESTIME,"d2: Can't find story to delete\n");
             story = NULL;
             goto END;
          }
@@ -1492,15 +1720,15 @@ struct storystate *story;
         if (fgets(author, MAXSTRLEN, tfp) != NULL) {
           author[strlen(author)-1] = '\0';
           }
-        else wlog("d3: Can't get author for story delete");
+        else write_log(YESTIME,"d3: Can't get author for story \"%s\" delete\n",dirbuf);
         }
-      else wlog("d4: Can't open story index file for delete");
+      else write_log(YESTIME,"d4: Can't open index file for story \"%s\" delete\n",dirbuf);
 
       fclose(tfp);
-      if (!strcmp(lowername,author) || !strcmp(lowername,ROOT_ID)) { }
+      if (!strcmp(ustr[user].name,author) || !strcmp(ustr[user].name,ROOT_ID)) { }
       else {
-          sendchat(".tell %s You must be the author to delete this story!\n",playername);
-          wlog("d5: No permission to delete story.");
+          sendchat(".tell %s You must be the author to delete this story!\n",ustr[user].name);
+          write_log(YESTIME,"d5: No permission to delete story \"%s\".\n",dirbuf);
           story = NULL;
           goto END;
          }
@@ -1510,9 +1738,9 @@ struct storystate *story;
           dirp=opendir((char *)buffer2);
 
           if (dirp == NULL) {
-            sendchat(".tell %s Can't open the story's directory to delete your story\n",playername);
-            sendchat(".tell %s Please tell %s about this.\n",playername,ROOT_ID);
-            wlog("d6: Can't open the story's directory.");
+            sendchat(".tell %s Can't open the story's directory to delete your story\n",ustr[user].name);
+            sendchat(".tell %s Please tell %s about this.\n",ustr[user].name,ROOT_ID);
+            write_log(YESTIME,"d6: Can't open the story directory for story \"%s\".\n",dirbuf);
             story = NULL;
             goto END;
             }
@@ -1530,25 +1758,25 @@ struct storystate *story;
           /* Remove empty directory */
           sprintf(dirbuf,"%s/%s",STORYDIR,buffer);
           if (rmdir(dirbuf) == -1) {
-            sendchat(".tell %s Could not remove empty directory..\n",playername);
-            sendchat(".tell %s Please tell %s about this.\n",playername,ROOT_ID);
-            wlog("d7: Can't remove empty directory.");
+            sendchat(".tell %s Could not remove empty directory..\n",ustr[user].name);
+            sendchat(".tell %s Please tell %s about this.\n",ustr[user].name,ROOT_ID);
+            write_log(YESTIME,"d7: Can't remove empty directory for \"%s\".\n",buffer);
             story = NULL;
             goto END;
           }
 
-          sendchat(".tell %s Ok, I deleted that story *sigh*\n",playername);
-          sendchat(".emote deletes a story for %s.\n",playername);
+          sendchat(".tell %s Ok, I deleted that story *sigh*\n",ustr[user].name);
+          sendchat(".emote deletes a story for %s.\n",ustr[user].say_name);
           sendchat(".say I'm tellin' ya, that was a really good story!\n");
-          wlog("Story deleted");
+          write_log(YESTIME,"Story \"%s\" deleted\n",buffer);
        } /* end of if not in story in else */
      }  /* end of delete command */
     else if (!strncasecmp(command, "execute ", 8)) {
-	if (strcmp(ustr[u].name,ROOT_ID)) {
+	if (strcmp(ustr[user].name,ROOT_ID)) {
     	  if (volume == WHISPER)
 	   sendchat(".say Only %s can tell me to do that! :-P\n",ROOT_ID);
 	  else
-	   sendchat(".tell %s Only %s can tell me to do that! :-P\n",ustr[u].name,ROOT_ID);
+	   sendchat(".tell %s Only %s can tell me to do that! :-P\n",ustr[user].name,ROOT_ID);
 	  goto END;
 	  }
 	remove_first(command);
@@ -1556,12 +1784,47 @@ struct storystate *story;
 	sendchat("%s\n",command);
 	goto END;
 	}
+    else if (!strcasecmp(command, "status")) {
+	sendchat(".tell %s Ny name is %s and I live in the %s\n",ustr[user].name,BOT_NAME,g_HOME_ROOM);
+	sendchat(".tell %s My master is %s\n",ustr[user].name,ROOT_ID);
+	sendchat(".tell %s I %s feeling vindictive today\n",ustr[user].name,g_KILLSWEAR==YES?"AM":"am NOT");
+	sendchat(".tell %s I am running on code version %s\n",ustr[user].name,VERSION);
+	sendchat(".tell %s Paragraph formatting is: %s\n",ustr[user].name,g_FORMATTED==YES?"ON":"OFF");
+	sendchat(".tell %s Conversation logging is: %s\n",ustr[user].name,g_CONVOLOG==YES?"ON":"OFF");
+	goto END;
+	}
+    else if (!strncasecmp(command, "killswear ", 10)) {
+	if (strcmp(ustr[user].name,ROOT_ID)) {
+    	  if (volume == WHISPER)
+	   sendchat(".tell %s Only %s can tell me to do that! :-P\n",ustr[user].name,ROOT_ID);
+	  else
+	   sendchat(".say Only %s can tell me to do that! :-P\n",ROOT_ID);
+	  goto END;
+	  }
+	remove_first(command);
+		if (!strcmp(command,"on")) {
+		g_KILLSWEAR=YES;
+	  	if (volume == WHISPER)
+		sendchat(".tell %s Ok, now i'm vindictive! MUAWHAHAHA!\n",ROOT_ID);
+		else
+		sendchat(".say Ok, now i'm vindictive! MUAWHAHAHA!\n");
+		goto END;
+		}
+		else if (!strcmp(command,"off")) {
+		g_KILLSWEAR=NO;
+	  	if (volume == WHISPER)
+		sendchat(".tell %s Ok, now i'm all forgiving! DAMN IT!\n",ROOT_ID);
+		else
+		sendchat(".say Ok, now i'm all forgiving! DAMN IT!\n");
+		goto END;
+		}
+	} /* killswear */
     else if (!strncasecmp(command, "logging ", 8)) {
-	if (strcmp(ustr[u].name,ROOT_ID)) {
+	if (strcmp(ustr[user].name,ROOT_ID)) {
     	  if (volume == WHISPER)
 	   sendchat(".say Only %s can tell me to do that! :-P\n",ROOT_ID);
 	  else
-	   sendchat(".tell %s Only %s can tell me to do that! :-P\n",ustr[u].name,ROOT_ID);
+	   sendchat(".tell %s Only %s can tell me to do that! :-P\n",ustr[user].name,ROOT_ID);
 	  goto END;
 	  }
 	remove_first(command);
@@ -1569,20 +1832,20 @@ struct storystate *story;
 	strcpy(buffer2, LOG_FILE);
 	if (!(log_fp = fopen(buffer2, "a"))) {
 	  if (volume == WHISPER)
-	   sendchat(".tell %s I can't open my notepad, %s!\n",ustr[u].name,ustr[u].say_name);
+	   sendchat(".tell %s I can't open my notepad, %s!\n",ustr[user].name,ustr[user].say_name);
 	  else
 	   sendchat(".say I can't open my notepad!\n");
 	  goto END;
 	  }
 	if (volume == WHISPER) {
-	 sendchat(".sem %s gets out his notepad and felt tip pen.\n",ustr[u].name);
-	 sendchat(".tell %s Ok, i'm ready!\n",ustr[u].name);
+	 sendchat(".sem %s gets out his notepad and felt tip pen.\n",ustr[user].name);
+	 sendchat(".tell %s Ok, i'm ready!\n",ustr[user].name);
 	}
 	else {
 	 sendchat(".emote gets out his notepad and felt tip pen.\n");
 	 sendchat(".say Ok, i'm ready!\n");
 	 }
-	logging=1;
+	g_CONVOLOG=YES;
 	time(&tm);
 	sprintf(buffer,"*** Log started on %s",ctime(&tm));
 	fputs(buffer,log_fp);
@@ -1594,12 +1857,12 @@ struct storystate *story;
 	fputs(buffer,log_fp);
 	fclose(log_fp);
 	if (volume == WHISPER) {
-	 sendchat(".sem %s closes his notepad and caps his pen.\n",ustr[u].name);
+	 sendchat(".sem %s closes his notepad and caps his pen.\n",ustr[user].name);
 	}
 	else {
 	 sendchat(".emote closes his notepad and caps his pen.\n");
 	 }
-	logging=0;
+	g_CONVOLOG=NO;
 	goto END;
 	}
 	else if (!strcmp(command,"read")) {
@@ -1610,11 +1873,14 @@ struct storystate *story;
 	/* bot would log the log he just read back to us. Instead,     */
 	/* we'll just close the file, read the log, and open it back   */
 	/* up again.				-Cygnus		       */
-	if (logging==1) fflush(log_fp);
+	if (g_CONVOLOG==YES) {
+		fflush(log_fp);
+		fclose(log_fp);
+	}
 
 	if (!(fp = fopen(buffer2, "r"))) {
 	  if (volume == WHISPER)
-	   sendchat(".tell %s I can't open my notepad, %s!\n",ustr[u].name,ustr[u].say_name);
+	   sendchat(".tell %s I can't open my notepad, %s!\n",ustr[user].name,ustr[user].say_name);
 	  else
 	   sendchat(".say I can't open my notepad!\n");
 
@@ -1622,7 +1888,7 @@ struct storystate *story;
 	  }
 
 	if (volume == WHISPER) {
-	 sendchat(".sem %s starts from the beginning.\n",ustr[u].name);
+	 sendchat(".sem %s starts from the beginning.\n",ustr[user].name);
 	}
 	else {
 	 sendchat(".emote starts from the beginning.\n");
@@ -1631,7 +1897,7 @@ struct storystate *story;
 	while (fgets(buffer,1000,fp) != NULL) {
 	buffer[strlen(buffer)-1]=0; /* strip nl */
 	if (volume == WHISPER)
-		sendchat(".tell %s %s\n",ustr[u].name,buffer);
+		sendchat(".tell %s %s\n",ustr[user].name,buffer);
 	else
 		sendchat(".say %s\n",buffer);
 	} /* end of while */
@@ -1639,23 +1905,35 @@ struct storystate *story;
 	buffer[0]=0;
 
 	/* reopen log file for continued logging */
-	if (logging==1) {
+	if (g_CONVOLOG==YES) {
 	  log_fp = fopen(buffer2, "a");
 	  }
 
 	goto END;
 	}
 	else if (!strcmp(command,"clear")) {
+	strcpy(buffer2, LOG_FILE);
+
+	if (g_CONVOLOG==YES) {
+		fflush(log_fp);
+		fclose(log_fp);
+	}
 	remove(LOG_FILE);
 	if (volume == WHISPER)
-	 sendchat(".semote %s rips up the log and throws it in the garbage\n",ustr[u].name);
+	 sendchat(".semote %s rips up the log and throws it in the garbage\n",ustr[user].name);
 	else
 	 sendchat(".emote rips up the log and throws it in the garbage\n");
+
+        /* reopen log file for continued logging */
+        if (g_CONVOLOG==YES) {
+          log_fp = fopen(buffer2, "a");
+          }
+
 	goto END;
-	}
+	} /* end of logging clear */
 	else {
 	if (volume == WHISPER)
-	 sendchat(".tell %s I don't understand what you want me to do!\n",ustr[u].name);
+	 sendchat(".tell %s I don't understand what you want me to do!\n",ustr[user].name);
 	else
 	 sendchat(".say I don't understand what you want me to do!\n");	 	
 	goto END;
@@ -1665,9 +1943,9 @@ struct storystate *story;
     else if (!strncasecmp(command, "list ", 5)) {
       if (story && story->numkids > 0)  {
         sendchat(".tell %s Sorry, I'm in the middle of a story just now.\n",
-                playername);
+                ustr[user].name);
         sendchat(".tell %s Say 'stop' if you want me to read a different one.\n",
-               playername);
+               ustr[user].name);
         }
       else {
 		read_titles(command+5,1);
@@ -1676,9 +1954,9 @@ struct storystate *story;
     else if (!strcasecmp(command, "list")) {
       if (story && story->numkids > 0)  {
         sendchat(".tell %s Sorry, I'm in the middle of a story just now.\n",
-                playername);
+                ustr[user].name);
         sendchat(".tell %s Say 'stop' if you want me to read a different one.\n",
-               playername);
+               ustr[user].name);
         }
       else {
 		read_titles(NULL,0);
@@ -1687,16 +1965,15 @@ struct storystate *story;
     else if (!strncasecmp(command, "read ", 5)) {
       if (story && story->numkids > 0) {
         sendchat(".tell %s I'm already in the middle of reading a story, %s.\n",
-               playername, playername);
+               ustr[user].name, ustr[user].say_name);
         sendchat(".tell %s Say 'stop' if you want me to read a different one.\n",
-               playername);
+               ustr[user].name);
       }
       else {
         if (resolve_title(command+5, buffer, YES) == NULL)
-          sendchat(".tell %s I don't know which story you mean!\n", playername);
+          sendchat(".tell %s I don't know which story you mean!\n", ustr[user].name);
         else {
-          sprintf(mess, "%s reads %s", playername, buffer);
-          wlog(mess);
+          write_log(YESTIME,"%s reads \"%s\"\n", ustr[user].say_name, buffer);
           story = start_story(buffer, story);
           sendchat(".desc %s\n", TELLMSG);
           sprintf(buffer, "%s/%s/a.idx", STORYDIR, story->title);
@@ -1715,27 +1992,27 @@ struct storystate *story;
     else if (!strncasecmp(command, "write ", 6)) {
       if (story && story->numkids > 0) {
         sendchat(".tell %s I'm already in the middle of reading a story, %s.\n",
-               playername, playername);
+               ustr[user].name, ustr[user].say_name);
         sendchat(".tell %s Say 'stop' if you want to tell me a new one.\n",
-               playername);
+               ustr[user].name);
       }
-      else if (!isalpha(command[6]) && !isdigit(command[6]))
+      else if (!isalpha((int)command[6]) && !isdigit((int)command[6]))
         sendchat(".tell %s Titles must start with a letter or digit.\n",
-                playername);
+                ustr[user].name);
       else {
-        if (islower(command[6]))
+        if (islower((int)command[6]))
           command[6] = toupper(command[6]);
         if (resolve_title(command+6, buffer, NO) == NULL) {
           story = start_story(command+6, story);
-          sendchat(".desc %s %s.\n", LISTENMSG, playername);
-          sendchat(";turns his attention to %s and their story.\n", playername);
-          strcpy(story->author, lowername);
+          sendchat(".desc %s %s.\n", LISTENMSG, strip_color(ustr[user].say_name));
+          sendchat(";turns his attention to %s and their story.\n", ustr[user].say_name);
+          strcpy(story->author, ustr[user].name);
           story->writing = YES;
           story->editing = NO;
         }
         else 
           sendchat(".tell %s That title is already taken.  Try a different one.\n",
-                 playername);
+                 ustr[user].name);
       }
     }
     else if (!strcasecmp(command, "reread")) {
@@ -1743,31 +2020,31 @@ struct storystate *story;
         read_paragraph(story);
       else
         sendchat(".tell %s I'm not reading any story at the moment.\n", 
-               playername);
+               ustr[user].name);
     }
     else if (!strcasecmp(command, "next") || !strcasecmp(command, "n")) {
       if (story && story->numkids > 0) 
         read_next(NULL, story);
       else
-        sendchat(".tell %s There is no next paragraph.\n", playername);
+        sendchat(".tell %s There is no next paragraph.\n", ustr[user].name);
     }
     else if (!strncasecmp(command, "next ", 5)) {
       if (story && story->numkids > 0) 
         read_next(command+5, story);
       else
-        sendchat(".tell %s There is no next paragraph.\n", playername);
+        sendchat(".tell %s There is no next paragraph.\n", ustr[user].name);
     }
     else if (!strncasecmp(command, "n ", 2)) {
       if (story && story->numkids > 0) 
         read_next(command+2, story);
       else
-        sendchat(".tell %s There is no next paragraph.\n", playername);
+        sendchat(".tell %s There is no next paragraph.\n", ustr[user].name);
     }
     else if (!strcasecmp(command, "back") || !strcasecmp(command, "b")) {
       if (story && strlen(story->paragraphid) > 1)
         read_previous(story);
       else
-        sendchat(".tell %s There is no previous paragraph.\n", playername);
+        sendchat(".tell %s There is no previous paragraph.\n", ustr[user].name);
     }
     else if (!strcasecmp(command, "stop")) {
       if (story) {
@@ -1776,24 +2053,24 @@ struct storystate *story;
         sendchat(".desc %s\n", IDLEMSG);
       }
       else
-        sendchat(".tell %s But I'm not reading any story now!\n", playername);
+        sendchat(".tell %s But I'm not reading any story now!\n", ustr[user].name);
     }
     else if (!strcasecmp(command, "format")) {
-      if (FORMATTED) {
-        FORMATTED = NO;
+      if (g_FORMATTED) {
+        g_FORMATTED = NO;
         sendchat(".say Paragraph formatting turned off.\n");
       }
       else {
-        FORMATTED = YES;
+        g_FORMATTED = YES;
         sendchat(".say Paragraph formatting turned on.\n");
       }
     }
     else if (!strcasecmp(command, "add")) {
-      for (i = 0; i < story->numkids && strcmp(story->kids[i], playername); i++)
+      for (i = 0; i < story->numkids && strcmp(story->kids[i], ustr[user].name); i++)
         ;
       if (i < story->numkids)
         sendchat(".tell %s You already have a branch of this paragraph.\n",
-                playername);
+                ustr[user].name);
       else {
         strcpy(buffer, story->paragraphid);
         sprintf(buffer+strlen(buffer), "%c", 'a' + story->numkids);
@@ -1805,32 +2082,32 @@ struct storystate *story;
         story->numlines = 0;
         story->numkids = 0;
         strcpy(story->paragraphid, buffer);
-        strcpy(story->author, lowername);
-        sendchat(".desc %s %s.\n", LISTENMSG, playername);
+        strcpy(story->author, ustr[user].name);
+        sendchat(".desc %s %s.\n", LISTENMSG, strip_color(ustr[user].say_name));
         sendchat(";turns his attention to %s and their story addition.\n",
-               playername);
+               ustr[user].say_name);
         story->writing = YES;
         story->editing = NO;
       }
     }
     else if (!strcasecmp(command, "edit")) {
-      if (strcmp(lowername, story->author)
-	&& strcmp(lowername,ROOT_ID))
+      if (strcmp(ustr[user].name, story->author)
+	&& strcmp(ustr[user].name, ROOT_ID))
       {
         sendchat(".tell %s You can't edit someone else's paragraph.\n", 
-                playername);
+                ustr[user].name);
         sendchat(".tell %s If you want to write a different version of this\n",
-               playername);
+               ustr[user].name);
         sendchat(".tell %s paragraph, go 'back' and then 'add'.\n",
-               playername);
+               ustr[user].name);
       }
       else {
-        sendchat(".desc %s %s.\n", LISTENMSG, playername);
-        sendchat(".tell %s Starting edit at end of paragraph.\n", playername);
+        sendchat(".desc %s %s.\n", LISTENMSG, strip_color(ustr[user].say_name));
+        sendchat(".tell %s Starting edit at end of paragraph.\n", ustr[user].name);
         sendchat(".tell %s To start the paragraph over instead, say 'clear'.\n",
-               playername);
+               ustr[user].name);
         sendchat(";turns his attention to %s for a paragraph edit.\n",
-                playername);
+                ustr[user].say_name);
         story->writing = YES;
         story->editing = YES;
       }
@@ -1843,38 +2120,36 @@ END:
 
 /* Handle_writing handles all the things an author can do while writing. */
 
-struct storystate *handle_writing(playername, lowername, command, story)
-char *playername, *lowername, *command;
-struct storystate *story;
+struct storystate *handle_writing(int user, char *command, struct storystate *story)
 {
   int i;
   char buffer[MAXSTRLEN];
 
   if (strlen(command) == 0) {
     if (story->numlines == 0) {           /* Author is done */
-      sendchat(".tell %s Nice listening to you.\n", playername);
+      sendchat(".tell %s Nice listening to you.\n", ustr[user].name);
       story = abort_writing(story);
-      wlog("Done with abort writing1.");
+      write_log(YESTIME,"Done with abort writing1.\n");
     }
     else {                                /* Save this paragraph */
       /* Foist, create a directory if we need one */
-      wlog("Setting up new directory..");
+      write_log(YESTIME,"Setting up new directory..\n");
       if (!setup_directory(story)) {
         sendchat(".tell %s Sorry, I'm unable to start saving your story!\n",
-               playername);
+               ustr[user].name);
         story = abort_writing(story);
-       wlog("Done with abort writing2.");
+       write_log(YESTIME,"Done with abort writing2.\n");
       }
-      else if (!(save_para(story, playername, lowername))) {
-        sendchat(".tell %s This just isn't my day...\n", playername);
+      else if (!(save_para(story, user))) {
+        sendchat(".tell %s This just isn't my day...\n", ustr[user].name);
         story = abort_writing(story);
-      wlog("Done with abort writing3.");
+      write_log(YESTIME,"Done with abort writing3.\n");
       }
       /* If we're just "editing", we're done. */
       else if (story->editing) {
         sendchat(".tell %s Paragraph edited. Thank you for making corrections.\n", 
-		playername);
-        sendchat(";has finished listening to %s's paragraph.\n", playername);
+		ustr[user].name);
+        sendchat(";has finished listening to %s's paragraph.\n", ustr[user].say_name);
         story->writing = NO;
         if (story->numkids == 0) 
           sendchat(".desc %s\n", IDLEMSG);
@@ -1883,7 +2158,7 @@ struct storystate *story;
       }
       /* If not, start a new para! */
       else {
-        sendchat(";logs %s's paragraph.\n", playername);
+        sendchat(";logs %s's paragraph.\n", ustr[user].say_name);
         sprintf(buffer, "%s%c", story->paragraphid, 'a' + story->numkids);
 	strcat(buffer,"\0"); 
        /* Above line ASSUMES ASCII */
@@ -1900,30 +2175,30 @@ struct storystate *story;
   else if (!strcasecmp(command, "delete")) {
     if (story->numlines == 0)
       sendchat(".tell %s There are no lines in this paragraph to delete.\n",
-             playername);
+             ustr[user].name);
     else {
       sendchat(".tell %s Deleting: %s\n", 
-             playername, story->paragraph[--(story->numlines)]);
+             ustr[user].name, story->paragraph[--(story->numlines)]);
       free(story->paragraph[story->numlines]);
     }
   }
   else if (!strcasecmp(command, "abort")) {
-    sendchat(".tell %s Paragraph aborted.  Nice listening to you.\n", playername);
+    sendchat(".tell %s Paragraph aborted.  Nice listening to you.\n", ustr[user].name);
     story = abort_writing(story);
-      wlog("Done with abort writing4.");
+      write_log(YESTIME,"Done with abort writing4.\n");
   }
   else if (!strcasecmp(command, "format")) {
-    sendchat(".tell %s 'Format' commands have no effect now.\n", playername);
+    sendchat(".tell %s 'Format' commands have no effect now.\n", ustr[user].name);
     sendchat(".tell %s (Formatting is always turned off while I'm writing.)\n",
-            playername);
+            ustr[user].name);
   }
   else if (!strcasecmp(command, "clear")) {
     if (story->numlines == 0) {
-      sendchat(".tell %s The paragraph is already empty.\n", playername);
-      sendchat(".tell %s If you wish to quit, say 'abort'.\n", playername);
+      sendchat(".tell %s The paragraph is already empty.\n", ustr[user].name);
+      sendchat(".tell %s If you wish to quit, say 'abort'.\n", ustr[user].name);
     }
     else {
-      sendchat(".tell %s Clearing entire paragraph contents.\n", playername);
+      sendchat(".tell %s Clearing entire paragraph contents.\n", ustr[user].name);
       for (i = 0; i < story->numlines; i++)
         free(story->paragraph[i]);
       story->numlines = 0;
@@ -1937,9 +2212,9 @@ struct storystate *story;
   else {                           /* This is the next line of the story */
     if (story->numlines + 2 == MAXLINES) {
       sendchat(".tell %s Your paragraph is too big.  Please end it.\n",
-              playername);
+             ustr[user].name);
       sendchat(".tell %s (An empty say (with just .say) ends a paragraph.)\n",
-              playername);
+              ustr[user].name);
     }
     else {
       story->paragraph[story->numlines] =
@@ -1968,54 +2243,51 @@ int setup_directory(struct storystate *story)
 
 /* save_para attempts to save a paragraph of the story, and then update
     the appropriate index files.  Returns positive if successful.        */
-
-int save_para(struct storystate *story, char *playername, char *lowername)
+int save_para(struct storystate *story, int user)
 {
   char buffer[MAXSTRLEN];
   FILE *fp;
   int i;
 
   sprintf(buffer, "%s/%s/%s.txt", STORYDIR, story->title, story->paragraphid);
-  if ((fp = fopen(buffer, "w")) == NULL) {
-    sendchat(".tell %s Sorry, I can't save this paragraph!\n",playername);
-    wlog("Paragraph save error");
+  if (!(fp = fopen(buffer, "w"))) {
+    sendchat(".tell %s Sorry, I can't save this paragraph!\n",ustr[user].name);
+    write_log(YESTIME,"Paragraph save error %s\n",get_error());
     return 0;
   }
   for (i = 0; i < story->numlines; i++)
     fprintf(fp, "%s\n", story->paragraph[i]);
   fclose(fp);
-  sprintf(mess, "%s saves paragraph in %s", playername, story->title);
-  wlog(mess);
+  write_log(YESTIME,"%s saves paragraph in %s\n", strip_color(ustr[user].say_name), story->title);
   if (!(story->editing)) {
     sprintf(buffer, "%s/%s/%s.idx", STORYDIR, story->title, story->paragraphid);
-    if ((fp = fopen(buffer, "w")) == NULL) {
+    if (!(fp = fopen(buffer, "w"))) {
       sendchat(".tell %s I can't save this paragraph! (index creation problem)\n",
-              playername);
-      wlog("Index creation error");
+              ustr[user].name);
+      write_log(YESTIME,"Index creation error for \"%s\" %s\n",story->title,get_error());
       return 0;
     }
-    fprintf(fp, "%s\n", lowername);
+    fprintf(fp, "%s\n", ustr[user].name);
     fclose(fp);
     if (strlen(story->paragraphid) > 1) {     /* Update previous index file */
       sprintf(buffer, "%s/%s/", STORYDIR, story->title);
       strncat(buffer, story->paragraphid, strlen(story->paragraphid)-1);
       strcat(buffer, ".idx");
-      if ((fp = fopen(buffer, "a")) == NULL) {
+      if (!(fp = fopen(buffer, "a"))) {
         sendchat(".tell %s I can't save this paragraph! (index update problem)\n",
-                playername);
-        wlog("Index update error");
+                ustr[user].name);
+        write_log(YESTIME,"Index update error for \"%s\" %s\n",story->title,get_error());
         return 0;
       }
-      fprintf(fp, "%s\n", lowername);
+      fprintf(fp, "%s\n", ustr[user].name);
       fclose(fp);
-      sprintf(mess, "Index file for %s updated.", story->title);
-      wlog(mess);
+      write_log(YESTIME,"Index file for \"%s\" updated.\n", story->title);
     }
     else {                                    /* Make new directory file */
 	/*
       sprintf(buffer, "/bin/ls %s > %s", STORYDIR, DIRECTORY);
       system(buffer);
-      wlog("New directory created.");
+      write_log(YESTIME,"New directory created.\n");
 	*/
     }
   }
@@ -2024,15 +2296,14 @@ int save_para(struct storystate *story, char *playername, char *lowername)
 
 /* Abort_writing cleans up gracefully after we abort an edit */
 
-struct storystate *abort_writing(story)
-struct storystate *story;
+struct storystate *abort_writing(struct storystate *story)
 {
   story->writing = NO;
-  wlog("In abort_writing");
+  write_log(YESTIME,"In abort_writing for \"%s\"\n",story->title);
   if (story->editing) {
     sendchat(";has finished listening to %s's revision.\n", story->author); 
     get_paragraph(story);
-      wlog("Story revision completed.");
+      write_log(YESTIME,"Story revision completed for \"%s\".\n",story->title);
     if (story->numkids)
       sendchat(".desc %s\n", TELLMSG);
   }
@@ -2040,76 +2311,76 @@ struct storystate *story;
     sendchat(";has finished listening to %s's story.\n", story->author); 
     story = finish_story(NULL);
     sendchat(".desc %s\n", IDLEMSG);
-    wlog("New story or addition completed.");
+    write_log(YESTIME,"New story or addition completed for \"%s\".\n",story->title);
   }
-  wlog("Leaving abort_writing");
+  write_log(YESTIME,"Leaving abort_writing\n");
   return story;
 }
 
 /* Give_help gives appropriate help for different story states. */
 
-void give_help(char *playername, char *lowername, struct storystate *story)
+void give_help(int user, struct storystate *story)
 {
-  sendchat("; passes %s a note.\n", playername);
-  sendchat(".tell %s I am now ", playername); 
+  sendchat("; passes %s a note.\n", ustr[user].say_name);
+  sendchat(".tell %s I am now ", ustr[user].name); 
   if (story && story->writing) {
-    if (strcmp(lowername, story->author) && strcmp(lowername,ROOT_ID)) {
+    if (strcmp(ustr[user].name, story->author) && strcmp(ustr[user].name,ROOT_ID)) {
       sendchat("listening to %s's story.\n", story->author);
-      sendchat(".tell %s I can't be of much help until they finish.\n",playername);
+      sendchat(".tell %s I can't be of much help until they finish.\n",ustr[user].name);
     }
     else {
       sendchat("listening to your story.\n");
-      sendchat(".tell %s I take anything you say as part of the story, except: \n", playername);
-      sendchat(".tell %s reread - read back the paragraph so far.\n",playername);
-      sendchat(".tell %s (paragraph formatting will be OFF in this case)\n",playername);
-      sendchat(".tell %s delete - delete last line in paragraph.\n",playername);
-      sendchat(".tell %s clear - delete entire paragraph.\n", playername);
-      sendchat(".tell %s abort - end this writing session.\n",playername);
-      sendchat(".tell %s help - give context-sensitive help\n",playername);
-      sendchat(".tell %s <blank line> (just .say)- end this paragraph.\n",playername);
-      sendchat(".tell %s (this saves the paragraph if anything's in it,\n", playername);
+      sendchat(".tell %s I take anything you say as part of the story, except: \n", ustr[user].name);
+      sendchat(".tell %s reread - read back the paragraph so far.\n",ustr[user].name);
+      sendchat(".tell %s (paragraph formatting will be OFF in this case)\n",ustr[user].name);
+      sendchat(".tell %s delete - delete last line in paragraph.\n",ustr[user].name);
+      sendchat(".tell %s clear - delete entire paragraph.\n", ustr[user].name);
+      sendchat(".tell %s abort - end this writing session.\n", ustr[user].name);
+      sendchat(".tell %s help - give context-sensitive help\n",ustr[user].name);
+      sendchat(".tell %s <blank line> (just .say)- end this paragraph.\n",ustr[user].name);
+      sendchat(".tell %s (this saves the paragraph if anything's in it,\n", ustr[user].name);
       sendchat(".tell %s and ends this writing session if it's empty.\n", 
-              playername);
+              ustr[user].name);
       sendchat(".tell %s Thus, 2 blank lines save the previous para. and quit.)\n", 
-              playername);
+              ustr[user].name);
     }
   }
   else if (story == NULL || !(story->numkids)) { 
     sendchat("ready to tell a story or hear one of yours.\n");
-    sendchat(".tell %s Useful selection commands are:\n", playername);
-    sendchat(".tell %s read <story title> - start reading a story\n",playername);
-    sendchat(".tell %s write <story title> - start recording your story\n", playername);
-    sendchat(".tell %s delete <story title> - delete a story of yours\n",playername);
-    sendchat(".tell %s list - list the stories I know\n", playername);
-    sendchat(".tell %s list <author> - list the stories I know by <author>\n", playername);
+    sendchat(".tell %s Useful selection commands are:\n", ustr[user].name);
+    sendchat(".tell %s read <story title> - start reading a story\n",ustr[user].name);
+    sendchat(".tell %s write <story title> - start recording your story\n", ustr[user].name);
+    sendchat(".tell %s delete <story title> - delete a story of yours\n",ustr[user].name);
+    sendchat(".tell %s list - list the stories I know\n", ustr[user].name);
+    sendchat(".tell %s list <author> - list the stories I know by <author>\n", ustr[user].name);
     sendchat(".tell %s format - turn paragraph formatting %s\n",
-            playername, (FORMATTED ? "off" : "on"));
-    sendchat(".tell %s help - give context-sensitive help\n", playername);
- if (!strcmp(lowername,ROOT_ID)) {
-    sendchat(".tell %s execute <command> - run a talker command\n",playername);
-    sendchat(".tell %s logging [on|off|read|clear] - log conversation i see to a file \"%s\" for later reading, etc..\n",playername,LOG_FILE);
+            ustr[user].name, (g_FORMATTED==YES?"on" : "off"));
+    sendchat(".tell %s help - give context-sensitive help\n", ustr[user].name);
+ if (!strcmp(ustr[user].name,ROOT_ID)) {
+    sendchat(".tell %s execute <command> - run a talker command\n",ustr[user].name);
+    sendchat(".tell %s logging [on|off|read|clear] - log conversation i see to a file \"%s\" for later reading, etc..\n",ustr[user].name,LOG_FILE);
     }
     sendchat(".tell %s For more documentation, read 'Using %s'.\n", 
-            playername,BOT_NAME);
+            ustr[user].name,BOT_NAME);
   }
   else {
     sendchat("in the middle of telling a story.\n");
-    sendchat(".tell %s Useful reading commands are:\n", playername);
-    sendchat(".tell %s n or next - read the next paragraph\n",playername);
-    sendchat(".tell %s n or next <authorname> - read the author's next paragraph\n", playername);
-    sendchat(".tell %s b or back - read the previous paragraph\n",playername);
-    sendchat(".tell %s reread - read the current paragraph again\n",playername);
-    sendchat(".tell %s stop - don't read any more of this story\n",playername);
+    sendchat(".tell %s Useful reading commands are:\n",ustr[user].name);
+    sendchat(".tell %s n or next - read the next paragraph\n",ustr[user].name);
+    sendchat(".tell %s n or next <authorname> - read the author's next paragraph\n", ustr[user].name);
+    sendchat(".tell %s b or back - read the previous paragraph\n",ustr[user].name);
+    sendchat(".tell %s reread - read the current paragraph again\n",ustr[user].name);
+    sendchat(".tell %s stop - don't read any more of this story\n",ustr[user].name);
     sendchat(".tell %s format - turn paragraph formatting %s\n",
-            playername, (FORMATTED ? "off" : "on"));
+            ustr[user].name, (g_FORMATTED==YES?"on" : "off"));
     sendchat(".tell %s add - add a branch or extension to this story\n", 
-            playername);
-    sendchat(".tell %s edit - edit current paragraph (if yours)\n",playername);
-    sendchat(".tell %s (Add and edit halt my storytelling until you finish\n", playername);
+            ustr[user].name);
+    sendchat(".tell %s edit - edit current paragraph (if yours)\n", ustr[user].name);
+    sendchat(".tell %s (Add and edit halt my storytelling until you finish\n", ustr[user].name);
     sendchat(".t %s adding your part; it's polite to check with other people\n", 
-            playername);
-    sendchat(".t %s in the room before you do this.)\n", playername);
-    sendchat(".t %s help - give context-sensitive help\n", playername);
+            ustr[user].name);
+    sendchat(".t %s in the room before you do this.)\n", ustr[user].name);
+    sendchat(".t %s help - give context-sensitive help\n", ustr[user].name);
   }
 }
 
@@ -2120,8 +2391,8 @@ void read_titles(char *bitmatch, int mode)
 {
   char *upperbit = 0;
   char buffer[MAXSTRLEN], titlebuf[MAXSTRLEN], author[MAXSTRLEN]; 
-  char buffer2[30], chunk1[4], chunk2[3];
-  char lsdir[256];
+  char buffer2[30], chunk1[4], chunk2[3], chunk3[3];
+  char lsdir[FILE_NAME_LEN];
   static int breakup=0;
   static int abreakup=0;
   int storynum=0, total_stories=0;
@@ -2138,7 +2409,7 @@ void read_titles(char *bitmatch, int mode)
 
   if (dirp == NULL) {
     sendchat(".say I'm sorry, but I can't get to my story directory!\n");
-    sendchat(".say Cygnus should know about this-- this shouldn't happen.\n");
+    sendchat(".say %s should know about this-- this shouldn't happen.\n",ROOT_ID);
     return;
   }
   else {
@@ -2186,7 +2457,7 @@ void read_titles(char *bitmatch, int mode)
 
   if (dirp == NULL) {
     sendchat(".say I'm sorry, but I can't get to my story directory!\n");
-    sendchat(".say Cygnus should know about this-- this shouldn't happen.\n");
+    sendchat(".say %s should know about this-- this shouldn't happen.\n",ROOT_ID);
   }
   else {
    if (mode==1) {
@@ -2209,13 +2480,14 @@ upperbit);
       sprintf(buffer2,"%s",ctime(&fileinfo.st_mtime));
       midcpy(buffer2,chunk1,4,6);
       midcpy(buffer2,chunk2,8,9);
+      midcpy(buffer2,chunk3,22,23);
       if (chunk2[0]==' ') midcpy(chunk2,chunk2,1,1);
 
         if (fgets(author, MAXSTRLEN, tfp) != NULL) {
           author[strlen(author)-1] = '\0';
           if (!strcmp(bitmatch,author)) {
 		if (++storynum >= abreakup-14  &&  storynum <= abreakup )
-		 sendchat(".say %s (^HM%s^)  [^HG%s-%s^]\n", titlebuf,author,chunk1,chunk2);
+		 sendchat(".say %s (^HM%s^)  [^HG%s-%s-%s^]\n", titlebuf,author,chunk1,chunk2,chunk3);
 		chunk1[0]=0; chunk2[0]=0; buffer2[0]=0;
           }
         } /* end of if fgets author */
@@ -2242,12 +2514,13 @@ upperbit);
       sprintf(buffer2,"%s",ctime(&fileinfo.st_mtime));
       midcpy(buffer2,chunk1,4,6);
       midcpy(buffer2,chunk2,8,9);
+      midcpy(buffer2,chunk3,22,23);
       if (chunk2[0]==' ') midcpy(chunk2,chunk2,1,1);
 
         if (fgets(author, MAXSTRLEN, tfp) != NULL) {
           author[strlen(author)-1] = '\0';
 			if (++storynum >= breakup-14  &&  storynum <= breakup )
-			 sendchat(".say %s (^HM%s^)  [^HG%s-%s^]\n", titlebuf,author,chunk1,chunk2);
+			 sendchat(".say %s (^HM%s^)  [^HG%s-%s-%s^]\n", titlebuf,author,chunk1,chunk2,chunk3);
 			chunk1[0]=0; chunk2[0]=0; buffer2[0]=0;
 
         } /* end of if fgets author */
@@ -2282,12 +2555,10 @@ upperbit);
    If no such story exists, or if the prefix is ambiguous, we return NULL.
    (If, however, the prefix exactly matches a title, we return that.) */
 
-char *resolve_title(prefix, buffer, acceptprefix)
-char *prefix, *buffer;
-int acceptprefix;
+char *resolve_title(char *prefix, char *buffer, int acceptprefix)
 {
   char inbuf[MAXSTRLEN];
-  char tmp[256];
+  char tmp[FILE_NAME_LEN];
   int storymatch;
   int exactmatch;
   struct dirent *dp;
@@ -2302,7 +2573,7 @@ int acceptprefix;
 
   if (dirp == NULL) {
     sendchat(".say I'm sorry, but I can't get to my story directory!\n");
-    sendchat(".say Cygnus should know about this-- this shouldn't happen.\n");
+    sendchat(".say %s should know about this-- this shouldn't happen.\n",ROOT_ID);
   }
   else {
     while ((dp = readdir(dirp)) != NULL && !exactmatch) {
@@ -2327,9 +2598,7 @@ int acceptprefix;
 
 /* start_story initializes a new story structure.            */
 
-struct storystate *start_story(title, story)
-char *title;
-struct storystate *story;
+struct storystate *start_story(char *title, struct storystate *story)
 {
   int i;
   finish_story(story);
@@ -2362,9 +2631,11 @@ void get_paragraph(struct storystate *story)
   int i;
 
   sprintf(filename, "%s/%s/%s.idx", STORYDIR, story->title, story->paragraphid);
-  if ((fp = fopen(filename, "r")) == NULL) {
+  if (!(fp = fopen(filename, "r"))) {
     sendchat(".say Hey! I can't retrieve index file for next paragraph!\n");
-    crash_n_burn("idx lookup failure %s!"); 
+    write_log(YESTIME,"idx lookup failure! %s\n",get_error());
+    crash_n_burn();
+    quit_robot();
   }
   else {
     for (i = 0; i < story->numkids; i++)
@@ -2389,9 +2660,11 @@ void get_paragraph(struct storystate *story)
     sendchat(".desc %s\n", IDLEMSG);
 
   sprintf(filename, "%s/%s/%s.txt", STORYDIR, story->title, story->paragraphid);
-  if ((fp = fopen(filename, "r")) == NULL) {
+  if (!(fp = fopen(filename, "r"))) {
     sendchat(".say Hey! I can't retrieve text file for next paragraph!\n");
-    crash_n_burn("txt lookup failure %s!"); 
+    write_log(YESTIME,"txt lookup failure! %s\n",get_error());
+    crash_n_burn();
+    quit_robot();
   }
   else {
     for (i = 0; i < story->numlines; i++)
@@ -2468,17 +2741,17 @@ void read_paragraph(struct storystate *story)
   char *token;
 
   col = 0;	
-  if (!(story->writing) && FORMATTED) {
+  if (!(story->writing) && (g_FORMATTED==YES)) {
     for (i = 0; i < story->numlines; i++) {
       token = story->paragraph[i];
       while (*token != '\0') {
-        if (isspace(*token))
+        if (isspace((int)*token))
           token++;
         else {
           if (!col)
             sendchat(";: ");
           tokenlen = 0;
-          while (token[tokenlen] != '\0' && !isspace(token[tokenlen]))
+          while (token[tokenlen] != '\0' && !isspace((int)token[tokenlen]))
             tokenlen++;
           if ((col + tokenlen) > FORMATMAX) {
             col = 0;
@@ -2523,8 +2796,7 @@ void read_paragraph(struct storystate *story)
 
 /* Finishstory frees up the story data structure */
 
-struct storystate *finish_story(story)
-struct storystate *story;
+struct storystate *finish_story(struct storystate *story)
 {
   int i;
 
@@ -2545,20 +2817,16 @@ struct storystate *story;
 /* sync_bot sends a garbage message and waits for the HUH? to     */
 /* come back. This is useful for synchronizing dialogue.          */
 
-void sync_bot()
+void sync_bot(void)
 {
 
 }
 
 /* handle_page2 takes a paging line, and pages back a message giving
     StoryBot's location.                                           */
-
-int handle_page2(char *pageline, char *playername, char *lowername)
+int handle_page2(int user, char *pageline)
 {
-  char playername2[MAXSTRLEN];
   int chance;
-
-  strcpy(playername2,playername);
 
   if ((!strcmp(pageline, ""))  ||
       (!strcmp(pageline, "directions")) ||
@@ -2570,14 +2838,14 @@ int handle_page2(char *pageline, char *playername, char *lowername)
       (!strcmp(pageline, "Where")) ||
       (!strcmp(pageline, "where")) ) {
       sendchat(".tell %s Hello, %s! You can find me from the %s %s\n",
-              playername2, playername2, MAIN_ROOM, directions);
+              ustr[user].name, ustr[user].say_name, MAIN_ROOM, directions);
      return 1;
     }
-  else if (!strcmp(pageline,"shutdown") && !strcmp(lowername,ROOT_ID)) {
-     sendchat(".tell %s Shutting down..\n",playername2);
+  else if (!strcmp(pageline,"shutdown") && !strcmp(ustr[user].name,ROOT_ID)) {
+     sendchat(".tell %s Shutting down..\n",ustr[user].name);
      chance = rand() % 2;
      if (chance==1)
-     sendchat(".shout See ya all! %s told me to go home..the nerve!\n",playername2);
+     sendchat(".shout See ya all! %s told me to go home..the nerve!\n",ustr[user].say_name);
      else
      sendchat(".shemote moons everyone!\n");
 
@@ -2586,9 +2854,9 @@ int handle_page2(char *pageline, char *playername, char *lowername)
      sendchat("%s\n", DCONMSG);
      quit_robot();
     }
-  else if (!strcmp(pageline,"reboot") && !strcmp(lowername,ROOT_ID)) {
-     sendchat(".tell %s Rebooting..\n",playername2);
-     sendchat(".shout See ya all in a bit! %s told me to reboot\n",playername2);
+  else if (!strcmp(pageline,"reboot") && !strcmp(ustr[user].name,ROOT_ID)) {
+     sendchat(".tell %s Rebooting..\n",ustr[user].name);
+     sendchat(".shout See ya all in a bit! %s told me to reboot\n",ustr[user].say_name);
      sendchat(".shemote spins around in a daze, singing 'Daisy'.\n");
      sendchat(".shemote sings more and more slowly, till he finally shuts down.\n");
      sendchat("%s\n", DCONMSG);
@@ -2610,8 +2878,7 @@ void handle_page(char *pageline)
 
   if ((sscanf(pageline, "%s", player) == 1)  ||
       (sscanf(pageline, "%s tells you%c", player,  &c) == 2)) {
-    sprintf(mess,"Paged by %s", player);
-    wlog(mess);
+    write_log(YESTIME,"Paged by %s\n", player);
     if (strcasecmp(player, "Gardener")) {
       sendchat(".tell %s Hello, %s! You can find me from the %s %s\n",
               player, player, MAIN_ROOM, directions);
@@ -2623,9 +2890,7 @@ void handle_page(char *pageline)
 /* Getline takes a line from specified input and stuffs it into inbuf. */
 /* Inbuf is NULL if EOF reached.                                       */
 
-char *getline(inbuf, fp)
-char *inbuf;
-FILE *fp;
+char *getline(char *inbuf, FILE *fp)
 {
   char c;
   int i = 0;
@@ -2644,17 +2909,15 @@ return(inbuf);
 }
 
 /* crash_n_burn handles panics.  We hope this never gets called.  */
-void crash_n_burn(char *string)
+void crash_n_burn(void)
 {
    sendchat(".desc %s\n", SHUTMSG);
    sendchat(".go\n");
    sendchat(";suddenly starts to panic!\n");
    sendchat(";spins around in a daze, singing 'Daisy'.\n");
    sendchat(";sings more and more slowly, till it finally shuts down.\n");
-   sendchat(";is broken.  Cygnus should hear about this.\n");
+   sendchat(";is broken.  %s should hear about this.\n",ROOT_ID);
    sendchat("%s\n", DCONMSG);
-   wlog(string);
-   quit_robot();
 }
 
 
@@ -2712,15 +2975,15 @@ inpstr[newpos]='\0';
 }
 
 
-void load_user()
+void load_user(void)
 {
 }
 
-void add_user()
+void add_user(void)
 {
 }
 
-void clear_all_users()
+void clear_all_users(void)
 {
 int u;
 
@@ -2745,11 +3008,13 @@ ustr[user].logon=0;
 int get_user_num(char *name)
 {
 int u;
+char tempname[SAYNAME_LEN];
 
-strtolower(name);
+strcpy(tempname,strip_color(name));
+strtolower(tempname);
 
 for (u=0;u<MAX_USERS;++u) {
-        if (!strcmp(ustr[u].name,name))
+        if (!strcmp(ustr[u].name,tempname))
         return u;
 	}
 
@@ -2757,7 +3022,7 @@ return(-1);
 
 }
 
-int find_free_slot()
+int find_free_slot(void)
 {
 int u;
 
@@ -2773,8 +3038,293 @@ int u;
 
 char *get_error(void)
 {
-static char errstr[256];
+static char errstr[FILE_NAME_LEN];
 
 sprintf(errstr,"(%d:%s)",errno,strerror(errno));
 return errstr;
 }
+
+
+/* Strip colors from string */
+char *strip_color(char *str)
+{
+char tp[3];
+static char tempst[500];
+int  left=strlen(str);
+int  i, count=0;
+
+tempst[0]=0;
+
+for(i=0; i<left; i++) {
+        if (str[i]==' ') {
+                strcat(tempst, " ");
+                continue;
+                }
+      if (str[i]=='@') { 
+                i++;
+                if (str[i]=='@') {
+                 count=0; continue;
+                }
+                else { i--;
+                       tp[0]=str[i]; tp[1]=0;
+                       strcat(tempst,tp);
+                       continue;
+                     }
+                }
+        if (str[i]=='^') {
+                if (count) {
+                        count=0;
+                        continue;
+                        }
+                else {
+                        count=1;
+                        i++;
+                         if (i == left) {
+                            count=0;
+                            break;
+                           }
+                 if (str[i]=='H') {
+                    i++;
+                     if (i == left) {
+                            count=0;
+                            break;
+                           }
+                     if (str[i]=='R') {
+                       continue;
+                      }
+                     else if (str[i]=='G') {
+                       continue;
+                       }
+                     else if (str[i]=='Y') {
+                       continue;
+                       }
+                     else if (str[i]=='B') {
+                       continue;
+                       }
+                     else if (str[i]=='M') {
+                       continue;
+                       }
+                     else if (str[i]=='C') {
+                       continue;
+                       }
+                     else if (str[i]=='W') {
+                       continue;
+                       }
+                     else { i--; tp[0]=str[i]; tp[1]=0;
+                            strcat(tempst,tp);
+                            }
+                   }
+                 else if (str[i]=='L') {
+                    i++;
+                     if (i == left) {
+                            count=0;
+                            break;
+                           }
+                     if (str[i]=='R') {
+                        continue;
+                      }
+                     else if (str[i]=='G') {
+                        continue;
+                       }
+                     else if (str[i]=='Y') {
+                        continue;
+                       }
+                     else if (str[i]=='B') {
+                        continue;
+                       }
+                     else if (str[i]=='M') {
+                        continue;
+                       }
+                     else if (str[i]=='C') {
+                        continue;
+                       }
+                     else if (str[i]=='W') {
+                        continue;
+                       }
+                     else { i--; tp[0]=str[i]; tp[1]=0;
+                            strcat(tempst,tp);
+                            }
+                   }
+                 else if (str[i]=='B') {
+                    i++;
+                     if (i == left) {
+                            count=0;
+                            break;
+                           }
+                     if (str[i]=='L') {
+                        continue;
+                      }
+                     else { i--; tp[0]=str[i]; tp[1]=0;
+                            strcat(tempst,tp);
+                            }
+                   }
+                 else if (str[i]=='U') {
+                    i++;
+                     if (i == left) {
+                            count=0;
+                            break;
+                           }
+                     if (str[i]=='L') {
+                        continue;
+                      }
+                     else { i--; tp[0]=str[i]; tp[1]=0;
+                            strcat(tempst,tp);
+                            }
+                   }
+                 else if (str[i]=='R') {
+                    i++;
+                     if (i == left) {
+                            count=0;
+                            break;
+                           }
+                     if (str[i]=='V') {
+                        continue;
+                      }
+                     else { i--; tp[0]=str[i]; tp[1]=0;
+                            strcat(tempst,tp);
+                            }
+                    }
+                 else { tp[0]=str[i]; tp[1]=0;
+                        strcat(tempst,tp);
+                        }
+                        continue;
+                    }
+                }
+        tp[0]=str[i];
+        tp[1]=0;
+        strcat(tempst, tp);
+        } 
+count=0;
+i=0;
+
+return tempst;
+}
+
+void sysud(int ud)
+{
+char filename[FILE_NAME_LEN];
+FILE *tfp;
+
+if (ud)
+ write_log(YESTIME,"Bot \"%s\" started with PID %u\n", BOT_NAME, (unsigned int)getpid());
+else
+ write_log(YESTIME,"Bot \"%s\" is exiting\n",BOT_NAME);
+
+sprintf(filename,"%s.pid",thisprog);
+
+if (ud) {
+  if (!(tfp=fopen(filename,"w"))) return;
+  fprintf(tfp,"%u",(unsigned int)getpid());
+  fclose(tfp);
+  }
+else {
+  remove(filename);
+}
+
+}
+
+void handle_sig(int sig)
+{
+
+switch(sig) {
+        case SIGTERM:
+                write_log(YESTIME,"Caught SIGTERM! Exiting..\n");
+		crash_n_burn();
+		quit_robot();
+        case SIGSEGV:
+                write_log(YESTIME,"Caught SIGSEGV! Exiting..\n");
+		crash_n_burn();
+		quit_robot();
+        case SIGILL:
+                write_log(YESTIME,"Caught SIGILL! Exiting..\n");
+		crash_n_burn();
+		quit_robot();
+        case SIGBUS:
+                write_log(YESTIME,"Caught SIGBUS! Exiting..\n");
+		crash_n_burn();
+		quit_robot();
+        case SIGPIPE:
+                write_log(YESTIME,"Caught SIGPIPE! Continuing..\n");
+  }
+}
+
+
+/* Write string and arguments to a specific logging facility */
+void write_log(int wanttime, char *str, ...)
+{
+char z_mess[ARR_SIZE*2];
+char logfile[FILE_NAME_LEN];
+va_list args;
+FILE *fp;
+
+z_mess[0]=0;
+strncpy(logfile,BOTLOG_FILE,FILE_NAME_LEN);
+
+ if (!(fp=fopen(logfile,"a")))
+   {
+    sendchat(".sos I can't open my log file! Help!\n");
+    quit_robot();
+   }
+
+ else {
+    va_start(args,str);
+    if (wanttime) {
+    sprintf(z_mess,"%s: ",get_time(0,0));
+    vsprintf(z_mess+strlen(z_mess),str,args);
+    }
+    else
+    vsprintf(z_mess,str,args);
+
+    va_end(args);
+
+/*    strcpy(z_mess, strip_color(z_mess)); */
+    fputs(z_mess,fp);
+    fclose(fp);
+   }
+}
+
+/* Get time in a certain way and return it as a string */
+/* mode 0 is to get rid of the year string and the carriage return */
+/* mode 1 is to get rid of just the carriage return */
+char *get_time(time_t ref,int mode)
+{
+time_t tm;
+static char mrtime[30];
+
+if ((int)ref==0) {
+   time(&tm);
+   strcpy(mrtime,ctime(&tm));
+  }
+else {
+   strcpy(mrtime,ctime(&ref));
+  }
+
+if (mode==0)
+   mrtime[strlen(mrtime)-6]=0; /* get rid of newline and year */
+else if (mode==1)
+   mrtime[strlen(mrtime)-1]=0; /* get rid of newline */
+
+   return mrtime;
+}
+
+/*** put string terminate char. at first char < 32 ***/
+void terminate(char *str)
+{
+int u;
+int bell = 7;
+int tab  = 9;
+
+for (u = 0; u<ARR_SIZE; ++u)
+  {
+   if ((*(str+u) == 13 &&       /* terminate line on first control char */
+       *(str+u) != bell &&     /* except for bell                      */
+       *(str+u) != tab) ||     /* and tab                              */
+       *(str+u) > 126  )       /* special chars over 126               */
+     {
+	/* write_log(YESTIME,"terminating on \"%c\" %d\n",*(str+u),*(str+u)); */
+      *(str+u)=0;
+      u=ARR_SIZE;
+     }
+  }
+}
+
