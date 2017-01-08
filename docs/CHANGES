@@ -1,9 +1,26 @@
-                      /*** Ncohafmuta 1.4.* changes ***/
+                      /*** Ncohafmuta 1.5.* changes ***/
 Quick need-to-do?:
 * if user .hilite==2 multi-tells with a lot of colored names in it might
 cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
+
+ 03/20/04 1.5.2
+* Version 1.4.2 changes
+* Updated ascii code comments in socket_funcs.c
+* Changed miscnum2 user structure to localecho. Added "localecho" keyword 
+  to login prompt to turn on echoing. Added ".set localecho" command. 
+  Added info to ".set show". This will work with charmode AND linemode 
+  clients. Updated info in loginhelp file to talk about localecho.
+* Added write_char() func for localecho support.
+* Changed set_car_ret() and set_white_space() funcs to not take inpstr.
+* Updated helpfiles. Added set_localecho helpfile.
+* Added CR or LF respectively to clients that only send one or the other.
+
+ 03/20/04 1.4.2
+* Fixed glitch in t_who with buffering.
+* Try to dynamically make proper width for room column in .who headers 
+  now.
 
  03/15/04 1.5.1
 * Version 1.4.1 changes

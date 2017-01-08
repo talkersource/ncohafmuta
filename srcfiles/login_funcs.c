@@ -155,9 +155,31 @@ if (ustr[user].pause_login==1) {
 	strtolower(name);
 	reset_user_struct(user,0);
         if (!strcmp(name,"quit")) {
+		/* Abort login */
                 write_str(user,IF_QUIT_LOGIN);
-                user_quit(user,1);  return;
-                }      
+                user_quit(user,1);
+		return;
+	}
+	if (!strcmp(name,"localecho")) {
+		/* Turn localecho on */
+		write_str(user,"");
+
+		if (!ustr[user].localecho) {
+			ustr[user].localecho = 1;
+			write_str(user,"Local echo is now enabled.");
+		}
+		else {
+			ustr[user].localecho = 0;
+			write_str(user,"Local echo is now disabled.");
+		}
+
+		write_str(user,"");
+
+		telnet_echo_on(user);
+                write_str_nr(user,SYS_LOGIN);
+		telnet_write_eor(user);
+		return;
+	}
         if (!strcmp(name,"help")) {
 		/* write out login help file to user */
 	        sprintf(filename,"%s",LOGINFILE); 

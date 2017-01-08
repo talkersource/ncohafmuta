@@ -137,31 +137,31 @@ if (mode==0) {
                        case IAC:     do_telnet_commands(user);
                                      break;
 
-                       case '\001':  user_quit(user,1); break;    /* soh  */
+                       case '\001':  user_quit(user,1); break;    /* soh */
                        case '\002':  user_quit(user,1); break;    /* stx */
                        case '\003':  user_quit(user,1); break;    /* etx */
-                       case '\004':  user_quit(user,1); break;
-                       case '\005':  user_quit(user,1); break;    /* enq  */
+                       case '\004':  user_quit(user,1); break;    /* eot */
+                       case '\005':  user_quit(user,1); break;    /* enq */
                        case '\006':  user_quit(user,1); break;    /* ack */
 
-                       case 127:                             /* delete */
-                       case '\010':  ustr[user].char_buffer_size--;
+                       case 127:                                  /* delete */
+                       case '\010':  ustr[user].char_buffer_size--;   /* bs */
                                      if (ustr[user].char_buffer_size < 0)
                                        {
                                         ustr[user].char_buffer_size = 0;
                                        }
                                       else
                                        {
-                                        write_str_nr(user, " \b");
+                                        write_str_nr(user, "\b \b");
                                        }
                                      break;
 
 
-                       case '\013':  user_quit(user,1); break;    /* enq */
-                       case '\014':  user_quit(user,1); break;    /* enq */
+                       case '\013':  user_quit(user,1); break;    /* vt */
+                       case '\014':  user_quit(user,1); break;    /* ff */
 
-                       case '\016':  user_quit(user,1); break;    /* enq */
-                       case '\017':  user_quit(user,1); break;    /* enq */
+                       case '\016':  user_quit(user,1); break;    /* so */
+                       case '\017':  user_quit(user,1); break;    /* si */
 
                        case '\020':  user_quit(user,1); break;    /* dle */
                        case '\021':  user_quit(user,1); break;    /* dc1 */
@@ -175,7 +175,7 @@ if (mode==0) {
                        case '\030':  user_quit(user,1); break;    /* can */
                        case '\031':  user_quit(user,1); break;    /* em  */
                        case '\032':  user_quit(user,1); break;    /* sub */
-                       case '\033':  ; break;                   /* esc */
+                       case '\033':  ; break;                     /* esc */
                        case '\034':  user_quit(user,1); break;    /* fs  */
                        case '\035':  user_quit(user,1); break;    /* gs  */
                        case '\036':  user_quit(user,1); break;    /* rs  */
@@ -183,6 +183,8 @@ if (mode==0) {
 
                        default:
                            ustr[user].char_buffer[ustr[user].char_buffer_size++] = inpchar[0];
+			   if (ustr[user].localecho && ((ustr[user].logging_in!=1 && ustr[user].logging_in!=2 && !ustr[user].lockafk) || !ustr[user].passhid))
+				write_char(user, ustr[user].char_buffer[ustr[user].char_buffer_size-1]);
                            break;
                      } /* end of switch */
 
@@ -205,16 +207,23 @@ if (mode==0) {
 			/* Got a LF - Line Feed..possibly part of a previous CRLF combo	*/
 			/* if it is or is just a LF ending, we take it the same way	*/
                          complete_line = 1;
-			 if (gotcr) gotcr=0;
+			 if (gotcr) {
+				gotcr=0;
+			 }
+			 else {
+				if (!ustr[user].localecho) {
+					write_char(user, '\r');
+				}
+			 }
                          ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
                         }
                       else
                         {
                          if (ustr[user].char_buffer_size > (MAX_CHAR_BUFF-4) )
                            {
-                  ustr[user].char_buffer[ustr[user].char_buffer_size++] = '\n';
-                  ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
-                            complete_line = 1;
+				ustr[user].char_buffer[ustr[user].char_buffer_size++] = '\n';
+				ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
+				complete_line = 1;
                            }
                         }
 
@@ -227,6 +236,8 @@ if (mode==0) {
 			/* this is just a CR line termination */
 				complete_line = 1;
 				gotcr=0;
+				write_char(user, '\r');
+				write_char(user, '\n');
 				ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
 			}
                       }
@@ -242,15 +253,10 @@ if (mode==0) {
                 /* check for complete line (terminated by \n)     */
                 /*------------------------------------------------*/
 
-                if (!complete_line)
-                 {
-    /*-----------------------------------------------------*/
-    /* need to support char mode, no local echo, some time */
-    /*-----------------------------------------------------*/
-    /* write_str_nr(user,ustr[user].char_buffer[ustr[user].char_buffer_size]); */
-    /*-----------------------------------------------------*/
-                   return -4;
-                  }
+                if (!complete_line) {
+		/* character-mode clients will hit this point */
+			return -4;
+		}
 
                 /*--------------------------------------------*/
                 /* copy the user buffer to the input string   */

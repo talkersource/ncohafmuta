@@ -52,11 +52,11 @@ command[0]=0;
   else if (!strcmp("cols",command) || !strcmp("width",command))
     { set_cols(user, inpstr); }
   else if (!strcmp("car",command) || !strcmp("carriage",command) )
-    { set_car_ret(user, inpstr); }
+    { set_car_ret(user); }
   else if (!strcmp("abbrs",command))
     { set_abbrs(user, inpstr); }
   else if (!strcmp("space",command))
-    { set_white_space(user, inpstr); }
+    { set_white_space(user); }
   else if (!strcmp("hi",command))
     { set_hilite(user, inpstr); }
   else if (!strcmp("hidden",command))
@@ -99,6 +99,8 @@ command[0]=0;
     { set_entermsg(user, inpstr); }
   else if (!strcmp("exitmsg",command))
     { set_exitmsg(user, inpstr); }
+  else if (!strcmp("localecho",command))
+    { set_localecho(user); }
   else if (!strcmp("show",command)) {
    strcpy(onoff[0],"OFF");
    strcpy(onoff[1],"ON ");
@@ -146,8 +148,8 @@ command[0]=0;
    write_str(user,mess);
    sprintf(mess,"Passhid : %s   Pbreak  : %s   Pause_Login : %s",onoff[ustr[user].passhid],onoff[ustr[user].pbreak],onoff[ustr[user].pause_login]);
    write_str(user,mess);
-   sprintf(mess,"PrivBeep: %s   Color   : %s",
-    onoff[ustr[user].beeps],onoff[ustr[user].color]);
+   sprintf(mess,"PrivBeep: %s   Color   : %s   Local_Echo  : %s",
+    onoff[ustr[user].beeps],onoff[ustr[user].color],onoff[ustr[user].localecho]);
    write_str(user,mess);
    write_str(user,"");
    sprintf(mess,"Enter msg: %s",ustr[user].entermsg);
@@ -163,21 +165,21 @@ command[0]=0;
   }
  else {
  write_str(user,"Valid options are: (help on these under ^.h set^)");
- write_str(user,"  cols               abbrs    (toggle)");
- write_str(user,"  desc               autofwd  (toggle)");
- write_str(user,"  email              autoread (toggle)");
- write_str(user,"  entermsg           beeps    (toggle)");
- write_str(user,"  exitmsg            car      (toggle)");
- write_str(user,"  fail               color    (toggle)");
- write_str(user,"  gender             help     (toggle)");
- write_str(user,"  home               hi       (toggle)");
- write_str(user,"  homepage           hidden   (toggle)");
- write_str(user,"  icq                pause    (toggle)");
- write_str(user,"  picurl             pbreak   (toggle)");
- write_str(user,"  profile            space    (toggle)");
- write_str(user,"  recap              visemail (toggle)");
- write_str(user,"  rows               who      (toggle)");
- write_str(user,"  show");
+ write_str(user,"  cols               abbrs     (toggle)");
+ write_str(user,"  desc               autofwd   (toggle)");
+ write_str(user,"  email              autoread  (toggle)");
+ write_str(user,"  entermsg           beeps     (toggle)");
+ write_str(user,"  exitmsg            car       (toggle)");
+ write_str(user,"  fail               color     (toggle)");
+ write_str(user,"  gender             help      (toggle)");
+ write_str(user,"  home               hi        (toggle)");
+ write_str(user,"  homepage           hidden    (toggle)");
+ write_str(user,"  icq                localecho (toggle)");
+ write_str(user,"  picurl             pause     (toggle)");
+ write_str(user,"  profile            pbreak    (toggle)");
+ write_str(user,"  recap              space     (toggle)");
+ write_str(user,"  rows               visemail  (toggle)");
+ write_str(user,"  show               who       (toggle)");
  write_str(user,"  succ");
  }
 }
@@ -555,35 +557,40 @@ void set_cols(int user, char *inpstr)
 }
 
 /*------------------------------------------------*/
-/* set car_return                                 */
+/* set local echo                                 */
 /*------------------------------------------------*/
-void set_car_ret(int user, char *inpstr)
+void set_localecho(int user)
 {
 
-if (!strlen(inpstr)) {
-  if (!ustr[user].car_return) {
-   write_str(user,"Set carriage returns ON");
-   ustr[user].car_return = 1;
-   }
-   else {
-   write_str(user,"Set carriage returns OFF");
-   ustr[user].car_return = 0;
-   }
- }
-else {
- if (!strcmp(inpstr,"1")) {
-   write_str(user,"Set carriage returns ON");
-   ustr[user].car_return = 1;
-   }
- else if (!strcmp(inpstr,"0")) {
-   write_str(user,"Set carriage returns OFF");
-   ustr[user].car_return = 0;
-  }
- else {
-   write_str(user,"Set carriage returns ON");
-   ustr[user].car_return = 1;
-  }   
- } /* end of else */
+  if (ustr[user].localecho)
+    {
+      write_str(user, "Local text echo is now off.");
+      ustr[user].localecho = 0;
+    }
+   else
+    {
+      write_str(user, "Local text echo is now on.");
+      ustr[user].localecho = 1;
+    }
+    
+  copy_from_user(user);
+  write_user(ustr[user].login_name);
+}
+
+/*------------------------------------------------*/
+/* set car_return                                 */
+/*------------------------------------------------*/
+void set_car_ret(int user)
+{
+
+	if (!ustr[user].car_return) {
+		write_str(user,"Set carriage returns ON");
+		ustr[user].car_return = 1;
+	}
+	else {
+		write_str(user,"Set carriage returns OFF");
+		ustr[user].car_return = 0;
+	}
 
   copy_from_user(user);
   write_user(ustr[user].login_name);
@@ -649,7 +656,7 @@ void set_abbrs(int user, char *inpstr)
 /*------------------------------------------------*/
 /* set white space                                */
 /*------------------------------------------------*/
-void set_white_space(int user, char *inpstr)
+void set_white_space(int user)
 {
 
 

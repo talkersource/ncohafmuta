@@ -17,4 +17,7 @@ for your account.
 Next, read the agreement shown to you, and proceed to re-enter your
 new password again for verification.
 
-
+If you can't see what you're typing, (e.g. when you typed "help" you 
+didn't see it), turn localecho-ing on in your client. If you don't 
+know how, you can have the talker do locaecho-ing by typing "localecho" 
+at the login prompt.

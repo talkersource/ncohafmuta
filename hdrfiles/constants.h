@@ -36,12 +36,12 @@
 /*                                                      -Cygnus         */
 /*----------------------------------------------------------------------*/
 
-/* last modified: Mar 15th, 2004  Cygnus */
+/* last modified: Mar 20th, 2004  Cygnus */
 
 #ifndef _CONSTANTS_H
 #define _CONSTANTS_H
 
-#define VERSION  "Ncohafmuta 1.5.1 by Cygnus"
+#define VERSION  "Ncohafmuta 1.5.2 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
@@ -1303,7 +1303,7 @@ struct profile {
 	char miscstr3[10];	/* 1.2.1 */
 	char miscstr4[10];	/* 1.2.1 */
 	int pause_login;	/* 1.2.1 */
-	int miscnum2;		/* 1.2.1 */
+	int localecho;		/* 1.2.1 - changed from miscnum2 in 1.5.2 */
 	int miscnum3;		/* 1.2.1 */
 	int miscnum4;		/* 1.2.1 */
 	int miscnum5;		/* 1.2.1 */

@@ -53,15 +53,24 @@ if (ustr[user].hilite)
 /*--------------------------------------------------------------------------*/
 void write_raw(int user, unsigned char *str, int len)
 {
-/* S_WRITE(ustr[user].sock, str, len); */
-queue_write(user,(char *)str,-1);
+	queue_write(user, (char *)str, -1);
 }
 
+/*----------------------------------*/
+/*   Write out a single character   */
+/*----------------------------------*/
+void write_char(int user, char str)
+{
+char tempst[2];
+
+	sprintf(tempst,"%c",str);
+	queue_write(user, tempst, -1);
+}
 
 /*** Write a NULL terminated string to a socket ***/
 void write_it(int sock, char *str)
 {
-S_WRITE(sock, str, strlen(str));
+	S_WRITE(sock, str, strlen(str));
 }
 
 

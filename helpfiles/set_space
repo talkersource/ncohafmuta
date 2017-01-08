@@ -1,4 +1,4 @@
- Syntax:  .set space <setting>
+ Syntax:  .set space
 
 Results:  This command allows you to set whether or not leading spaces
           that you type in are removed and discarded, or left in as text

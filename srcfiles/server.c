@@ -877,7 +877,7 @@ int    s,u,v,min,idl,invis=0,count=0,ranklen=0;
 int    z=0;
 int    vi=' ';
 int    with,num=0;
-char   ud[100],un[SAYNAME_LEN+5],an[NAME_LEN],und[SAYNAME_LEN*2],rank[50];
+char   ud[100],un[SAYNAME_LEN+5],an[ROOM_LEN+5],und[SAYNAME_LEN*2],rank[50];
 char   temp[256];
 char   check[NAME_LEN+1];
 char   i_buff[5];
@@ -953,7 +953,8 @@ write_str(user,"");
 
 /* Give Display format */
 if (ustr[user].who==0) { /* OURS */
-sprintf(mess,"^LCRoom^             ");
+/* sprintf(mess,"^LCRoom^             "); */
+sprintf(mess,"%-*s",ROOM_LEN+6,"^LCRoom^");
 strcat(mess,"^HGTime^ "); 
 strcat(mess,"^HRStat^ "); 
 strcat(mess,"^Idl^   ");
@@ -965,7 +966,8 @@ if (ustr[user].pbreak) {
 else write_str(user,mess);
 } /* end of if */
 else if (ustr[user].who==2) { /* IFORMS */
-sprintf(mess,"^LCRoom^              ");
+/* sprintf(mess,"^LCRoom^              "); */
+sprintf(mess,"%-*s",ROOM_LEN+7,"^LCRoom^");
 strcat(mess,"^HMName^/^HBDescription^                           ");
 strcat(mess,"^HGTime^-"); 
 strcat(mess,"^HRStat^-"); 
@@ -9015,7 +9017,7 @@ tot_mem=
 	+strlen(t_ustr.miscstr3)
 	+strlen(t_ustr.miscstr4)
 	+2 /* pause_login */
-	+2 /* miscnum2 */
+	+2 /* localecho */
 	+2 /* miscnum3 */
 	+2 /* miscnum4 */
 	+2 /* miscnum5 */
@@ -9233,7 +9235,7 @@ if (tmpConv != NULL) {
 	+MY_SIZE(ustr[u].miscstr3,mode)
 	+MY_SIZE(ustr[u].miscstr4,mode)
 	+2 /* pause_login */
-	+2 /* miscnum2 */
+	+2 /* localecho */
 	+2 /* miscnum3 */
 	+2 /* miscnum4 */
 	+2 /* miscnum5 */
@@ -15565,7 +15567,6 @@ strcpy(ustr[user].miscstr2, "NA");
 strcpy(ustr[user].miscstr3, "NA");
 strcpy(ustr[user].miscstr4, "NA");
 ustr[user].pause_login =     1;
-ustr[user].miscnum2 =        0;
 ustr[user].miscnum3 =        0;
 ustr[user].miscnum4 =        0;
 ustr[user].miscnum5 =        0;
@@ -15736,7 +15737,7 @@ ustr[user].ttt_killed     =t_ustr.ttt_killed;
 ustr[user].hang_wins      =t_ustr.hang_wins;
 ustr[user].hang_losses    =t_ustr.hang_losses;
 ustr[user].pause_login    =t_ustr.pause_login;
-ustr[user].miscnum2       =t_ustr.miscnum2;
+ustr[user].localecho      =t_ustr.localecho;
 ustr[user].miscnum3       =t_ustr.miscnum3;
 ustr[user].miscnum4       =t_ustr.miscnum4;
 ustr[user].miscnum5       =t_ustr.miscnum5;
@@ -15880,7 +15881,7 @@ t_ustr.ttt_killed      =ustr[user].ttt_killed;
 t_ustr.hang_wins       =ustr[user].hang_wins;
 t_ustr.hang_losses     =ustr[user].hang_losses;
 t_ustr.pause_login     =ustr[user].pause_login;
-t_ustr.miscnum2        =ustr[user].miscnum2;
+t_ustr.localecho       =ustr[user].localecho;
 t_ustr.miscnum3        =ustr[user].miscnum3;
 t_ustr.miscnum4        =ustr[user].miscnum4;
 t_ustr.miscnum5        =ustr[user].miscnum5;
@@ -15990,7 +15991,7 @@ t_ustr.ttt_killed    = 0;
 t_ustr.hang_wins     = 0;
 t_ustr.hang_losses   = 0;
 t_ustr.pause_login   = 0;
-t_ustr.miscnum2      = 0;
+t_ustr.localecho     = 0;
 t_ustr.miscnum3      = 0;
 t_ustr.miscnum4      = 0;
 t_ustr.miscnum5      = 0;
@@ -16218,7 +16219,7 @@ rbuf(t_ustr.miscstr1,10);	/* miscstr1 */
 rbuf(t_ustr.miscstr2,10);	/* miscstr2 */
 rbuf(t_ustr.miscstr3,10);	/* miscstr3 */
 rbuf(t_ustr.miscstr4,10);	/* miscstr4 */
-fscanf(f,"%d %d %d %d %d\n", &t_ustr.pause_login, &t_ustr.miscnum2,
+fscanf(f,"%d %d %d %d %d\n", &t_ustr.pause_login, &t_ustr.localecho,
        &t_ustr.miscnum3, &t_ustr.miscnum4, &t_ustr.miscnum5);
 
 rbuf(buff1,-1);	/* ENDVER STRING */
@@ -16266,31 +16267,31 @@ if (t_ustr.passhid > 1      || t_ustr.passhid < 0)     t_ustr.passhid =0;
 
 /* ints, third set */
 if (t_ustr.pbreak > 1       || t_ustr.pbreak < 0)      t_ustr.pbreak =0;
-if (t_ustr.beeps > 1        || t_ustr.beeps < 0)      t_ustr.beeps =0;
-if (t_ustr.mail_warn > 1        || t_ustr.mail_warn < 0) t_ustr.mail_warn =0;
-if (t_ustr.mail_num > 200   || t_ustr.mail_num < 0)    t_ustr.mail_num = 0;
-if (t_ustr.friend_num > MAX_ALERT || t_ustr.friend_num < 0)  t_ustr.friend_num=0;
-if (t_ustr.gag_num > MAX_GAG   || t_ustr.gag_num < 0)    t_ustr.gag_num =0;
+if (t_ustr.beeps > 1           || t_ustr.beeps < 0)		t_ustr.beeps =0;
+if (t_ustr.mail_warn > 1       || t_ustr.mail_warn < 0)		t_ustr.mail_warn =0;
+if (t_ustr.mail_num > 200      || t_ustr.mail_num < 0)		t_ustr.mail_num = 0;
+if (t_ustr.friend_num > MAX_ALERT || t_ustr.friend_num < 0)	t_ustr.friend_num=0;
+if (t_ustr.gag_num > MAX_GAG      || t_ustr.gag_num < 0)	t_ustr.gag_num =0;
 if (t_ustr.revokes_num > MAX_GRAVOKES   || t_ustr.revokes_num < 0)	t_ustr.revokes_num =0;
-if (t_ustr.nerf_kills > 32767     || t_ustr.nerf_kills < 0)       t_ustr.nerf_kills =0;
-if (t_ustr.nerf_killed > 32767     || t_ustr.nerf_killed < 0)       t_ustr.nerf_killed =0;
-if (t_ustr.muz_time > 32767     || t_ustr.muz_time < 0)       t_ustr.muz_time =0;
-if (t_ustr.xco_time > 32767      || t_ustr.xco_time < 0)       t_ustr.xco_time =0;
-if (t_ustr.gag_time > 32767      || t_ustr.gag_time < 0)  t_ustr.gag_time =0;
-if (t_ustr.frog > 1      || t_ustr.frog < 0)       t_ustr.frog =0;
-if (t_ustr.frog_time > 32767      || t_ustr.frog_time < 0)  t_ustr.frog_time =0;
-if (t_ustr.anchor > 1      || t_ustr.anchor < 0)       t_ustr.anchor =0;
-if (t_ustr.anchor_time > 32767      || t_ustr.anchor_time < 0) t_ustr.anchor_time =0;
-if (t_ustr.promote > 22      || t_ustr.promote < 0)       t_ustr.promote=1;
-if (t_ustr.ttt_kills > 32767     || t_ustr.ttt_kills < 0)       t_ustr.ttt_kills =0;
-if (t_ustr.ttt_killed > 32767     || t_ustr.ttt_killed < 0)       t_ustr.ttt_killed =0;
-if (t_ustr.hang_wins > 32767     || t_ustr.hang_wins < 0)       t_ustr.hang_wins =0;
-if (t_ustr.hang_losses > 32767     || t_ustr.hang_losses < 0)       t_ustr.hang_losses =0;
-if (t_ustr.pause_login > 32767     || t_ustr.pause_login < 0)	t_ustr.pause_login=0;
-if (t_ustr.miscnum2 > 32767     || t_ustr.miscnum2 < 0)	t_ustr.miscnum2=0;
-if (t_ustr.miscnum3 > 32767     || t_ustr.miscnum3 < 0)	t_ustr.miscnum3=0;
-if (t_ustr.miscnum4 > 32767     || t_ustr.miscnum4 < 0)	t_ustr.miscnum4=0;
-if (t_ustr.miscnum5 > 32767     || t_ustr.miscnum5 < 0)	t_ustr.miscnum5=0;
+if (t_ustr.nerf_kills > 32767  || t_ustr.nerf_kills < 0)	t_ustr.nerf_kills =0;
+if (t_ustr.nerf_killed > 32767 || t_ustr.nerf_killed < 0)	t_ustr.nerf_killed =0;
+if (t_ustr.muz_time > 32767    || t_ustr.muz_time < 0)		t_ustr.muz_time =0;
+if (t_ustr.xco_time > 32767    || t_ustr.xco_time < 0)		t_ustr.xco_time =0;
+if (t_ustr.gag_time > 32767    || t_ustr.gag_time < 0)		t_ustr.gag_time =0;
+if (t_ustr.frog > 1            || t_ustr.frog < 0)		t_ustr.frog =0;
+if (t_ustr.frog_time > 32767   || t_ustr.frog_time < 0)		t_ustr.frog_time =0;
+if (t_ustr.anchor > 1          || t_ustr.anchor < 0)		t_ustr.anchor =0;
+if (t_ustr.anchor_time > 32767 || t_ustr.anchor_time < 0)	t_ustr.anchor_time =0;
+if (t_ustr.promote > 22        || t_ustr.promote < 0)		t_ustr.promote=1;
+if (t_ustr.ttt_kills > 32767   || t_ustr.ttt_kills < 0)		t_ustr.ttt_kills =0;
+if (t_ustr.ttt_killed > 32767  || t_ustr.ttt_killed < 0)	t_ustr.ttt_killed =0;
+if (t_ustr.hang_wins > 32767   || t_ustr.hang_wins < 0)		t_ustr.hang_wins =0;
+if (t_ustr.hang_losses > 32767 || t_ustr.hang_losses < 0)	t_ustr.hang_losses =0;
+if (t_ustr.pause_login > 1     || t_ustr.pause_login < 0)	t_ustr.pause_login=0;
+if (t_ustr.localecho > 1       || t_ustr.localecho < 0)		t_ustr.localecho=0;
+if (t_ustr.miscnum3 > 32767    || t_ustr.miscnum3 < 0)		t_ustr.miscnum3=0;
+if (t_ustr.miscnum4 > 32767    || t_ustr.miscnum4 < 0)		t_ustr.miscnum4=0;
+if (t_ustr.miscnum5 > 32767    || t_ustr.miscnum5 < 0)		t_ustr.miscnum5=0;
 
 FCLOSE(f);
 return 1;
@@ -16386,7 +16387,7 @@ ustr[user].ttt_killed    = 0;
 ustr[user].hang_wins     = 0;
 ustr[user].hang_losses   = 0;
 ustr[user].pause_login   = 0;
-ustr[user].miscnum2      = 0;
+ustr[user].localecho     = 0;
 ustr[user].miscnum3      = 0;
 ustr[user].miscnum4      = 0;
 ustr[user].miscnum5      = 0;
@@ -16615,7 +16616,7 @@ rbuf(ustr[user].miscstr1,10);       /* miscstr1 */
 rbuf(ustr[user].miscstr2,10);       /* miscstr2 */
 rbuf(ustr[user].miscstr3,10);       /* miscstr3 */
 rbuf(ustr[user].miscstr4,10);       /* miscstr4 */
-fscanf(f,"%d %d %d %d %d\n", &ustr[user].pause_login, &ustr[user].miscnum2,       
+fscanf(f,"%d %d %d %d %d\n", &ustr[user].pause_login, &ustr[user].localecho,       
        &ustr[user].miscnum3, &ustr[user].miscnum4, &ustr[user].miscnum5);
 
 rbuf(buff1,-1);	/* ENDVER STRING */
@@ -16685,11 +16686,11 @@ if (ustr[user].ttt_kills > 32767 || ustr[user].ttt_kills < 0)  ustr[user].ttt_ki
 if (ustr[user].ttt_killed > 32767 || ustr[user].ttt_killed < 0)  ustr[user].ttt_killed =0;
 if (ustr[user].hang_wins > 32767 || ustr[user].hang_wins < 0)  ustr[user].hang_wins =0;
 if (ustr[user].hang_losses > 32767 || ustr[user].hang_losses < 0)  ustr[user].hang_losses =0;
-if (ustr[user].pause_login  > 32767 || ustr[user].pause_login < 0)  ustr[user].pause_login=0;
-if (ustr[user].miscnum2  > 32767 || ustr[user].miscnum2 < 0) ustr[user].miscnum2=0;
-if (ustr[user].miscnum3  > 32767 || ustr[user].miscnum3 < 0) ustr[user].miscnum3=0;
-if (ustr[user].miscnum4  > 32767 || ustr[user].miscnum4 < 0) ustr[user].miscnum4=0;
-if (ustr[user].miscnum5  > 32767 || ustr[user].miscnum5 < 0) ustr[user].miscnum5=0;
+if (ustr[user].pause_login > 1 || ustr[user].pause_login < 0)  ustr[user].pause_login=0;
+if (ustr[user].localecho > 1 || ustr[user].localecho < 0)  ustr[user].localecho=0;
+if (ustr[user].miscnum3 > 32767 || ustr[user].miscnum3 < 0) ustr[user].miscnum3=0;
+if (ustr[user].miscnum4 > 32767 || ustr[user].miscnum4 < 0) ustr[user].miscnum4=0;
+if (ustr[user].miscnum5 > 32767 || ustr[user].miscnum5 < 0) ustr[user].miscnum5=0;
 
 FCLOSE(f);
 return 1;
@@ -16822,7 +16823,7 @@ wbuf(t_ustr.miscstr1);       /* miscstr1 */
 wbuf(t_ustr.miscstr2);       /* miscstr2 */
 wbuf(t_ustr.miscstr3);       /* miscstr3 */
 wbuf(t_ustr.miscstr4);       /* miscstr4 */
-fprintf(f,"%d %d %d %d %d\n", t_ustr.pause_login, t_ustr.miscnum2,       
+fprintf(f,"%d %d %d %d %d\n", t_ustr.pause_login, t_ustr.localecho,       
        t_ustr.miscnum3, t_ustr.miscnum4, t_ustr.miscnum5);      
 
 /* tack on marker */
