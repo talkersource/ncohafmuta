@@ -7,12 +7,6 @@
 #include "constants.h"
 #include "protos.h"
 
-/*--------------------------------------------------------------*/
-/* Define this if you're debugging the IAC telnet options       */
-/* otherwise, comment out                                       */
-/*--------------------------------------------------------------*/
-/* #define IAC_DEBUG */
-
 unsigned char off_seq[4]       = {IAC, WILL, TELOPT_ECHO, '\0'};
 unsigned char off_seq_cr[5]    = {IAC, WILL, TELOPT_ECHO, '\n',0};
 unsigned char on_seq[4]        = {IAC, WONT, TELOPT_ECHO, '\0'};
@@ -85,13 +79,13 @@ void telnet_write_eor(int user)
 	if (ustr[user].promptseq==1) {
 		write_raw(user, eor_seq2, 3);
 #if defined(IAC_DEBUG)
-		print_to_syslog("writing EOR for prompts\n");
+		write_log(DEBUGLOG,YESTIME,"writing EOR for prompts\n");
 #endif
 	}
 	else if (ustr[user].promptseq==0) {
 		write_raw(user, go_ahead_str, 3);
 #if defined(IAC_DEBUG)
-		print_to_syslog("writing GA for prompts\n");
+		write_log(DEBUGLOG,YESTIME,"writing GA for prompts\n");
 #endif
 	}
 }
@@ -99,23 +93,24 @@ void telnet_write_eor(int user)
     
 /*------------------------------------------------------------*/
 /* this section designed to process telnet commands           */
-/* NOTE: to get here, we have alread read an IAC command      */
+/* NOTE: to get here, we have already read an IAC command     */
 /*------------------------------------------------------------*/
 void do_telnet_commands(int user)
 {
  unsigned char inpchar[2];
- char t_buff[132];
-
- t_buff[0]=0;
  
  if (S_READ(ustr[user].sock, inpchar, 1) != 1)
     return;
 
+#if defined(IAC_DEBUG)
+	write_log(DEBUGLOG,YESTIME,"NOTE: got IAC MAIN %d/%s (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
+
  switch(inpchar[0])
    {
     case BREAK:
-    case IP:     user_quit(user); break;
- 
+    case IP:     user_quit(user,1); break;   /* user sent cntrl-c */
+
     case DONT:   proc_dont(user); break;
     case DO:     proc_do(user);   break;
     case WONT:   proc_wont(user); break;
@@ -140,54 +135,47 @@ void do_telnet_commands(int user)
                  
     default:
 #if defined(IAC_DEBUG)
-	sprintf(t_buff,"NOTE: IAC %d not recognized (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
+	write_log(DEBUGLOG,YESTIME,"NOTE: IAC MAIN %d/%s not recognized (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
 #endif
        break;
    }
-#if defined(IAC_DEBUG)
-	sprintf(t_buff,"NOTE: got main IAC %d (user:%s)\n",(int)inpchar[0],ustr[user].name);
-	print_to_syslog(t_buff);
-#endif
 }
     
 void proc_dont(int user)
 {
  unsigned char inpchar[2];
- char t_buff[132];
-
- t_buff[0]=0;
     
  if (S_READ(ustr[user].sock, inpchar, 1) != 1)
     return;  
+
+#if defined(IAC_DEBUG)
+        write_log(DEBUGLOG,YESTIME,"NOTE: got IAC DONT  %d/%s (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
     
  switch(inpchar[0])
    {
 
-    case ECHO:   break;
+    case ECHO:		break;
+    case TELOPT_EOR:	ustr[user].promptseq=0; break;
  
     default:
 #if defined(IAC_DEBUG)
-	sprintf(t_buff,"NOTE: IAC DONT %d not recognized (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
+	write_log(DEBUGLOG,YESTIME,"NOTE:     IAC DONT  %d/%s not recognized (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
 #endif
        break;
    }
-#if defined(IAC_DEBUG)
-        sprintf(t_buff,"NOTE: got IAC DONT %d (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
-#endif
 }   
  
 void proc_do(int user)
 {
  unsigned char inpchar[2];
- char t_buff[132];
-
- t_buff[0]=0;
     
  if (S_READ(ustr[user].sock, inpchar, 1) != 1)
     return;  
+
+#if defined(IAC_DEBUG)
+        write_log(DEBUGLOG,YESTIME,"NOTE: got IAC DO    %d/%s (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
     
  switch(inpchar[0])
    {
@@ -198,26 +186,22 @@ void proc_do(int user)
 
     default:
 #if defined(IAC_DEBUG)
-        sprintf(t_buff,"NOTE: IAC DO %d not recognized (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
+        write_log(DEBUGLOG,YESTIME,"NOTE:     IAC DO    %d/%s not recognized (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
 #endif
        break;
    }
-#if defined(IAC_DEBUG)
-        sprintf(t_buff,"NOTE: got IAC DO %d (user:%s)\n",(int)inpchar[0],ustr[user].name);
-	print_to_syslog(t_buff);
-#endif
 }
     
 void proc_wont(int user)
 {
  unsigned char inpchar[2];
- char t_buff[132];
-
- t_buff[0]=0;
     
  if (S_READ(ustr[user].sock, inpchar, 1) != 1)
     return;  
+
+#if defined(IAC_DEBUG)
+        write_log(DEBUGLOG,YESTIME,"NOTE: got IAC WONT  %d/%s (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
     
  switch(inpchar[0])
    {
@@ -225,26 +209,22 @@ void proc_wont(int user)
  
     default:
 #if defined(IAC_DEBUG)
-       sprintf(t_buff,"NOTE: IAC WONT %d not recognized (user:%s)\n",(int)inpchar[0], ustr[user].name);
-       print_to_syslog(t_buff);
+       write_log(DEBUGLOG,YESTIME,"NOTE:     IAC WONT  %d/%s not recognized (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
 #endif
        break;
    }
-#if defined(IAC_DEBUG)
-        sprintf(t_buff,"NOTE: got IAC WONT %d (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
-#endif
 }
 
 void proc_will(int user)
 {   
  unsigned char inpchar[2];
- char t_buff[132];
-
- t_buff[0]=0;
     
  if (S_READ(ustr[user].sock, inpchar, 1) != 1)
     return;  
+
+#if defined(IAC_DEBUG)
+        write_log(DEBUGLOG,YESTIME,"NOTE: got IAC WILL  %d/%s (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
 
  switch(inpchar[0])
    {
@@ -252,14 +232,55 @@ void proc_will(int user)
     
     default:
 #if defined(IAC_DEBUG)
-        sprintf(t_buff,"NOTE: IAC WILL %d not recognized (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
+        write_log(DEBUGLOG,YESTIME,"NOTE:     IAC WILL  %d/%s not recognized (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
 #endif
        break;
    }
-#if defined(IAC_DEBUG)
-        sprintf(t_buff,"NOTE: got IAC WILL %d (user:%s)\n",(int)inpchar[0], ustr[user].name);
-	print_to_syslog(t_buff);
-#endif
 }   
 
+char *get_iac_string(unsigned char code)
+{
+
+switch(code) {
+    case BREAK:  return "BREAK";
+    case IP:     return "IP";
+ 
+    case DONT:   return "DONT";
+    case DO:     return "DO";
+    case WONT:   return "WONT";
+    case WILL:   return "WILL";
+ 
+    case SB:     return "SB";
+    case GA:     return "GA";
+    case EL:     return "EL";
+    case EC:     return "EC";
+
+    case AYT:    return "AYT";
+
+    case AO:     return "AO";
+    case DM:     return "DM";
+    case SE:     return "SE";
+    case EOR:    return "EOR";
+        
+    case ABORT:  return "ABORT";
+    case SUSP:   return "SUSP";
+    case xEOF:   return "xEOF";
+
+/* telopts */
+    case TELOPT_BINARY:	return "_BINARY";
+    case TELOPT_ECHO:   return "_ECHO";
+    case TELOPT_SGA:    return "_SGA";
+    case TELOPT_STATUS:	return "_STATUS";
+    case TELOPT_TM:	return "_TM";
+    case TELOPT_RCTE:	return "_RCTE";
+    case TELOPT_LOGOUT:	return "_LOGOUT";
+    case TELOPT_TTYPE:	return "_TTYPE";
+    case TELOPT_EOR:	return "_EOR";
+    case TELOPT_NAWS:	return "_NAWS";
+    case TELOPT_TSPEED:	return "_TSPEED";
+    case TELOPT_LFLOW:	return "_LFLOW";
+    case TELOPT_LINEMODE:	return "_LINEMODE";
+}
+
+return "UNK";
+}

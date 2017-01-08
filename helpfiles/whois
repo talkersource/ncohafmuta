@@ -1,13 +1,15 @@
  Syntax:  .whois <search string>
-          .whois -h nic.ddn.nil <search string>
+          .whois <search string>@<whois host>
 
 Results:  Use the Unix "whois" command to search the Internet's Domain
           Registration Service for info on domain names, sites, or
-          even people. If the first syntax returns no info, try the
-          second. At the bottom of the info it'll tell you the opposite 
-          of which one you picked.
-          If you didn't enter a -h host it searches RS.INTERNIC.NET, and it 
-          will tell you to look at nic.ddn.mil for more info..and vice-versa.
+          even people.
+	  The first syntax is usually for normal domains and people.
+	  The second is for more specific info, like:
+	  * IP address information (.whois ip-address@rs.arin.net)
+	  * European domain info (.whois domain@whois.ripe.net)
+	  * Asia/Pacific domain info (.whois domain@whois.apnic.net)
+	  etc..
         
 Example:  .whois misty.com
 

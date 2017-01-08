@@ -1,8 +1,25 @@
+/* ANSI C forbids braced groups in expressions..the system include */
+/* files do this..bleh */
+#if defined(__OpenBSD__) || defined(__CYGWIN32__)
+#undef __GNUC__
+#endif
+
 #include <stdio.h>
 #include <unistd.h>
-#include <netdb.h>
+#if !defined(__STRICT_ANSI__)
+#define __STRICT_ANSI__
+#include <sys/socket.h>    /* for socket(), bind(), etc.. */
+#undef __STRICT_ANSI__
+#else
+#include <sys/socket.h>    /* for socket(), bind(), etc.. */
+#endif
 #include <arpa/inet.h>
-#include <sys/socket.h>
+#include <netdb.h>
+#if defined(SOL_SYS) || defined(__linux__)
+#include <string.h>        /* for strcpy(),strcmp(),memcpy(), etc */
+#else
+#include <strings.h>
+#endif
 
 #include "constants.h"
 #include "protos.h"

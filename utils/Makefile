@@ -5,6 +5,7 @@
 
 # Name of the executable to be made
 ADDBIN           = addstruct
+TRIMBIN          = trimbackups
 
 ##########################################################################
 # Your compiler program. Must be 
@@ -16,20 +17,26 @@ CC               = gcc
 
 # Files used by the program
 ADDCFILES         = addstruct.c
+TRIMCFILES        = trimbackups.c
 
 # Makefile arguments
 #
 all:		clean \
-		$(ADDBIN)
+		$(ADDBIN) \
+		$(TRIMBIN)
 				@echo 'Made all'
 
 $(ADDBIN): $P $(OFILES) Makefile
 	  $(CC) -o $(ADDBIN) $(ADDCFILES)
 
+$(TRIMBIN): $P $(OFILES) Makefile
+	  $(CC) -o $(TRIMBIN) $(TRIMCFILES)
+
 clean:
-	rm -f $(ADDBIN)
+	rm -f $(ADDBIN) $(TRIMBIN)
 
 # DO NOT REMOVE THIS LINE OR CHANGE ANYTHING AFTER IT #
 addstruct.o: addstruct.c 
+trimbackups.o: trimbackups.c 
 
 

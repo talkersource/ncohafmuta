@@ -1,5 +1,5 @@
 /* Copyright 1990 by John Ockerbloom.
-   Derivative for talker by Cygnus (cygnus@ncohafmuta.com), 1996
+   Derivative for talker by Cygnus (code@ncohafmuta.com), 1996
 
   Permission to copy this software, to redistribute it, and to use it
   for any purpose is granted, subject to the following restrictions and
@@ -30,8 +30,8 @@
 
 */
 
-/* Last changed: Mar 15th 1999 */
-/* Version 1.2 */
+/* Last changed: May 13th 2000 */
+/* Version 1.3 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@
 char *host = "ncohafmuta.com";
 
 /* REPLACE THIS with the talker's main login port */
-int   port = 5000;
+int   port = 1900;
 
 /* BOT_NAME and ROOT_ID must be all lowercase */
 /* REPLACE THIS with the bot's name */
@@ -66,13 +66,17 @@ int   port = 5000;
 
 /* REPLACE THIS with the bot's login sequence. The default here is */
 /* bot_username <carriage-return> bot_password                     */
-#define CONNMSG       "\n spokes \n maple2\0"
+/* YOU DO NOT NEED TO END THIS STRING WITH \n's OR \r's		   */
+/* THE PROGRAM AUTOMATICALLY SENDS 2 OF THEM TO FINISH THE LOGIN   */
+#define CONNMSG       "\n spokes \n maple2"
 
 /* REPLACE THIS with the username of the bot's owner */
 #define ROOT_ID       "cygnus"
 
 /* REPLACE THIS with the command the bot will use to disconnect */
-#define DCONMSG       ".q\0"
+/* YOU DO NOT NEED TO END THIS STRING WITH \n's OR \r's		   */
+/* THE PROGRAM AUTOMATICALLY SENDS ONE TO FINISH THE LOGOUT	   */
+#define DCONMSG       ".quit"
 
 /* REPLACE THESE with .desc messages the bot will change to */
 #define IDLEMSG       "sits silently on his dais."
@@ -83,10 +87,11 @@ int   port = 5000;
 /* REPLACE THIS with the name of the talker's main room */
 #define MAIN_ROOM     "front_gate"
 
-/* REPLACE THIS with the bot room set in the talker's constants.h */
+/* REPLACE THIS with the room the bot will go to when he first logs in */
+/* ..usually where he will live */
 #define HOME_ROOM     "pond"
 
-/* REPALCE THIS with the directions the bot will give to get to him */
+/* REPLACE THIS with the directions the bot will give to get to him */
 /* Last %s is the bot's home room */
 #define UNKNOWNDIRS "by typing \".go meadow\", then \".go %s\" "
 
@@ -108,45 +113,7 @@ int   port = 5000;
 /* dont change */
 #define DIRECTORY     "."
 
-/*-----------------------------------------------------------------*/
-/* The number of characters minus the length of the players's name */
-/* are before where the input string starts                        */
-/*                                                                 */
-/* i.e. if a comm format in constants.h is "%s tells you: %s"      */
-/*      then the offset is 12, because there is 12 characters      */
-/*      minus the length of the player before the actual message   */
-/*-----------------------------------------------------------------*/
-#define SAY_OFFSET	7
-#define TELL_OFFSET	13
-#define SHOUT_OFFSET	9
-#define SEMOTE_OFFSET	5
-#define SHEMOTE_OFFSET	3
-#define EMOTE_OFFSET	1
-
 /*** END OF CONFIGURATION SECTION ***/
-
-/*** FUTURE USE ***/
-/*---------------------------------------------------------*/
-/* Current communications formats                          */
-/* Set these to the same communications syntax you have    */
-/* in your talkers constants.h                             */
-/*---------------------------------------------------------*/
-/* NORMAL TALK */
-#define SAY_FORM     "[%s]: %50c"
-
-/* PRIVATE TELLS */
-#define TELL_FORM    "%s tells you: \"%s\""
-
-/* SEMOTES */
-#define SEMOTE_FORM  "--> %s %s"
-
-/* SHOUTS */
-#define SHOUT_FORM   "%s shouts \"%s\""
-
-/* SHEMOTES */
-#define SHEMOTE_FORM "& %s %s"
-
-/*** END OF FUTURE USE ***/
 
 /* Some maximum quantities */
 
@@ -236,6 +203,7 @@ int save_para(struct storystate *story, char *playername, char *lowername);
 char *getline();
 char *getinput();
 char *resolve_title();
+char *get_error(void);
 struct storystate *start_story(), *finish_story(), 
                   *handle_command(), *handle_writing(), *abort_writing();
 
@@ -251,7 +219,7 @@ FILE *log_fp;		 /* file pointer for log file */
 
 /* The main program spawns the child process, sets up the socket */
 /* to the talker and then calls robot().                         */
-int main()
+int main(void)
 {
   int fd;
 
@@ -282,7 +250,7 @@ int main()
         case -1:    wlog("FORK 1 FAILED");
                     exit(1);
 
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || defined(__OSF__) || defined(__osf__) || defined(__bsdi__)
         case 0:     setpgrp(0,0);
 #else
         case 0:     setpgrp();
@@ -292,6 +260,9 @@ int main()
         default:    sleep(1); 
                     exit(0);
       }
+
+
+#if !defined(__CYGWIN32__)
 
   switch(fork())
      {
@@ -303,13 +274,15 @@ int main()
         default:    exit(0);
       }
 
+#endif
+
     clear_all_users();
 
     wlog("Bot starting...");
 
     bs = connect_robot();
     if (bs < 0) {
-      sprintf(mess,"Connect failed to %s %d, exiting!",host,port);
+      sprintf(mess,"Connect failed to %s %d, exiting! %s",host,port,get_error());
       wlog(mess);
       exit(-1);
      }
@@ -348,10 +321,16 @@ int connect_robot()
   }
   
   cs = socket(AF_INET, SOCK_STREAM, 0);
-  if (cs < 0) return -1;
-   
-  if (connect(cs,(struct sockaddr *) &sin, sizeof(sin)) < 0) return -1;
-  
+  if (cs < 0) {
+	sprintf(mess,"socket() creation failed for %s %d! %s",host,port,get_error());
+	wlog(mess);
+	return -1;
+   }
+  if (connect(cs,(struct sockaddr *) &sin, sizeof(sin)) < 0) {
+	sprintf(mess,"connect() failed for %s %d! %s",host,port,get_error());
+	wlog(mess);
+	return -1;
+  }
   return cs;
 }
 
@@ -481,7 +460,7 @@ int a1, a2, a3, a4, a5, a6, a7, a8, a9, a10;
 
   if (write(bs, buf, len) != len)
     {
-     sprintf(mess,"Write failed: %s",buf);
+     sprintf(mess,"Write failed: %s %s",buf,get_error());
      wlog(mess);
      quit_robot();
     }
@@ -547,7 +526,6 @@ void listen_to_people()
    int volume;                     /* Was cmd a SAY or a WHISPER?           */
    int chance2;
    struct storystate *ourstory;    /* Ptr to main story structure           */
-   char c;
    int u,vis;
    char room[NAME_LEN];
 
@@ -675,12 +653,12 @@ void listen_to_people()
         wlog("Got talker quit message.");
         quit_robot();
      }
-     else if (sscanf(inbuf, "%s says %c", playername, &c) == 2) {
+     else if (sscanf(inbuf, "+++++ comm_say:%s %*s", playername) == 1) {
 	u=get_user_num(playername);
         strcpy(lowername,playername);
         strtolower(lowername);
 
-         command = inbuf+strlen(playername)+SAY_OFFSET;
+         command = inbuf+strlen(playername)+16;
 	 if (logging==1) {
 	  if (strcmp(ustr[u].name,BOT_NAME)) {
 		fputs(inbuf,log_fp);
@@ -702,10 +680,10 @@ void listen_to_people()
        else { }
       }
      }
-     else if (sscanf(inbuf, "%s tells you: %c", playername, &c) == 2) {
+     else if (sscanf(inbuf, "+++++ comm_tell:%s %*s", playername) == 1) {
         strcpy(lowername,playername);
         strtolower(lowername);
-         command = inbuf+strlen(playername)+TELL_OFFSET;
+         command = inbuf+strlen(playername)+17;
 
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
@@ -727,10 +705,10 @@ void listen_to_people()
       }
      }
 
-     else if (sscanf(inbuf, "%s shouts %c", playername, &c) == 2) {
+     else if (sscanf(inbuf, "+++++ comm_shout:%s %*s", playername) == 1) {
         strcpy(lowername,playername);
         strtolower(lowername);
-         command = inbuf+strlen(playername)+SHOUT_OFFSET;
+         command = inbuf+strlen(playername)+18;
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
          sprintf(mess,"SHOUT: \"%s\" \"%s\"",playername,command);
@@ -740,10 +718,10 @@ void listen_to_people()
        handle_action(playername, lowername, command, volume);
      }
 
-     else if (sscanf(inbuf, "--> %s ", playername)) {
+     else if (sscanf(inbuf, "+++++ comm_semote:%s %*s", playername) == 1) {
         strcpy(lowername,playername);
         strtolower(lowername);
-         command = inbuf+strlen(playername)+SEMOTE_OFFSET;
+         command = inbuf+strlen(playername)+19;
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
          sprintf(mess,"SEMOTE: \"%s\" \"%s\"",playername,command);
@@ -753,11 +731,11 @@ void listen_to_people()
              handle_action(playername, lowername, command, volume);
          }
 
-     else if (sscanf(inbuf, "& %s ", playername)) {
+     else if (sscanf(inbuf, "+++++ comm_shemote:%s %*s", playername) == 1) {
           if (strstr(inbuf,"Spokes") || strstr(inbuf,"spokes")) {
         strcpy(lowername,playername);
         strtolower(lowername);
-         command = inbuf+strlen(playername)+SHEMOTE_OFFSET;
+         command = inbuf+strlen(playername)+20;
          if (command[strlen(command)-1]=='\"') command[strlen(command)-1]='\0';
 
          sprintf(mess,"SHEMOTE: \"%s\" \"%s\"",playername,command);
@@ -768,10 +746,10 @@ void listen_to_people()
              }
          }
 
-     else if (sscanf(inbuf, "%s ", playername)) {
+     else if (sscanf(inbuf, "+++++ comm_emote:%s %*s", playername) == 1) {
         strcpy(lowername,playername);
         strtolower(lowername);
-             command = inbuf+strlen(playername)+EMOTE_OFFSET;
+             command = inbuf+strlen(playername)+18;
              volume = EMOTE;
 
 	 if (logging==1) {
@@ -905,6 +883,21 @@ if (volume==SAY) {
          sendchat(".say Really %s? Sucks bein' you!\n",playername);
 
         sendchat(".emote hides\n");
+        goto ENDING;
+      }
+
+   else if (strstr (command2, "taxes" )) {
+         sendchat(".emote hops on his little soapbox.\n");
+	 sleep(2);
+         sendchat(".say Citizens!  Are you as tired as I am of these damned sales taxes?\n");
+	 sleep(2);
+	 sendchat(".say If you elect me as your leader, I'll eliminate ALL unjust taxes in this realm!\n");
+	 sleep(2);
+	 sendchat(".emote pauses and blinks brightly...\n");
+	 sleep(3);
+	 sendchat(".say Read my lips, No New Taxes!\n");
+	 sleep(2);
+	 sendchat(".emote leaps down from his soapbox.\n");
         goto ENDING;
       }
 
@@ -1133,6 +1126,20 @@ else if (volume==SHOUT) {
             strstr (command2, "hush" ) ||
             strstr (command2, "be quiet" )) {
         sendchat(".shout And who's gonna make me? You? HAH!\n");
+        goto ENDING;
+      }
+   else if (strstr (command2, "taxes" )) {
+         sendchat(".shemote hops on his little soapbox.\n");
+	 sleep(2);
+         sendchat(".shout Citizens!  Are you as tired as I am of these damned sales taxes?\n");
+	 sleep(2);
+	 sendchat(".shout If you elect me as your leader, I'll eliminate ALL unjust taxes in this realm!\n");
+	 sleep(2);
+	 sendchat(".shemote pauses and blinks brightly...\n");
+	 sleep(3);
+	 sendchat(".shout Read my lips, No New Taxes!\n");
+	 sleep(2);
+	 sendchat(".shemote leaps down from his soapbox.\n");
         goto ENDING;
       }
    else if (strstr (command2, "i'm good" ) ||
@@ -2762,4 +2769,12 @@ int u;
      }
   return -1;
 
+}
+
+char *get_error(void)
+{
+static char errstr[256];
+
+sprintf(errstr,"(%d:%s)",errno,strerror(errno));
+return errstr;
 }

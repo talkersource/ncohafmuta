@@ -1,0 +1,25 @@
+Quick primer to get your talker up and running
+-----------------------------------------------
+
+1. Edit the main port in config/init_data. First line, first variable.
+   See docs/README.init_data for specifc help.
+2. Edit essential variables in constants.h file to meet you talker theme. you're not REQUIRED to change
+   anything in here just to get the talker running, but there are things you should change right off
+   the bat. ROOT_ID, password lock string, port offsets.
+3. Compile the talker by typing "make". If you need more help on compiling, see docs/README.compiling
+4. Boot the talker by typing "./restart"
+5. Connect to the talker and login as ROOT_ID with whatever password you want.
+6. Go back and really start changing stuff. Major things are:
+   * Variables in constants.h and text.h
+   * MOTDs, agreefile, rulesfile, faqfile, mapfile, newsfile
+   * Room and system variables in config/init_data
+   * Command levels in server.c under sys[] (if you wish)
+   * Variables in webfiles/webport.cfg
+   * index.html in webfiles/
+7. Recompile the talker after changing any .h or .c files. If you just change .h file(s), do a
+   "make clean" before "make"
+
+
+-Cygnus
+code@ncohafmuta.com
+2-14-00

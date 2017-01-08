@@ -1,19 +1,26 @@
-#!/bin/csh -f
+#!/bin/sh
 # by Cygnus
-# cygnus@ncohafmuta.com
+# code@ncohafmuta.com
 #
 
 
 #  This next part copies over the log file to a backup,
 
-	if (-e botlog) then
+	if test -f "botlog"
+	then
          echo "Coping bot log to backup file..."
 	 cp botlog botlog.`/bin/date '+%m%d%y.%T'`
 	 rm botlog
          touch botlog
-	else
+	fi
 
-	endif
-
-echo "Starting the storybot..."
+if test -f "storybot"
+then
+echo -n "Starting the storybot..."
 ./storybot
+echo "Done"
+echo "See log file for details"
+else
+echo "Can't find the storybot program! Have you compiled it with ./compile?"
+fi
+

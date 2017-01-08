@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------*/
-/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.2.1    */
+/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.2.2    */
 /*----------------------------------------------------------------------*/
 /*  This code is a collection of software that originally started       */
 /*  as a system called:                                                 */
@@ -16,14 +16,14 @@
 /*              exportation of encoding technology.                     */
 /*----------------------------------------------------------------------*/
 
-/* last modified: Aug 4th, 1999  Cygnus */
+/* last modified: Jun 21, 2000  Cygnus */
 
-#define VERSION  "Ncohafmuta 1.2.1-pl3 by Cygnus"
+#define VERSION  "Ncohafmuta 1.2.2 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
 /* This makes common macros for these socket functions to be portable to win32 systems */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 HANDLE hThread;
 
 #ifdef _DEFINING_CONSTANTS
@@ -86,21 +86,21 @@ extern int S_WRITE(int sock, char *str, int len);
 /*                                                                     */
 /* DO NOT USE A SINGLE QUOTE (') or DOUBLE QUOTE (") IN THE NAME       */
 /*---------------------------------------------------------------------*/
-#define SYSTEM_NAME "Test-Talker"
+#define SYSTEM_NAME "Test-Talker2"
 
 /*------------------------------------------------------------*/
 /* Set this to a short description of the theme of the talker */
 /* This is only used on the info section of the talker list   */
 /* Please limit to around 45 characters                       */
 /*------------------------------------------------------------*/
-#define TTHEME        "A nice place to come and relax"
+#define TTHEME	"A nice place to come and relax"
 
 /*------------------------------------------------------------------*/
 /* This defines whether this talker is only for people 18 years old */
 /* and older. Set this to 1 if it is. Set to 0 if it's not.         */
 /* This is only used on the info section of the talker list         */
 /*------------------------------------------------------------------*/
-#define EIGHTTPLUS    0
+#define EIGHTTPLUS	0
 
 /*------------------------------------------------*/
 /* Password encryption key                        */
@@ -191,6 +191,7 @@ extern int num_locks;
 /* No No No */
 #define NO_USER_STR     "  [Dude, the user doesn't exist]"
 #define NO_WIZ_ENTRY    "You are not permitted to enter the wizard port."
+#define NO_CREATION     "Someone is already in the process of creating that username. Try again."
 #define NO_NEWS         "There is no news today"
 #define NO_FAQ          "FAQ is not available."
 #define NO_MAP          "There is no map."
@@ -207,6 +208,8 @@ extern int num_locks;
 #define NOT_UNIQUE      "Name was not unique, matched: %s"
 #define NOT_WORTHY      "Sorry - you're not worthy of that command"
 #define GIVE_CAPNAME    "You have to give your name!"
+#define BAD_FILEIO	"Failed! A file I/O error occured!"
+#define BAD_MALLOC	"Failed! A memory allocation error occured!"
 
 #define BYE_MESS        "\07Goodbye! See ya soon!..."
 #define IDLE_BYE_MESS   "\07Well you had your chance....Bye bye"
@@ -388,7 +391,8 @@ extern int num_locks;
 #define INIT_FILE    "init_data"
 #define MESSDIR      "messboards"
 #define NEWSFILE     "lib/newsfile"
-#define LOGFILE      "syslog"
+#define LOGFILE      "logfiles/syslog"
+#define LOGDIR       "logfiles"
 #define HELPDIR      "helpfiles"
 #define MAILDIR      "maildir"
 #define RESTRICT_DIR "restrict"
@@ -400,7 +404,7 @@ extern int num_locks;
 #define MAPFILE      "lib/mapfile"
 #define PRO_DIR      "prodir"
 #define LIBDIR       "lib"
-#define LASTLOGS     "lib/lastlogs"
+#define LASTLOGS     "lastlogs.log"
 #define SCHEDFILE    "lib/schedule"
 #define WIZFILE      "lib/wizlist"
 #define EXEMFILE     "lib/exempts"
@@ -417,6 +421,7 @@ extern int num_locks;
 #define NUKEWARN     "lib/nukewarn"
 #define HANGDICT     "lib/hangman_words"
 #define WLOGDIR      "warnings"
+#define REBOOTFILE   "REBOOT.db"
 
 #define WEBFILES     "webfiles"
 #define WEBCONFIG    "webfiles/webport.cfg"
@@ -442,8 +447,10 @@ extern int num_locks;
 /* end of hostname resolution options */
 
 
-#if !defined(WIN32) || defined(__CYGWIN32__)
-#define PROGNAME     "./restart"    /* file used to restart talker */
+/* File used to restart the talker internally. This should be the	*/
+/* BINARY, NOT a script, for soft-reboots to work			*/
+#if !defined(_WIN32) || defined(__CYGWIN32__)
+#define PROGNAME     "./server"
 #endif
 
 /* If the following programs exist on your system..you can find them        */
@@ -512,8 +519,6 @@ extern int num_locks;
 #define HEAD_ROOM   "headquarters"  /* room for special users only, which */
                                     /* are defined in go()                */
 #define NERF_ROOM   "arena" /* only room to nerf in */
-#define BOT_ROOM    "pond"  /* room the bot STAYS in and in which a */
-                            /* blank say is not .review for bot reasons */
 #define INIT_ROOM   0       /* main, normal talker room       */
                             /* 0 = first room defined in init_data */
 
@@ -536,6 +541,18 @@ extern int num_locks;
 #define NULL            0
 #endif
 
+/*-----------------------------------------------*/
+/* wiz only flag                                 */
+/*-----------------------------------------------*/
+#define WIZ_ONLY -4
+
+/*--------------------------------------------------------*/
+/* terminal control switch settings                       */
+/*--------------------------------------------------------*/
+#define NORM      0
+#define BOLD      1
+
+/* Restriction variables */
 #define NEW             1
 #define ANY             2
 
@@ -545,6 +562,11 @@ extern int num_locks;
                            /* 7 lines.. 80 chars x 7 lines is 560    */   
 
 #define SHOW_HIDDEN     1
+
+#define SHOW_SREBOOT	2   /* set to 2 if you want to show all users */
+			    /* that a soft-reboot is taking place.    */
+			    /* set to 1 to just show wizards/staff    */
+			    /* set to 0 for total silent soft-reboot  */
 
 #define AFK_NERF        0   /* set to 1 if you want users to be able to  */
                             /* go afk or bafk in the nerf_room */
@@ -617,6 +639,11 @@ extern int num_locks;
 #define MAX_NEW_PER_DAY 50  /* Max new users per day the system allows  */
 			    /* Can change online with ".quota"          */
 
+#define TRIM_BACKUPS	3   /* days to trim backup logs to		*/
+			    /* i.e. logs this many days old and up	*/
+			    /* will be deleted.				*/
+			    /* Must be greater than 0 to activate	*/
+
 #define COLOR_DEFAULT	0   /* Is coloring for new users on by default? */
 			    /* 0 for no, 1 for yes			*/
 			    /* Coloring by default for new users is	*/
@@ -658,7 +685,7 @@ extern int num_locks;
 #define NUM_USERS           40 
 #define NUM_WIZES           5
 #define MAX_WHO_CONNECTS    2
-#define MAX_WWW_CONNECTS    2
+#define MAX_WWW_CONNECTS    5
 #define MAX_INTERCONNECTS   3
 #define MAX_CYPHERCONNECTS  3
 #define MAX_USERS           NUM_USERS + NUM_WIZES 
@@ -703,20 +730,32 @@ extern int ATMOS_LAST;
 /* NOTE: It is not wise to EVER make the superuser rank and the  */
 /* Senior level the same number                                  */
 
-#define RANKS "01234"        /* Your ranks, lowest to highest */
+typedef struct
+{
+        char *lname;   /* long level name */
+        char *sname;   /* short level name, for NUTS .who */
+        char abbrev;   /* abbreviation for IFORMS,OUR .who..a number, a letter, a character */
+        int odds;      /* odds for this level for .fight */
 
-/*----------------------------------------------------*/
-/* this line is the odds for each rank for .fight,    */
-/* separated by commas                                */
-/* Make the odds what you want and make sure you have */
-/* a number for every rank                            */
-/*----------------------------------------------------*/
+} rank_struct;
 #ifdef _DEFINING_CONSTANTS
-int odds[]={10, 30, 270, 2150, 21000};
+rank_struct ranks[] = {
+			/* CHANGE THESE */
+	/* LONG NAME */		/* SHORT */	/* ABBR */ /* ODDS */
+        {"a Newbie",              "Newbie",       '0',    10},
+        {"a Wheeler",             "Wheeler",      '1',    30},
+        {"a Wizard",              "Wizard",       '2',    270},
+        {"a Manager",             "Manager",      '3',    2150},
+        {"an Admin",              "Admin",        '4',    21000},
+	/* STANDARD END MARKER */
+        {NULL,                    NULL,           '\0',   -1}
+        };
 #else
-extern int odds[];
+extern rank_struct ranks[];
 #endif
 
+#define RANK_LEN	8    /* length of your longest SHORT rank name	*/
+			     /* (sname). for formatting in .who		*/
 #define MIN_HIDE_LEVEL  2    /* level at which invisibility is allowed */
                              /* also level users can see invis users   */
                              /* in .who list */
@@ -733,6 +772,7 @@ extern int odds[];
 #define CBUFF_LEVEL     2    /* level that can clear all buffers */
 #define IDLE_LEVEL      2    /* level exempt from idle timeouts  */
 #define TELEP_LEVEL     2    /* level that can teleport to rooms */
+#define VOTE_LEVEL	3    /* level that can do -c and -d and read tallies on votes */
 #define PRIV_ROOM_RANK  2    /* rank before private without two users   */
 #define EXPIRE_EXEMPT  -1    /* users at or above this level get 30     */
                              /* extra days before they're up for an     */
@@ -753,27 +793,17 @@ extern int odds[];
 #define PROMOTE_TO_ABOVE 0   /* allow promotions to a higher level as promoter */
 #define DEMOTE_SAME      0   /* allows a wiz or higher to demote users */
                              /* same level as them */
-
-#define RANK_LEN	 8   /* length of your longest rank name. for formatting */
-			     /* in .who						 */
+#define GRANT_TO_SAME	 0   /* allow granting and revoking of commands   */
+			     /* OF SAME LEVEL to/from users? i.e. a level */
+			     /* 4 can give out a level 4 command	  */
 
 #ifdef _DEFINING_CONSTANTS
-/*------------------------------*/
-/*  Rank descriptors            */
-/*------------------------------*/
-char *ranks[]={"Newbie",
-               "Wheeler",
-               "Wizard",
-               "Manager",
-               "Admin"};
-
 /*----------------------------*/
 /* Port status descriptors    */
 /*----------------------------*/
 char *opcl[]={"CLOSED",
               "OPEN"};
 #else
-extern char *ranks[];
 extern char *opcl[];
 #endif
 
@@ -810,7 +840,7 @@ flag_names_type flag_names[NUM_IGN_FLAGS+1] = {
        {"roomdescs"},
        {"beeps"},
        {"tictactoes"},
-       {"<not defined yet>"},
+       {"tells"},
        {""}
       };
 #else
@@ -840,7 +870,7 @@ extern flag_names_type flag_names[NUM_IGN_FLAGS+1];
 #define ROOMD     20  /* room descriptions in .look */
 #define BEEPS     21  /* any beeping */
 #define TTTS      22  /* tic-tac-toes */
-#define MISC2     23  /* future */
+#define TELLS     23  /* tells */
 
 /*-----------------------------------------------------------------*/
 /* Gagged types                                                    */
@@ -864,11 +894,11 @@ int gagged_types[]={ECHOM,PICTURE,
 /* when the talker boots.				     */
 /* INTER and CRYPT currently dont work. for future use.      */
 /*-----------------------------------------------------------*/
-int WIZ_OFFSET    =  50;   /* wiz port for incoming          */
+int WIZ_OFFSET    =   50;  /* wiz port for incoming          */
 int WHO_OFFSET    =   1;   /* standard offset for who        */
-int WWW_OFFSET    =  30;   /* www offset                     */
-int INTER_OFFSET  =   2;   /* inter talker offset         DONT CHANGE   */
-int CRYPT_OFFSET  =   3;   /* offset for caller-id verify DONT CHANGE   */
+int WWW_OFFSET    =   30;  /* www offset                     */
+int INTER_OFFSET  =   4;   /* inter talker offset         DONT CHANGE   */
+int CRYPT_OFFSET  =   5;   /* offset for caller-id verify DONT CHANGE   */
 #else
 extern int gagged_types[];
 extern int WIZ_OFFSET;
@@ -893,10 +923,10 @@ char com[20];
 /*-----------------------------*/
 /* Macro variable definitions  */
 /*-----------------------------*/
-#define NERF_MACRO      0   /* set to 1 if you want users to be able to */
+#define NERF_MACRO	0   /* set to 1 if you want users to be able to */
                             /* make macros for .nerf                    */
-#define NUM_MACROS    20    /* number of macros allowed                 */
-#define MACRO_LEN     100   /* max macro length                         */
+#define NUM_MACROS	20    /* number of macros allowed                 */
+#define MACRO_LEN	100   /* max macro length                         */
 #define CANT_MACRO      "Sorry, you can't macro that command."
 #define MACRO_NLONG     "Sorry, that macro name is too long."
 #define MACRO_LONG      "Sorry, that macro is too long."
@@ -1029,7 +1059,6 @@ struct profile {
 	int area;
 	int listen;
 	int shout;
-	int igtell;
 	int color;
         int clrmail; /* User is clearing his mail file */
 	int sock;  /* socket number */
@@ -1134,6 +1163,12 @@ struct profile {
 	int miscnum3;		/* 1.2.1 */
 	int miscnum4;		/* 1.2.1 */
 	int miscnum5;		/* 1.2.1 */
+	char *output_data;	/* 1.2.1 - temp */
+	int write_offset;	/* 1.2.1 - temp */
+	int alloced_size;	/* 1.2.1 - temp */
+	int log_stage;		/* 1.2.2b */
+	char temp_buffer[80];	/* 1.2.2b */
+	int tempnum1;		/* 1.2.2 - temp - was igtell */
         };
 /* typedef profile *UserPtr; */
 #ifdef _DEFINING_CONSTANTS
@@ -1196,26 +1231,50 @@ struct {
         int sock;
         int method;
         int req_length;
-        char keypair[700];
-        char file[256];
+        char keypair[82*PRO_LINES+650];
+        char file[268];
         char site[21];
         char net_name[64];
+	char *output_data;	/* 1.2.2a-pl5 - temp */
+	int write_offset;	/* 1.2.2a-pl5 - temp */
+	int alloced_size;	/* 1.2.2a-pl5 - temp */
        } wwwport[MAX_WWW_CONNECTS];
 
+/* Log facility definitions */
+#define VEMAILLOG	0	/* email verification */
+#define LOGINLOG	1	/* connect and login log */
+#define WARNLOG		2	/* warning and security log */
+#define ERRLOG		3	/* error log */
+#define BOOTLOG		4	/* bootup/shutdown log */
+#define SYSTEMLOG	5	/* general system log */
+#define BANLOG		6	/* site/user restriction log */
+#define DEBUGLOG	7	/* debugging log */
+#define NOTIME		0	/* don't timestamp log entries */
+#define YESTIME		1	/* timestamp log entries */
+
+typedef struct
+{
+	int loglevel;
+	char *name;
+	char *file;
+} log_struct;
+#ifdef _DEFINING_CONSTANTS
+log_struct logfacil[] = {
+			{VEMAILLOG,	"vemaillog",	"%s/emailver.log"},
+			{LOGINLOG,	"loginlog",	"%s/logins.log"},
+			{WARNLOG,	"warnlog",	"%s/warnings.log"},
+			{ERRLOG,	"errlog",	"%s/errors.log"},
+			{BOOTLOG,	"bootlog",	"%s/boot.log"},
+			{SYSTEMLOG,	"systemlog",	"%s/system.log"},
+			{BANLOG,	"banlog",	"%s/restrict.log"},
+			{DEBUGLOG,	"debuglog",	"%s/debug.log"},
+			{-1,		NULL,		NULL}
+			};
+#else
+extern log_struct logfacil[];
+#endif
 
 /***** EXPERIMENTAL VARIABLES *****/
-
-#define VEMAIL_L	0
-#define LOGIN_L		1
-#define ERROR_L		2
-#define WARNING_L	3
-#define SYSLOG_ALSO	1
-#define NEWLINE		1
-#define NONEWLINE	0
-#define EMAILLOG	"logs/emailver.log"
-#define LOGINLOG	"logs/logins.log"
-#define ERRORLOG	"logs/errors.log"
-#define WARNINGLOG	"logs/warnings.log"
 
 /* Web server return errors */
 #define BAD_REQUEST		1
@@ -1225,8 +1284,10 @@ struct {
 #define NO_HEADER		0
 #define HEADER			1
 
-#define SYS_VAR "%system%"
-#define USER_VAR "%user%"
+#define SYS_VAR		"%system%"
+#define USER_VAR	"%user%"
+#define HOST_VAR	"%host%"
+#define MAINPORT_VAR	"%mainport%"
 
 #if defined(__OSF__) || defined(__osf__)
 /* WNOHANG causes the wait to not hang if there are no stopped */
@@ -1261,13 +1322,14 @@ struct {
 #define wval(val) fprintf (f, "%d\n", val)
 #define wlong(val) fprintf (f, "%ld\n", val)
 #define wtime(val) fprintf (f, "%ld\n", val)
+#define wchar(val) fprintf (f, "%c\n", val)
 #define rbuf(buf,buflen) getbuf(f, buf, buflen)  
 #define rbufnocr(buf) fscanf (f, "%s ", (char *)buf)
 #define rval(val) val=getint(f)
 #define rtime(val) val=getlong(f)
 #define rlong(val) val=getlong(f)   
+#define rchar(val) val=getonechar(f)
 #define FCLOSE(file) if (file) fclose(file)
 #define CHECK_NAME(var) if (check_fname(var,user)) { \
                           write_str(user,"Illegal name."); \
                           return;}
-

@@ -3,16 +3,26 @@
 #include <time.h>
 #include <sys/time.h>
 #include <unistd.h>
-#if defined(SOL_SYS)
+#include <errno.h>
+#if defined(WIN32) && !defined(__CYGWIN32__)
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#endif
+#if defined(SOL_SYS) || defined(__linux__)
 #include <string.h>
 #else
 #include <strings.h>
 #endif
+#include <stdarg.h>		/* for va_start(),va_arg(),va_end() */
 
 #include "constants.h"
 #include "protos.h"
 
+#define RENEW(o,t,n) ((t*) realloc( (void*) o, sizeof(t) * (n) ))
+
+static void realloc_str(char** strP, int size);
+
 extern int bot;
+extern int syslog_on;
 extern char mess[ARR_SIZE+25];
 
 void write_cygnus(int user)
@@ -55,7 +65,8 @@ if (ustr[user].hilite)
 /*--------------------------------------------------------------------------*/
 void write_raw(int user, unsigned char *str, int len)
 {
- S_WRITE(ustr[user].sock, str, len);
+/* S_WRITE(ustr[user].sock, str, len); */
+queue_write(user,(char *)str,-1);
 }
 
 
@@ -91,7 +102,7 @@ if (ustr[user].hilite)
 /*------------------------------------------------*/
 void write_bot(char *fmt)
 {
- write_str(bot, fmt);
+if (bot!=-5) write_str(bot, fmt);
 }
 
 /*------------------------------------------------------------------*/
@@ -99,7 +110,7 @@ void write_bot(char *fmt)
 /*------------------------------------------------------------------*/
 void write_bot_nr(char *fmt)
 {
- write_str_nr(bot, fmt);
+if (bot!=-5) write_str_nr(bot, fmt);
 }
 
 /*----------------------------------------*/
@@ -114,7 +125,7 @@ int  left=strlen(str);
 int  i, count=0;
 
 /* Check for bot write */
-if (!strcmp(ustr[user].name,BOT_ID) && bot==-5) return;
+/* if (!strcmp(ustr[user].name,BOT_ID)) return; */
 
 /*--------------------------------------------------------*/
 /* pick reasonable range for width                        */
@@ -350,11 +361,16 @@ i=0;
 
 if (left == 0 )
   {
+/*
    if (ustr[user].car_return && ustr[user].afk<2) 
      S_WRITE(ustr[user].sock, "\r\n", 2);
     else
      S_WRITE(ustr[user].sock, "\n", 1);
-
+*/
+   if (ustr[user].car_return && ustr[user].afk<2) 
+     queue_write(user, "\r\n", -1);
+    else
+     queue_write(user, "\n", -1);
    return;
   }
 
@@ -377,7 +393,8 @@ for(; left > 0; left -= stepper )
   
    if (ustr[user].afk<2)
      {
-      S_WRITE(ustr[user].sock, buff, strlen(buff));
+      queue_write(user, buff, -1);
+/*      S_WRITE(ustr[user].sock, buff, strlen(buff)); */
      }
   
    }
@@ -400,7 +417,7 @@ int  left=strlen(str);
 int  i, count=0;
 
 /* Check for bot write */
-if (!strcmp(ustr[user].name,BOT_ID) && bot==-5) return;
+/* if (!strcmp(ustr[user].name,BOT_ID)) return; */
 
 /*-------------------------------------------*/
 /* Convert string to hilited if carets exist */
@@ -626,10 +643,61 @@ i=0;
 
 if (ustr[user].afk<2)
   {
-   S_WRITE(ustr[user].sock,tempst,strlen(tempst));
+     queue_write(user, tempst, -1);
+/*   S_WRITE(ustr[user].sock,tempst,strlen(tempst)); */
   }
 
 tempst[0]=0;
+}
+
+
+/*--------------------------------------------------------------------------*/
+/* write out a string to a web users queue with no carriage return          */
+/*--------------------------------------------------------------------------*/
+void write_str_www(int user, char *str, int size)
+{
+
+/* Check for bot write */
+if (!strcmp(ustr[user].name,BOT_ID) && bot==-5) return;
+
+queue_write_www(user, str, size);
+}
+
+
+/* Write string and arguments to a specific logging facility */
+void write_log(int type, int wanttime, char *str, ...)
+{
+char z_mess[ARR_SIZE*2];
+char logfile[FILE_NAME_LEN];
+va_list args;
+FILE *fp;
+
+if (!syslog_on) return;
+
+z_mess[0]=0;
+
+sprintf(z_mess,logfacil[type].file,LOGDIR);
+strncpy(logfile,z_mess,FILE_NAME_LEN);
+
+ if (!(fp=fopen(logfile,"a")))
+   {
+    sprintf(z_mess,"%s LOGGING: Couldn't open file(a) \"%s\"! %s",STAFF_PREFIX,logfile,get_error());
+    writeall_str(z_mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0);
+    return;
+   }
+ else {
+    va_start(args,str);
+    if (wanttime) {
+    sprintf(z_mess,"%s: ",get_time(0,0));
+    vsprintf(z_mess+strlen(z_mess),str,args);
+    }
+    else
+    vsprintf(z_mess,str,args);
+
+    va_end(args);
+    fputs(z_mess,fp);
+    FCLOSE(fp);
+   }
 }
 
 
@@ -1072,3 +1140,172 @@ i=0;
 return tempst;
 }
 
+
+/* queue data to go out in the user's output_data pointer */
+void queue_write(int user, char *queue_str, int length)
+{
+
+if (length==-1) length = strlen(queue_str);
+
+#if defined(QWRITE_DEBUG)
+write_log(DEBUGLOG,NOTIME,"QW : Want to write %d chars to buffer\n",length);
+#endif
+if (ustr[user].alloced_size) {
+#if defined(QWRITE_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QW : reallocing data of current size %d (malloced: %d)\n",strlen(ustr[user].output_data),ustr[user].alloced_size);
+	write_log(DEBUGLOG,NOTIME,"QW : to new malloced size %d\n",ustr[user].alloced_size+length);
+#endif
+realloc_str( &ustr[user].output_data, ustr[user].alloced_size + length);
+}
+else {
+  ustr[user].output_data	= NULL;
+  ustr[user].write_offset	= 0;
+  ustr[user].alloced_size	= 0;
+  ustr[user].output_data	= (char *)malloc(length+1);
+#if defined(QWRITE_DEBUG)
+  write_log(DEBUGLOG,NOTIME,"QW : QUEUED-NEW %d chars to buffer\n",length);
+#endif
+  }
+(void) memcpy( &(ustr[user].output_data[ustr[user].alloced_size]), queue_str, length );
+ustr[user].alloced_size += length;
+
+}
+
+
+/* user's socket is writable, start writing output_data pointer to socket */
+int queue_flush(int user)
+{
+int cnt=0;
+
+if (!ustr[user].alloced_size) return 1;
+
+#if defined(QFLUSH_DEBUG)
+write_log(DEBUGLOG,NOTIME,"QF : Trying to FLUSH %d chars, of data size %d\n",ustr[user].alloced_size - ustr[user].write_offset,ustr[user].alloced_size);
+#endif
+
+cnt = S_WRITE(ustr[user].sock,
+	      ustr[user].output_data + ustr[user].write_offset,
+	      ustr[user].alloced_size - ustr[user].write_offset);
+if (cnt >= (ustr[user].alloced_size - ustr[user].write_offset)) {
+#if defined(QFLUSH_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QF : Flushed ALL %d chars\n",cnt);
+#endif
+	free(ustr[user].output_data);
+	ustr[user].output_data	= NULL;
+	ustr[user].alloced_size	= ustr[user].write_offset = 0;
+  }
+else if (cnt < 0) {
+	write_log(ERRLOG,YESTIME,"ERRNO %s in queue_flush writing %d chars for %s!\n",
+		get_error(),ustr[user].alloced_size - ustr[user].write_offset,ustr[user].say_name);
+	if (errno == EWOULDBLOCK || errno == EAGAIN)
+	  return 1;                       
+	free(ustr[user].output_data);
+	ustr[user].output_data	= NULL;
+	ustr[user].alloced_size	= ustr[user].write_offset = 0;
+	return 0;
+  }
+else {
+#if defined(QFLUSH_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QF : Flushed SOME %d chars of %d\n",cnt,ustr[user].alloced_size);
+#endif
+  ustr[user].write_offset += cnt;
+
+#if defined(QFLUSH_DEBUG)
+write_log(DEBUGLOG,NOTIME,"QF: %d chars left\n",ustr[user].alloced_size-ustr[user].write_offset);
+#endif
+  return 1;
+  }
+return 1;
+}
+
+
+/* queue data to go out in the web port's output_data pointer */
+void queue_write_www(int user, char *new_str, int length)
+{
+
+if (length==-1) length = strlen(new_str);
+
+#if defined(QWRITE_DEBUG)
+write_log(DEBUGLOG,NOTIME,"QWW: Want to write %d chars to buffer\n",length);
+#endif
+if (wwwport[user].alloced_size) {
+#if defined(QWRITE_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QWW: reallocing data of current size %d (malloced: %d)\n",strlen(wwwport[user].output_data),wwwport[user].alloced_size);
+	write_log(DEBUGLOG,NOTIME,"QWW: to new malloced size %d\n",wwwport[user].alloced_size+length);
+#endif
+realloc_str( &wwwport[user].output_data, wwwport[user].alloced_size + length);
+}
+else {
+  wwwport[user].output_data	= NULL;
+  wwwport[user].write_offset	= 0;
+  wwwport[user].alloced_size	= 0;
+  wwwport[user].output_data	= (char *)malloc(length+1);
+#if defined(QWRITE_DEBUG)
+  write_log(DEBUGLOG,NOTIME,"QWW: QUEUED-NEW %d chars to buffer\n",length);
+#endif
+  }
+(void) memcpy( &(wwwport[user].output_data[wwwport[user].alloced_size]), new_str, length );
+wwwport[user].alloced_size += length;
+
+}
+
+
+/* web port's socket is writable, start writing output_data pointer to socket */
+int queue_flush_www(int user)
+{
+int cnt=0;
+
+if (!wwwport[user].alloced_size) return 1;
+
+#if defined(QFLUSH_DEBUG)
+write_log(DEBUGLOG,NOTIME,"QFW: Trying to FLUSH %d chars, data size %d\n",wwwport[user].alloced_size - wwwport[user].write_offset,wwwport[user].alloced_size);
+#endif
+
+cnt = S_WRITE(wwwport[user].sock,
+	      wwwport[user].output_data + wwwport[user].write_offset,
+	      wwwport[user].alloced_size - wwwport[user].write_offset);
+if (cnt >= (wwwport[user].alloced_size - wwwport[user].write_offset)) {
+#if defined(QFLUSH_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QFW: Flushed ALL %d chars\n",cnt);
+#endif
+	free(wwwport[user].output_data);
+	wwwport[user].output_data  = NULL;
+	wwwport[user].alloced_size = wwwport[user].write_offset = 0;
+	free_sock(user,'4');
+  }
+else if (cnt < 0) {
+	write_log(ERRLOG,YESTIME,"ERRNO %s in queue_flush_www writing %d chars!\n",
+		get_error(),wwwport[user].alloced_size - wwwport[user].write_offset);
+	if (errno == EWOULDBLOCK || errno == EAGAIN)
+	  return 1;
+	free(wwwport[user].output_data);
+	wwwport[user].output_data  = NULL;
+	wwwport[user].alloced_size = wwwport[user].write_offset = 0;
+	free_sock(user,'4');
+	return 0;
+  }
+else {
+#if defined(QFLUSH_DEBUG)
+	write_log(DEBUGLOG,NOTIME,"QFW: Flushed SOME %d chars of %d\n",cnt,wwwport[user].alloced_size);
+#endif
+  wwwport[user].write_offset += cnt;
+
+#if defined(QFLUSH_DEBUG)
+write_log(DEBUGLOG,NOTIME,"QFW: %d chars left\n",wwwport[user].alloced_size - wwwport[user].write_offset);
+#endif
+  return 1;
+  }
+return 1;
+}
+
+static void realloc_str(char** strP, int size) {
+int maxsizeP;
+
+        maxsizeP = size * 5 / 4;
+        *strP = RENEW( *strP, char, maxsizeP + 1 );
+
+    if ( *strP == (char*) 0 )
+        {
+	write_log(ERRLOG,YESTIME,"QW : ERRNO: REALLOC: Out of memory!\n");
+	}
+}

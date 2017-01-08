@@ -1,18 +1,511 @@
                       /*** Ncohafmuta 1.2.* changes ***/
+ 6/21/2000 1.2.2
+* Removed commented/phased out code and released as final 1.2.2 version
+
+ 6/9/2000
+* If the talker crashes and lastcommand.CRASH exists, it will be appended 
+to so it has a record of all lastcommands for multiple crashes
+* In t_who() if idl variable is < 0, we set to 0
+
+ 5/31/2000 1.2.2b-3
+* Changed format of .permission a bit. First argument is now <user>
+instead of add|sub. Permissions now have extra flag of "X". "N" now means
+normal access, "Y" means special access, and "X" means no access (unless
+invited). Because of this change the add|sub options to .permission do
+step-clearance now. Meaning, if the user has "N" access, and you "add"
+more access, they get "Y". If they have "Y" access and you "sub" them,
+then get "N", if you "sub" them again, they get "X". Then they would need
+two "add"s to get back to "Y" again.
+Allowed/Denied list now formatted better, with less blank lines and spaces
+Read helpfile.
+* Phased out .igtells. Moved to a .ignore option, ".ignore tells" and 
+".listen tells" respectively..setting WILL be saved on logout.
+Removed igtell flag read and writing from reboot DB.
+The igtell user structure variable is now called tempnum1.
+* modified user_wants_message() to take -1 as a user argument for getting
+a setting for a non-online user after a read_user() (as in usr_stat())
+* Made a few minor changes to the bot code. Also changed the compile and
+restart scripts to use just /bin/sh
+
+ protos.h CHANGES:
+ Removed
+  void igtells(int user);
+  void heartells(int user);
+
+ constants.h CHANGES:
+ Replaced under user structs
+ int igtell;
+  with
+ int tempnum1;           /* 1.2.2 - temp - was igtell */
+
+ C files CHANGED: server.c datautils.c
+
+ 5/4/2000
+* Fixed bug in read_rebootdb() where ustr[].login_name wasn't read back
+in. We just copy the read-in ustr[].name to it.
+* Removed BOT_ROOM define in constants.h. In server.c instead of comparing
+the bot room to the room the current user is in, i now compare the room
+the user is in to the room the bot is in. This lets him move around the
+talker out of his room and still read/listen and respond to
+actions/conversation. the special cases of blank-say-is-a-review and
+"help" triggers bot-help now follow the room he is in.
+* Put standard +++++ notifications into the communication functions the
+bot understands. i.e. if a user does a .tell to the bot, instead of using
+whatever format the talker is set at by the admin, the bot gets a:
+ +++++ comm_tell: username_that_said message
+notification. this frees anyone from having to modify the bot's code if
+they change the communication's formats from the distribution defaults!
+* Made bot not get +++++ REBOOT on a soft-reboot
+* Updated documentation README.compiling, BUGS, BETA-TODO, CREDITS, added
+LAFK and BAFK to the .who helpfile
+
+ constants.h CHANGES:
+ Removed
+#define BOT_ROOM	"pond"
+
+ C files CHANGED: server.c
+
+ 5/3/2000
+* Change %y to %Y in the backup code because some C libs gave a harmless
+warning saying it generates only a 2 digit year. I knew that! I didn't
+need it to warn me about it! And I hate warnings, even harmless ones, so i
+made it happy. :-)
+* Fixed a glitch in make_sockets(). Setting a port offset to 0 and trying
+to soft-reboot the talker would kick some or all of the users off, when it
+shouldn't kick any off.
+* Added function do_tracking() to consolidate code for sending UP and DOWN
+tracking info for the talker. See function code for use.
+* Added function do_timeset() to consolidate local timezone setting on
+bootup and in systime() Also, found a very odd truth regarding the
+setting of the TZ enviromental variable. I noticed this on glibc systems
+where the set TZONE timezone would be reverted back to the normal machine
+clock! After furthur research it was determined that when setting an char
+array to define TZ and then putenv()ing that array to set the environment,
+any furthur modification of the array resulted in the automatic change of
+the environment to that modification, without needing to do a putenv()
+again! This, to me, is ludicrous! If i used the array "mess" and then did
+mess[0]=0; after the putenv(), the TZ variable would disappear from the
+environment! But, according to the standard, it can't be touched..who
+am I to argue with standards? :) the do_timeset() function along with a
+static char array fixes this. NOTE: this fix only affects people that
+change TZONE from localtime and that TZONE is different from local machine
+time.
+
+ protos.h CHANGES:
+ Added
+  void do_tracking(int mode, char *downmess);
+  void do_timeset(char *zonetime);
+
+ C files CHANGED: server.c
+
+ 5/2/2000
+* Replaced tm/time(&tm) usage with time(0) where the tm structure was
+not needed. This should save some CPU cycles and make time calculations
+a tiny bit more accurate.
+
+ C files CHANGED: server.c
+
+ 4/24/2000
+* defined SOCKET_ERROR for unix-type systems. Took out #if's for 
+SOCKET_ERROR/-1 mixing
+* Took nstat reference out of nerf helpfile. Removed nstat helpfile.
+* Updated cygwin info in docs/README.win95NT
+
+ 4/3/2000
+* Added SHOW_SREBOOT #define to constants.h. See file for details on
+  use.
+* Moved some logging of reboots around
+
+ constants.h CHANGES:
+ Added
+#define SHOW_SREBOOT	2
+
+ C files CHANGED: server.c
+
+ 3/30/2000
+* Changed solaris prototype for bcopy()
+
+ protos.h CHANGES:
+  void bcopy(const void, void, size_t);
+	IS NOW
+  void bcopy(const void *, void *, size_t);
+
+ 3/28/2000
+* Added a simple write_log() of the changing of .quota number
+
+ C files CHANGED: server.c
+
+ 3/27/2000
+* Changed .whois to take input string format of <string> or 
+<string>@<whois host>. See updated helpfile.
+
+ C files CHANGED: server.c
+
+ 3/10/2000
+* THe bot was broke with a change i made in write_bot()/write_bot_nr()
+It would not output ANYTHING to him/her/it..fixed now.
+
+ C files CHANGED: strfuncs.c
+
+ 3/5/2000
+* Added the function getonechar() and macro defines rchar() and wchar().
+These are used to read and write the attach_port character in 
+read_/write_rebootdb, because using rvale/wval is invalid and reads/
+writes wrong values.
+* Added some \n's in write_log()'s that i missed
+
+ constants.h CHANGES:
+ Added
+#define wchar(val) fprintf (f, "%c\n", val)
+#define rchar(val) val=getonechar(f)
+
+ protos.h CHANGES:
+ Added
+  char getonechar(FILE *f);
+
+ C files CHANGED: server.c
+
+ 2/28/2000
+* Added clearing of some more variables in reset_user_struct and
+init_user_struct
+
+ C files CHANGED: datautils.c
+
+ 2/25/2000
+* Added VOTE_LEVEL define. This will replcae the requirement for user
+to be ROOT_ID to view tallies and MAX_LEVEL to do -c or -d. Updated
+helpfile
+
+ constants.h CHANGES:
+ Added
+#define VOTE_LEVEL      3    /* level that can do -c and -d and read tallies on votes */
+
+ C files CHANGED: server.c
+
+ 2/19/2000
+* Added README.vt100stuff to docs/ directory, just a little reference.
+* Added "top" option to .clist and some top sub-options. See command.
+
+ C files CHANGED: server.c
+
+ 2/14/2000
+* Updated documentation.  Added README.quickstart doc.  Updated TODO a little.
+
+ 2/1/2000 (devel: b  start of beta & feature-freeze)
+* Added mode to reset_user_struct(). mode will determine if all structs get
+reset or just some (actually ALMOST all). Added reset_user_struct()
+to a few places where structs were reset in the function. Most notably
+user_quit()
+* Fixed a minor race where 2 users of the same username could be created
+if in the login process at the same time. Now, whoever gets to the 
+password prompt first, wins. Added check_for_creation() (1/4/2000)
+* Changed conditions on email verification creation a bit. Previously if
+emailver was on, a user requested verification, then emailver was turned
+off, when the user came back, it'd still act as if emailver was on 'cause
+they were in the verification DB. Now, when they come back they will be
+treated like a normal user. When the talker is booted with emailver off or
+emailver is turned off in the talker, AND a verification DB exists, the DB
+will be removed.
+* Phased out print_to_syslog() and logerror() functions. Replaced with 
+write_log() which will write to specific logs and take variable arguments.
+write_log() was under construction and in server.c. Now put in strfuncs.c
+Logged more errors and try to log errno wherever possible now. Lastlogs file
+will now be in the log directory, as will the lastcommand. (1/18/2000)
+* Added directory "logfiles"
+* Added #include <stdarg.h> to strfuncs.c so write_log() can use variable
+argument functions.
+* Changed promote() so ROOT_ID can promote to same level even if 
+PROMOTE_TO_SAME is set to 0 (From joelie) (1/5/2000)
+* player_create() changed to use a ustr[user] type struct to do it's 
+variable setting instead of t_ustr. We do this so we can use 
+reset_user_struct() to cut down on duplication of the resetting of all 
+user variables before we set them to defaults. We also now use init_user()
+to set the new user to system defaults as much as possible. (1/4/2000)
+* Reset some other user structures in various places. Removed some unneed
+code in login() due to a bit better function usage (1/4/2000)
+* Put bot!=-5 check in write_bot() and write_bot_nr(). Without it it would
+crash on cygwin32. (1/5/2000)
+* Removed <sys/wait.h> from server.c since child wait stuff is in
+signals.c now (1/5/2000)
+* Moved frags/ into utils/code_fragments and www/ into utils/javaclient
+(1/5/2000)
+* Put comments before auth_xxxx() functions and rearranged their flow
+according to execution. Re-coded parts of them to use better methods to 
+set non-blocking and to check for readability/writability. Added error
+logging. Added write timeout variable. THere was no sense to have a read 
+timeout variable if you're gonna select() the writability of the socket
+forever, Arctic! write timeout set to 6 seconds. read reset to 3.
+(1/7/2000)
+* Set all ports to be passed as (unsigned short) to htons() (1/7/2000)
+* Set bootup to get logged even if we're in debugging mode.
+ ** System running ** message will not show in debugging mode. (1/7/2000)
+* Zeroed ALL bind addresses before creating in make_sockets() (1/7/2000)
+* Changed user_quit() to kill() a child remote who if it exists for a
+user, instead of waiting for it to die before closing the connection. If a
+user was in a remote who and a shutdown was performed, the shutdown would
+hang until the child exited..not exactly the behaviour we want (1/11/2000)
+* Jazzin pointed out that if you were afk, then did a remote who, the
+"you're back" message would print twice. This was caused by us not forcing
+a flush of the user's queue before the fork(). Also, the "you may
+play while you wait" message would not show up until the remote who
+succeeded/failed, for the same reasons. Fixed. (1/11/2000)
+* Added define checks for OpenBSD to get rid of some socket call and 
+ANSI C warnings. Thanx for the OpenBSD account, ziffnab. (1/12/2000)
+* Added logfiles directory creation in Makefile "dist" section
+* Updated README.compiling
+* Added functionality for soft-rebooting. This will reboot the binary
+without disconnecting the users or losing their current information (I
+guess you could call it hot-rebooting) User data will be written to a db,
+binary executed, then db read back into the proper user slots. The -r 
+option of shutdown will now do soft-reboots. -h will now do the previous
+hard-reboot. Soft-reboot sets a "restarting" variable, so listening
+sockets dont get reopened with the new binary, since they don't get closed
+to begin with. Changed the outputting of some messages and colsolidated
+some if()s in check_shut() Added define REBOOTFILE, which is the db that
+will be written, read, then removed on soft-reboot. Updated shutdown
+helpfile. (1/15/2000)
+* Modified "help" helpfile (.h help) to be a short guide to the help
+system and to the syntaxes of commands in the command's helpfile.
+(1/15/2000)
+* Had check_var check for hostname and main port var. See HOST_VAR and
+MAINPORT_VAR
+* Tweaked out soft-rebooting some more. (1/17/2000)
+* restart, shutdown, and helpfiles/TOP now run from sh instead of csh
+* If we go down or reboot from an error (shutdown_error()) we're gonna try 
+and move the lastcommand file to lastcommand.CRASH
+* Added backup_logs() function which will get called from check_mess() at
+midnight to backup/rename all logs to a new subdirectory under LOG_DIR
+Added trim_backups() function which will also get called from check_mess()
+at midnight to trim logs to x days (set as TRIM_BACKUPS). Called by staff
+as .backup (function backup_stuff()) Added option to init_data
+to set on or off initially. Added .backup helpfile (1/18/2000)
+* modified/enhanced .readlog to take in account new log file
+format/writing. Added 2 temp. user structures log_stage and temp_buffer.
+log_stage will hold the log number we're reading while in cat() prompting.
+temp_buffer will hold the search string/number of lines. These are needed
+because the user may specify to cat/search all files, which requires us to
+return into the function on our own (w/o user intervention) after each
+file is catting. Updated helpfile (1/19/2000)
+* changed the ranks structure. This now contains the fields lname (long
+rank name), sname (short rank name), abbrev (1 letter/number/character
+abbreviation), and odds. Changed .who listing to use abbrevs and/or short
+name where appropriate. Removed old RANKS define, odds[], and ranks[]
+arrays. (1/19/2000)
+* changed the way partial queue flushes are done. j_mess no longer used,
+because of the limited size. output_size now is alloced_size the total
+size we want to send..this doesn't decrese. new temp user struct variable
+write_offset contains how far we are in write()ing. debug messages for
+queue flushes and queue_writes no longer contain the buffers. (1/25/2000)
+* rechecked the string-terminating character in get_input(). We should be
+able to handle CR, LF, or CRLF. Added some code to try and do this.
+(1/24/2000)
+* tweaked soft-rebooting. make_sockets is now done after everything else
+(but before forking). reboot db is read before make_sockets() This is so
+if the talker is compiled and soft-rebooted with port offsets different
+than the previously running binary, the ports can be open or closed. i.e.
+binary was running with WHO port open, then compiled with WHO offset of 0,
+meaning closed, soft-reboot done, talker detects port was open but needs
+to be closed for new boot, so closes it (1/25/2000)
+* added some checking in get_input() for read() returning -1. If a network
+error, we call user_quit() silently (no output to user) and forego any
+furthur socket flushes. This should get handle most of the "Broken pipe"
+errors from write() which are normal, but just annoy me. BE ADVISED, for
+silent mode user_quit() now has a new "mode" parameter passed to it!
+(1/27/2000)
+* added GRANT_TO_SAME define to constants.h to let your determine whether
+or not you want to let users grant or revoke commands OF THEIR
+LEVEL to/from users (2/1/2000)
+
+ constants.h CHANGES:
+ Replaced
+#define LOGFILE      "syslog"
+  with
+#define LOGDIR       "logfiles"
+ Replaced under user and www structs
+ int output_size;
+  with
+ int alloced_size;
+ 
+ Changed
+#define LASTLOGS     "lib/lastlogs"
+  to
+#define LASTLOGS     "lastlogs.log"
+ Added
+/* Log facility definitions */
+#define VEMAILLOG       0       /* email verification */
+#define LOGINLOG        1       /* connect and login log */
+#define WARNLOG         2       /* warning and security log */
+#define ERRLOG          3       /* error log */
+#define BOOTLOG         4       /* bootup/shutdown log */
+#define SYSTEMLOG       5       /* general system log */
+#define BANLOG          6       /* site/user restriction log */
+#define DEBUGLOG        7       /* debugging log */
+#define NOTIME          0       /* don't timestamp log entries */
+#define YESTIME         1       /* timestamp log entries */
+#define TRIM_BACKUPS	3	/* days to trim backup logs to */
+#define NO_CREATION	"Someone is already in the process of creating that username. Try again."
+#define BAD_FILEIO      "Failed! A file I/O error occured!"
+#define BAD_MALLOC      "Failed! A memory allocation error occured!"
+#define REBOOTFILE	"REBOOT.db"
+#define HOST_VAR        "%host%"
+#define MAINPORT_VAR    "%mainport%"
+#define GRANT_TO_SAME   0    /* allow granting and revoking commands */
+                             /* to/from users of the same level */
+
+log_struct typedef struct and logfacil define of struct
+int log_stage and char temp_buffer[80] to user structure
+rank_struct typedef struct and ranks define of struct
+ Added under user and www structs
+int write_offset;
+
+ Moved from server.c
+#define WIZ_ONLY -4
+#define NORM      0
+#define BOLD      1
+
+ Removed
+#define VEMAIL_L        0
+#define LOGIN_L         1
+#define ERROR_L         2
+#define WARNING_L       3
+#define SYSLOG_ALSO     1
+#define NEWLINE         1
+#define NONEWLINE       0
+#define EMAILLOG        "logs/emailver.log"
+#define LOGINLOG        "logs/logins.log"  
+#define ERRORLOG        "logs/errors.log"  
+#define WARNINGLOG      "logs/warnings.log"
+#define RANKS
+int odds[];
+char *ranks[];
+
+ text.h CHANGES: none
+ protos.h CHANGES:
+  void reset_user_struct(int user);
+	IS NOW
+  void reset_user_struct(int user, int mode);
+  void write_log(char *str, int type, int nl);
+	IS NOW
+  void write_log(int type, int wanttime, char *str, ...);
+  void user_quit(int user);
+	IS NOW
+  void user_quit(int user, int mode);
+  Added int check_for_creation(ustr[user].login_name);
+  Added void read_rebootdb(void);
+  Added void write_rebootdb(int user);
+  Added void user_hot_quit(int user);
+  Added int backup_logs(int user);
+  Added void backup_stuff(int user, char *inpstr);
+  Added void trim_backups(int user, int days);
+  Removed void logerror(char *s);
+  Removed void print_to_syslog(char *logstr);
+ authuser.h CHANGES:
+  extern char *auth_tcpuser4()
+	IS NOW
+  extern char *auth_tcpuser4(register unsigned long inlocal, register unsigned long inremote, register 
+  unsigned short local, register unsigned short remote, register int wtimeout, register int rtimeout);
+  extern char *auth_sockuser2()
+	IS NOW
+  extern char *auth_sockuser2(register int s, register unsigned short local, register unsigned short 
+  remote, int rtimeout, int wtimeout);
+  
+ C files CHANGED: ALL
+
+ 12/15/99
+ Added logging of auto-expires, auto-expire nukes, manual-expire
+nukes, and auto-nukes
+
+ 12/01/99 (devel: pl5)
+ Rewrote the way data is written down to a www socket, just like the
+user sockets (5/10/99 entry). The web port wasn't working on glibc,
+but worked fine on libc5. Added relevant variables.
+* Added code and changes to wwport after get_input() call in server.c
+* Added cat_to_www() function, modified parameter to user instead of sock
+in server.c
+* Modified free_sock() to reset output_data and output_size in server.c
+* Modified init_misc_struct() to reset output_data and output_size in
+datautils.c
+* Added write_str_www(), queue_write_www(), queue_flush_www() in
+strfuncs.c
+* Change cat_to_sock() call to cat_to_www() in whowww.c
+* change write_it() calls to write_str_www() with user pass instead of
+sock pass in whowww.c
+* change external_www() call to pass user instead of sock.
+* expanded size of wwwport[].file by 12 to support adding on of server
+type to be parsed later
+* added new realloc macros and add new data on to malloced
+user/wwwstructure using memcpy()
+* Included string.h instead of strings.h for linux
+* defined __STRICT_ANSI__ before including sys/socket.h on glibc systems
+since it produces a warning due to a glitch in the system include file.
+* www reading was changed so that the head GET line isn't parsed until
+after the browser sends a blank line..this is how it's usually done.
+Previously, we read right after we got the head line in.
+* updated TODO, README.win95NT, and helpfiles for ".site" and ".cline"
+
+ constants.h CHANGES: Added char *output_data and int output_size to
+ wwwport structure
+ text.h CHANGES: none
+ protos.h CHANGES:
+  Added void write_str_www(int user, char *str, int size);
+  Added void queue_write_www(int user, char *new_str, int length);
+  Added int queue_flush_www(int user);
+  Added int cat_to_www(char *filename, int user);
+  void external_www(int as);
+	IS NOW
+  void external_www(int user);
+  void queue_write(int user, char *queue_str);
+	IS NOW
+  void queue_write(int user, char *queue_str, int length);
+ authuser.h CHANGES: none
+ C files CHANGED: ALL except telopts.c
+
+ 11/12/99
+ Added ifdef check for setpgrp on OSF/Digital systems. Digital requires
+arguments passed to setpgrp();
+ Include <string.h> or <strings.h> in resolve.c depending on system.
+ Fixed warning in systime() of passing strlen() calculated values to a
+field width on systems that dont define a strlen() return as int.
+ Fixed some warnings in whowww.c of passing strlen() values to a
+conversion on systems that dont define a strlen() return as int.
+
+ 11/8/99
+ Added trimbackups.c script to utils directory. Compile with "make all" or
+"make trimbackups" This program is used to remove backups older than days
+specified on command line. Type program by itself for arguments it
+requires, or see updated README.backups file.
+ Removed rm -f server.pid from restart script. Talker overwrites the file
+on startup.
+
  8/24/99 (stable: pl3  devel: pl4)
  Fixed memory overwrite in .wlog that causes a segfault when staff gives
 a long inpstr.
  Fixed glitch in revoking .say where the first word of chat was cut off.
+ constants.h CHANGES: MAX_WWW_CONNECTS now should default to 5
+ text.h CHANGES: none
+ protos.h CHANGES:
+  void say(int user, char *inpstr);
+	IS NOW
+  void say(int user, char *inpstr, int mode);
 
- 8/4/99 (stable: pl2  devel: pl3)
+  void external_users(int user, int mode, char *query);
+	IS NOW
+  void external_users(int user, int mode, char *query, int photofilter);
+ authuser.h CHANGES: none
+
+ 8/4/99 pl3 (stable: pl2  devel: pl3)
  Fixed a glitch that let users with .say revoked still say messages as
 long as they just typed it and didn't use .say
  Made it so that if a user has .wiztell revoked they wont see wiztells
 either. Also if they have .wiztell granted, they will also see wiztells.
  Made it so that a .greet with special characters errors out instead of
 showing the room just blank lines.
+ constants.h CHANGES: none
+ text.h CHANGES: none
+ protos.h CHANGES: none
+ authuser.h CHANGES: none
 
- 7/12/99 pl1
+ 7/12/99 pl2
  Fixed a bug that caused the talker to segfault on blank username file
 open. Should C really allow a directory to be opened with fopen()???
  tinfo tracking now sends process PID too to be sure it updates the right
@@ -20,11 +513,46 @@ talker entry (in case multiple running with same SYSTEM_NAME)
  Fixed hole in .site which allows . (dot) files to go through and segfault
 the talker.
 
+ 7/1/99 1.2.2a-pl1
+ Made code more compliant with glibc2. It was segfaulting in an FD_ISSET
+when it tried to check for a socket in a writemask, and the socket wasn't
+being used. Changed get_input() to a return type of int (was char *) and
+evaluated return value in switch statement. If socket is -1 after get_input
+the user is gone and no need to check for the socket in the writemask.
+ Removed DEBUG define. To make talker NOT fork to background for
+debugging, just use the -d switch on the command line. i.e.
+ ./server -d or ./server <config file> -d
+ Added function get_iac_string to return string versions of IAC numbers to
+the system log.
+ Made it so that you can abort a talker addition (.talker -a) by typing a
+q/Q by itself on any entry line. Made it so that a \n isn't written to the
+end of the addition prompts.
+ Updated compiling README, TODO, and CREDITS
+
+ 5/28/99
+ Cleaned up a few glitches.
+ Put DEBUG define's in Makefile instead of in .c files. 
+ Put all main external who/www functions in whowww.c
+ Finished POST method for web port.
+ Added _login function to web port
+ Started adding functionality to web port login to allow reading and
+changing of a user's preferences.
+
  5/10/99
- Added count calculation in t_who() for friends .who formatting. Thanx    
+ Added count calculation in t_who() for friends .who formatting. Thanx
 Joelie.
  Added brackets around in if in syssign(). Function was telling bot twice
 that a user was logged in. Thanx Joelie.
+ Rewrote the way data is written down to a user socket. Inspired by a
+problem with gmud, where the talker sends data faster than the client is
+ready to receive it. We now use select to poll the user sockets for
+WRITEability. until a user socket is marked as such by select(), data will
+be queued up in a malloced/realloced user structure 
+ustr[user].output_data. When marked, all data will be sent down it
+possible. If only some goes, the rest will go when the socket is next
+marked writable. malloced space will be freed when struct is empty. This
+works but is still in testing for problems/memory leaks. Added funcs
+queue_write() and queue_flush()
 
  5/4/99
  .to direct emote/possesive emotes now handle spaces better.
@@ -235,7 +763,7 @@ accordingly.
 
  10/16/98
  Finished function declarations in protos.h
- Claysto finished ANSI declarations in server.c
+ Calysto finished ANSI declarations in server.c
  Fixed some bad casts to functions.
 
  9/22/98

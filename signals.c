@@ -3,21 +3,22 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <errno.h>
+#if defined(SOL_SYS) || defined(__linux__)
+#include <string.h>        /* for strcpy(),strcmp(),memcpy(), etc */
+#else
+#include <strings.h>
+#endif
 
 #include "constants.h"
 #include "protos.h"
-
-/*--------------------------------------------------------------*/
-/* Define this if you're debugging the zombie killer or waitpid */
-/* otherwise, comment out                                       */
-/*--------------------------------------------------------------*/   
-/* #define ZOMBIE_DEBUG */
 
 extern int down_time;
 extern int num_of_users;
 extern int atmos_on;
 extern int signl;
 extern int treboot;
+extern char mess[ARR_SIZE+25];
 
 void init_signals()
 {
@@ -34,7 +35,7 @@ signal(SIGTERM,handle_sig);
 signal(SIGUSR1,handle_sig); /* does win32 like us? */
 signal(SIGSEGV,handle_sig);
 
-signal(SIGILL,SIG_IGN);
+signal(SIGILL,handle_sig);
 signal(SIGINT,SIG_IGN);
 signal(SIGABRT,SIG_IGN);
 signal(SIGFPE,SIG_IGN);
@@ -66,7 +67,7 @@ signal(SIGEMT,SIG_IGN); /* does win32 like us? */
 /* Function to clean up the zombied child process from a fork           */
 /*                                                                      */
 /* Zombie'd child processes occur when the the child finishes before    */
-/* the parent process. Teh kernel still keeps some of the information   */
+/* the parent process. The kernel still keeps some of the information   */
 /* about the child in case the parent might need it. To be able to get  */
 /* this info, the parent calls waitpid(). When this happens, the kernel */
 /* can discard the information. Zombies dont take up any resources,     */
@@ -81,12 +82,14 @@ pid_t child_pid=-1;
 pid_t get_pid;
 
 #if defined(ZOMBIE_DEBUG)
- print_to_syslog("Calling zombie killer..\n");
+ write_log(DEBUGLOG,YESTIME,"ZOMBIE: Calling zombie killer..\n");
 #endif
 
+/* (void *) casts to avoid warnings on systems that mis-declare */
+/* the argument type. */
 while ( (get_pid = waitpid(
         -1,             /* Wait for any child */
-        &status,
+        (void *) &status,
         WNOHANG         /* Don't block waiting */
        )) > 0) {
            if (get_pid <= 0) break;
@@ -97,8 +100,7 @@ while ( (get_pid = waitpid(
 if (child_pid <= 0) {
         if (child_pid == -1) {
 #if defined(ZOMBIE_DEBUG)
-        sprintf(mess,"%s: waitpid() error (%s)\n",get_time(0,0),strerror(errno));
-        print_to_syslog(mess);
+        write_log(DEBUGLOG,YESTIME,"ZOMBIE: waitpid() error! %s\n",get_error());
 #endif   
         }
         signal(SIGCHLD, zombie_killer);
@@ -106,8 +108,7 @@ if (child_pid <= 0) {
         }
 else {
 #if defined(ZOMBIE_DEBUG)
-        sprintf(mess,"%s: waitpid() returned pid %u\n",get_time(0,0),(unsigned int)child_pid);
-        print_to_syslog(mess);
+        write_log(DEBUGLOG,YESTIME,"ZOMBIE: waitpid() returned pid %u\n",(unsigned int)child_pid);
 #endif
         }
         
@@ -128,8 +129,7 @@ signal(SIGCHLD, zombie_killer);
     {
         child_val = WEXITSTATUS(status); /* get child's exit status */
 #if defined(ZOMBIE_DEBUG)
-        sprintf(mess,"%s: Child exited normally with status %d\n",get_time(0,0), child_val);
-        print_to_syslog(mess);
+        write_log(DEBUGLOG,YESTIME,"ZOMBIE: Child exited normally with status %d\n", child_val);
 #endif
 
      
@@ -193,19 +193,21 @@ void handle_sig(int sig)
                  
 switch(sig) {
         case SIGTERM:
-                shutdown_error(10);   
-                 
-        case SIGUSR1:
-                shutdown_error(13);
- 
+                shutdown_error(log_error(10));
         case SIGSEGV:
                 if (REBOOT_A_CRASH==1)
                  treboot=1;
-                shutdown_error(11);
+                shutdown_error(log_error(11));
         case SIGBUS: 
                 if (REBOOT_A_CRASH==1)
                  treboot=1;
-                shutdown_error(12);
+                shutdown_error(log_error(12));
+        case SIGUSR1:
+                shutdown_error(log_error(13));
+        case SIGILL:
+                if (REBOOT_A_CRASH==1)
+                 treboot=1;
+                shutdown_error(log_error(15));
   }
 }
 

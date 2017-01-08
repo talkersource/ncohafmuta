@@ -1,9 +1,9 @@
 Code tracking
 -------------
-Be advised I have implemented a very simple code tracking system
+Be advised I have implemented a very simple code tracking system  
 into the code. Whenever the talker it booted or shut down, it will
 fire off mail email to tinfo@ncohafmuta.com.
-Included in the email is various BASIC info from the talker, name,
+Included in the email is various BASIC info from the talker, name,  
 owner, address, # of users, new user status, theme, etc..
 This info will be parsed into a database and used to create an HTML list
 of ncohafmuta talkers on the net. It shows the info just mentioned plus
@@ -24,3 +24,4 @@ Thanx,
 
 -Cygnus
 code@ncohafmuta.com
+

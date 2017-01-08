@@ -1,5 +1,5 @@
 This code was programmed in parallel with SunOS 4.1.4 and Linux 2.0.x
-(with libc5) It is made to compile on a variety of UNIXes.
+(with libc5) It is made to compile/run on a variety of UNIXes.
 You can find out your type of system by running: uname -a
 
 NOTE: Do NOT kill a talker with 'kill -9' unless ABSOLUTELY NECESSARY and 
@@ -23,8 +23,8 @@ System specific help MAY be under: README.<your system type>
 Then to compile:
   "make"          compiles the talker code
   "make test"     makes a.out test binary from .c files
-  "make clean"    removes a.out, core, and syslo* files
-  "make logclean" removes syslog.* and lib/lastlogs
+  "make clean"    removes a.out, server, core, and files in objs/
+  "make logclean" removes logfiles/*.log and logfiles/lastcommand.*
   "make objclean" removes object binaries from compile in objs/
   "make dist"     makes the distribution in .tar.gz format
   "make distuu"   makes the distribution in uuencoded text format
@@ -37,15 +37,56 @@ So, if you're on a 2 processor system, you could do:   make -j3
 The code MUST be recompiled if changes are made to any .c or .h file.
 When you re-compile the talker code for changes to take effect AND the talker
 is still running, I, personally, run:
-	./shutdown ; make ; ./restart
-
-If you want to save the downtime while it compiles you can do:
-	make test
-	./shutdown ; cp a.out server ; ./restart
-
-If you KNOW you're on a unix that can write to a binary file while it's in
-use, you can do:
 	make
-	.reboot (from inside the talker)
+	.shutdown -r (from inside the talker)
+
+Some systems do not let you overwrite a running binary, to get around 
+this, you can do:
+	make test
+	rm server ; cp a.out server
+	.shutdown -r (from inside the talker)
+
+To run the talker without fork()ing it into the background (usually for
+debugging) use the -d switch on the command line. If you use the restart
+script, run ./restart -d or ./restart <your config file> -d
+If you just run the binary by itself, run
+ ./server -d or ./server <your config file> -d
 
 ***** END OF UNIX COMPILING INFO *****
+
+***** ENVIRONMENT INFO *****
+
+Operating Systems:
+-----------------
+SunOS .. 4.1:           sun             (abbr.: SunOS4)
+Solaris:                sun __svr4__    (abbr.: solaris)
+Silicon Graphics:       sgi
+Atari ST/TT MiNT:       atarist
+Amiga, DICE:            AMIGA _DCC
+Amiga, SAS/C:           AMIGA __SASC
+BeOS                    __BEOS__
+Linux:                  linux
+NeXT:                   NeXT
+Sequent:                _SEQUENT_
+Ultrix:                 ultrix
+IBM RS6000              _AIX _IBMR2
+HP-UX                   hpux
+OS/2                    OS2 (not always set by the compiler???)
+???                     M_UNIX
+Apple Unix              AUX             /* add -D_POSIX_SOURCE to CFLAGS */
+Windows NT/95/98        _WIN32, WINNT, _WINNT
+
+Processor Hardware:
+------------------
+Sparc                   sparc
+Intel (MWerks/Be)       __INTEL__
+Intel (gcc)             i386, __i386__
+
+Compilers:
+---------
+gcc:                    __GNUC__
+Cygnus gcc for Win32    __CYGWIN32__ resp. __CYGWIN__
+Metrowerks (Be)         __MWERKS__
+
+***** END OF ENVIRONMENT INFO *****
+

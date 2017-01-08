@@ -3,6 +3,21 @@ Things to do..in this particular order!
 (if you would like to assist on any of these and are good in C,
  let me know..code@ncohafmuta.com)
 
+Put filesize or line limit on system logs so they cant fill up disk. Either
+stop logging at limit or start wrapping (might be resource wasteful). Put
+limits on amount of RSS or SIZE memory we can use so malicious users cant
+malloc() to death the talker.
+
+Ability to turn off some or all logging from in the talker.
+
+Make .igtells into .ignore tells
+
+Colored recaps.
+
+More flexible autopromotion conditions.
+
+Wildcard * site banning.
+
 Add level-based mail and massmail to .smail command with options,
 add #define MAIL_LEVEL for the level allowed to do mass mails to other
 levels
@@ -87,9 +102,21 @@ inside the talker.
 Port code to Win95/98/NT
 
 Greatly enhance web port so that it can truely send and receive HTTP
-requests. (75% functional) Need to fix POST support so to can do logins
-from web ports for users to use advanced functions in webpage (send mail,
-read mail, read help, read message boards)
+requests. (85% functional) _menu functions need to be finished for
+users to use advanced functions in webpage (send mail, read mail,
+read help, read message boards)
+Help reading may or may not be on _menu ( i suppose a person really doesn't
+need to be a user to read help) Formatting will probably be same as when
+you search for users.
+Reading mail formatting might be top frame for the header, middle frame for
+message list, with columns of
+1) Timestamp
+2) sender's name a link to their profile (popup in new
+window)
+3/4) maybe real small column links to their email addy and homepage.
+5) a column for the first few words of the email to distiguish it
+6) a view button/link to view message in the larger frame below
+
 
 Start inter-talker connectivity
 
@@ -101,13 +128,28 @@ cygnus.pinwheels@ncohafmuta.com
 
 **Things being considered still**
 
-Using a database
-Using Async I/O threads
-Encrypting all user files
-Mail folders w/folder management
-.set age (maybe? possibly too customized for the distribution code)
-Add route command to display a route between two rooms.  Maybe 
-make it an option of another command instead of making a new command? Or maybe
-the user should not be lazy and use .map? :)
+* Using a database
+* Using Async I/O threads
+* Encrypting all user files
+* Mail folders w/folder management
+* .set age (maybe? possibly too customized for the distribution code)
+* Add route command to display a route between two rooms.  Maybe 
+  make it an option of another command instead of making a new command? Or
+  maybe the user should not be lazy and use .map? :)
+* Centralizing room flags to a command..and adding addition flags.
+  .set <room> visible (room is visible in exits and .rooms and .who)
+  .set <room> invisible (room is hidden in exits and .rooms and .who)
+  .set <room> public (unlocks room for enterage)
+  .set <room> private (locks room from enterage)
+  .set <room> windy (talk in the room also shows up in adjacent rooms)
+  .set <room> abode (users can .set home to this room)
+  .set <room> tellable (you can send tells from the room)
+  .set <room> talkable (you can say, mutter, emote, to in the room)
+  .set <room> readable (you can read the message board in the room)
+
+<room> can be replace by "here" if it's meant for the current room.
+as in: .set here public
+
+
 
 

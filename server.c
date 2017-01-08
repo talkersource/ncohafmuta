@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------*/
-/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.2.1    */
+/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.2.2    */
 /*----------------------------------------------------------------------*/
 /*  This code is a collection of software that originally started       */
 /*  as a system called:                                                 */
@@ -28,7 +28,7 @@
                 add command initialization from a file
                 create standards for diffent term type 
                 allocate structure dynamically
-                break code up into multiple C files
+                break code up into multiple C files (in progress)
                 port code to Win95 and WinNT (in progress)
  */
  
@@ -39,18 +39,16 @@
 /*   strings are not supported properly                         */
 /*                                                              */
 /*--------------------------------------------------------------*/
+
+/* ANSI C forbids braced groups in expressions..the system include */
+/* files do this..bleh */
+#if defined(__OpenBSD__) || defined(__CYGWIN32__)
+#undef __GNUC__
+#endif
  
-/*--------------------------------------------------------------*/
-/* the debug switch make it easier to run this under a debugger */
-/* it prevents deamonization and hardcodes the config directory */
-/* to testfig when set to 1                                     */
-/*--------------------------------------------------------------*/
-
-#define DEBUG 0
-
 #if defined(__sun__)
  /* SunOS of some sort */
-  #if defined(__svr4__)
+  #if defined(__svr4__) || defined(__SVR4)
   /* Solaris, i.e. SunOS 5.x */
    #define SOL_SYS
  #else
@@ -62,11 +60,13 @@
 #include <stdio.h>
 #include <stdlib.h>  
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+/* this probably isn't right..anyone? */
 #include <winsock.h>
 #include <winnt.h>
 #include <process.h>
 #include <io.h>
+#include <sys/timeb.h>	   /* for select() */
 #define EINTR WSAEINTR
 #define EMFILE WSAEMFILE
 #define EWOULDBLOCK WSAEWOULDBLOCK
@@ -77,36 +77,48 @@
 #define ECONNREFUSED WSAECONNREFUSED
 #define EIO WSAEIO /* EIO is used in ident code, but what */
                    /* function is it an errno for         */
-#define MAXHOSTNAMELEN 32
 #define errno WSAGetLastError()
 #define strerror(errnum) winerrstr(errnum)
 #else
-#include <sys/utsname.h>
+/* NOT windows */
+#define	SOCKET_ERROR	-1
+#include <sys/utsname.h>   /* for OS and machine info */
+#if !defined(__STRICT_ANSI__)
+#define __STRICT_ANSI__
 #include <sys/socket.h>    /* for socket(), bind(), etc.. */
-#include <netinet/in.h>    /* for sockaddr_in structure   */
-#include <netdb.h>
-#include <fcntl.h>
-#include <arpa/telnet.h>
-#include <arpa/inet.h>
+#undef __STRICT_ANSI__
+#else
+#include <sys/socket.h>    /* for socket(), bind(), etc.. */
 #endif
 
-#include <sys/time.h>
-#include <sys/file.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <netinet/in.h>    /* for sockaddr_in structure   */
+#include <netdb.h>	   /* for gethostbyaddr() */
+#include <fcntl.h>	   /* for non-blocking */
+#include <arpa/telnet.h>   /* for IAC negotitation and options */
+#include <arpa/inet.h>	   /* for inet_addr() */
+#include <sys/time.h>	   /* for select() */
+#include <sys/file.h>	   /* for flock() */
+#endif
+
+/* ALL */
+#include <sys/types.h>	   /* for bitypes */
+#if defined(__OpenBSD__)
+#include <machine/endian.h>        /* for network conversion stuff */
+#endif
+#include <sys/stat.h>	   /* for stat() file info */
 
 #if defined(NeXT)
 #include <sys/dir.h>
 #define dirent direct
 #endif /* NeXT */
 
-#include <dirent.h>
-#include <signal.h>
-#include <time.h>
-#include <errno.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <ctype.h>
+#include <dirent.h>	   /* for various directory ops */
+#include <signal.h>	   /* for signal handling */
+#include <time.h>	   /* for time funcs and structures */
+#include <errno.h>	   /* for error codes and messages */
+#include <unistd.h>	   /* for close(),read(),write(),getcwd() */
+			   /* dup2(),execvp(),getpid(), etc */
+#include <ctype.h>	   /* for islower(),tolower() type things */
 
 /*
 #if defined(__linux__)
@@ -114,14 +126,14 @@
 #endif
 */
 
-#if defined(SOL_SYS)
-#include <string.h>
+#if defined(SOL_SYS) || defined(__linux__) || defined(_WIN32)
+#include <string.h>	   /* for strcpy(),strcmp(),memcpy(), etc */
 #else
 #include <strings.h>
 #endif
 
 #if defined(_AIX) || defined(AIX)
-#include <sys/select.h>
+#include <sys/select.h>	   /* for select() on AIX..not in time.h */
 #endif
 
 /* Figure out OS's socket non-blocking option */
@@ -175,13 +187,26 @@
 /* glibc changes the type for arg3 of accept() and other socket calls */
 /* from int to socklen_t, we want to eliminate some warnings	      */
 #if !defined(__GLIBC__) || (__GLIBC__ < 2)
+#if !defined(__OpenBSD__)
 #define socklen_t	int
+#endif
+#endif
+
+#if !defined(EPROTO)
+#define EPROTO EINTR
+#endif
+#if !defined(SIGCLD)
+#define SIGCLD SIGCHLD
+#endif
+#if !defined(MAXHOSTNAMELEN)
+#define MAXHOSTNAMELEN 64
 #endif
 
 /* Definitions for authuser info from a remote identd */
 struct timeval timeout={10, 0};
 unsigned short auth_tcpport = 113;
-int            auth_rtimeout = 5;
+int            auth_rtimeout = 3; /* time to read an ident */
+int            auth_wtimeout = 6; /* time to connect/write ident query */
 
 /*--------------------------------------------------------*/
 /* Talker-related include files                           */
@@ -191,6 +216,14 @@ int            auth_rtimeout = 5;
 #include "text.h"
 #include "constants.h"
 
+/*--------------------------------------------------------*/
+/* Initialize functions we need too			  */
+/* Almost all, including all command functions		  */
+/*--------------------------------------------------------*/
+#include "protos.h"
+
+
+/** Far too many bloody global declarations **/
 /*---------------------------------------------------------*/
 /* port definitions                                        */
 /*---------------------------------------------------------*/
@@ -217,26 +250,13 @@ int PORT;                  /* main login port for incoming   */
 
 int listen_sock[4];        /* 32 bit listening sockets       */
 fd_set    readmask;	   /* bitmap read set                */
+fd_set    writemask;	   /* bitmap write set               */
 int inter;                 /* inter talker connections       */
 int cypher;                /* caller id port                 */
 
-/*-----------------------------------------------*/
-/* wiz only flag                                 */
-/*-----------------------------------------------*/
-#define WIZ_ONLY -4
-
-/*--------------------------------------------------------*/
-/* terminal control switch settings                       */
-/*--------------------------------------------------------*/
-#define NORM      0
-#define BOLD      1
-
-/* Initialize functions we need too            */
-/* Almost all, including all command functions */
-#include "protos.h"
-
-/** Far too many bloody global declarations **/
 int last_user;
+static int nfds=0;
+int restarting=0;
 
 /*** START OF COMMAND STRUCTURES ***/
 
@@ -284,12 +304,10 @@ struct {
                   {".growl",    1,      199,    NONE,""},
 		  {".guru",     1,      188,    MISC,""},
 		  {".help",     0,      25,     INFO,""},
-		  {".heartells",1,      62,     SETS,""},
                   {".hiss",     1,      200,    NONE,""},
 		  {".home",     1,      159,    MOOV,""},
 		  {".hug",      1,      164,    NONE,""},
 		  {".ignore",   0,      5,      SETS,""},
-		  {".igtells",  1,      61,     SETS,""},
                   {".insult",   1,      201,    NONE,""},
 		  {".invite",   1,      10,     MOOV,""},
                   {".kick",     1,      202,    NONE,""},
@@ -436,6 +454,7 @@ struct {
 		  {".suname",     3,    114,    MISC,""},
 		  {".supass",     3,    115,    MISC,""},
 		  {".allow_new",  4,    38,     BANS,""},
+		  {".backup",     4,    220,    SETS,""},
 		  {".bbcast",     4,    110,    COMM,""},
 		  {".close",      4,    30,     MISC,""},
 		  {".gwipe",      4,    157,    MESG,""},
@@ -505,6 +524,7 @@ char *syserror="Sorry - a system error has occured";
 char area_nochange[MAX_AREAS]; 
 char mess[ARR_SIZE+25];    /* functions use mess to send output   */ 
 char t_mess[ARR_SIZE+25];  /* functions use t_mess as a buffer    */ 
+char t_inpstr[ARR_SIZE];  /* functions use t_mess as a buffer    */ 
 char l_mess[ARR_SIZE+25];  /* log functions use l_mess as buffer  */ 
 char conv[MAX_AREAS][NUM_LINES][MAX_LINE_LEN+1]; /* stores lines of conversation in room */
 char bt_conv[NUM_LINES][MAX_LINE_LEN+1]; /* stores lines of conversation in wiztell buffer */
@@ -526,6 +546,7 @@ int signl;
 int atmos_on;		/* all room atmospherics on?              */
 int syslog_on;		/* are we logging system stuff to a file  */
 int allow_new;		/* can new users be created?              */
+int dobackups;		/* are we archiving log files @ midnight? */
 int average_tells;	/* average tells                          */
 
 int tells;		/* tells in defined time period           */
@@ -553,6 +574,7 @@ int autonuke    = NUKE_NOSET;	/* nuking users on quit without a desc.? */
 int autoexpire  = AUTO_EXPIRE;	/* expiring users at midnight on auto?   */
 int bot         = -5;           /* this will hold the bots user number   */
 int new_room;			/* room new users log into               */
+int debug	= 0;
 
 /*** END OF GLOBAL DELCARATIONS ***/
 
@@ -597,22 +619,21 @@ int       com_num;
 int       new_user;	     /* new user's index number */
 int       imotd=0;	     /* random MOTD placer */
 int       i=0;
+int	  retval=0;
 int       fd;                /* file desc. for stdin,out,err    */
 
 char      port;
 char      filename[1024];
 char      inpstr[ARR_SIZE];
-char	  wcd1[FILE_NAME_LEN+10];
-
 
 unsigned  long ip_address;   /* connector's net address actually  */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 unsigned  long arg = 1;      /* for a WIN32 nonblocking set       */
 #endif
 
 struct timeval sel_timeout;  /* how much time to give select() */
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSADATA wsaData; /* WinSock details */
 DWORD dwThreadId, dwThrdParam = 1;
 DWORD alarm_thread(LPDWORD lpdwParam);
@@ -623,8 +644,9 @@ int err; /* error status */
 struct utsname uname_info;
 #endif
 
+fd=-1;
 /* It's showtime!!!!! */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 sprintf(mess,"WIN%s - WIN32 VERSION -",VERSION);
 SetConsoleTitle(mess);
 puts(mess);
@@ -635,7 +657,7 @@ puts(VERSION);
 puts("Copyrighted software                      ");
 puts("                                          ");
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
     /* Need to include library: wsock32.lib for Windows Sockets */
     err = WSAStartup(wVersionRequested, &wsaData);
     if (err != 0) {
@@ -657,20 +679,34 @@ puts("                                          ");
      printf("Max sockets program can open: %d\n",wsaData.iMaxSockets);
 #endif                          /* WIN32 */
 
-
-if (DEBUG)
-  {
-   puts("NOTE: Running in debug mode, using testfig for configuration info.");
-   strcpy(datadir,"testfig");
-  }
- else if (argc==1)       /* check comline input */
+ if (argc==1)       /* check comline input */
     {
      puts("NOTE: Running with config data directory");
      strcpy(datadir,"config");
+     debug=0;
     }
- else
+ else if (argc==2)
+    {
+     if (!strcmp(argv[1],"-d")) {
+      puts("NOTE: Running in debug mode, I wont fork to the background.");
+      strcpy(datadir,"config");
+      debug=1;
+     }
+     else
+      strcpy(datadir,argv[1]);
+    }
+ else if (argc==3)
     {
      strcpy(datadir,argv[1]);
+     if (!strcmp(argv[2],"-d")) {
+      puts("NOTE: Running in debug mode, I wont fork to the background.");
+      debug=1;
+     }
+     else {
+      puts("Invalid option. Valid options are:");
+      puts(" -d  (dont fork to background)");
+      exit(0);
+     }
     }
 
 /* Copy the program binary name to memory */
@@ -684,32 +720,13 @@ if (range.total_connections_allowed > FD_SETSIZE-3) {
         range.total_connections_allowed);
  printf("Connections allowed to allocate: %d\n",
         FD_SETSIZE-3);
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 	WSACleanup();
 #endif
  exit(0);
  }
 
-/* SET TALKER TIME TO THE TIMEZONE WE WANT */
-/* Get the current working directory so we can reference */
-/* to the absolute path of the TZ info                   */
-getcwd(wcd1,FILE_NAME_LEN);
-strcat(wcd1,"/tzinfo");
-
-if (!strcmp(TZONE,"localtime")) {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-putenv("TZ=:/etc/localtime");
-#else
-putenv("TZ=localtime");      
-#endif  
-}
-else {
-sprintf(mess,"TZ=:%s/%s",wcd1,TZONE);
-putenv(mess);
-}
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset(TZONE);
 
 printf("Checking abbreviation count..\n");
 abbrcount();
@@ -725,12 +742,6 @@ read_exem_data();
 /* read banned names */
 printf("Reading banned user names from file  %s ...\n",NBANFILE);
 read_nban_data();
-
-/*---------------------*/
-/* Initialize sockets  */
-/*---------------------*/
-printf("Initializing sockets...\n");
-make_sockets();
 
 /* Initialize functions */
 init_user_struct();
@@ -767,13 +778,30 @@ messcount();
 /* Clear fights */
 reset_chal(0,"");
 
-puts("** System running **");
+#if !defined(_WIN32) || defined(__CYGWIN32__)
+	/* Get OS version */
+	uname(&uname_info);
+	strcpy(thisos,uname_info.sysname);
+	strcat(thisos," ");
+	strcat(thisos,uname_info.release);
+#endif
+
+if (!check_for_file(REBOOTFILE)) restarting=0;
+else restarting=1;
+
+if (restarting) read_rebootdb();
+/*---------------------*/
+/* Initialize sockets  */
+/*---------------------*/
+if (!restarting) printf("Initializing sockets...\n");
+make_sockets();
+
 
 /*----------------------------*/
 /* dissociate from tty device */
 /*----------------------------*/
-if (!DEBUG) 
-  {
+if (!debug) {
+   puts("** System running **");
 
    /*-------------------------------------------------*/
    /* Redirect stdin, stdout, and stderr to /dev/null */
@@ -797,16 +825,16 @@ if (!DEBUG)
     dup2(0,1);
     dup2(0,2);
 
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 
    /*-------------------------------------------------------*/
    /* Fork the process away from the foreground space       */
    /*-------------------------------------------------------*/  
    switch(fork()) 
       {
-        case -1:    print_to_syslog("FORK 1 FAILED!\n"); 
+        case -1:    write_log(BOOTLOG,YESTIME,"FORK: FORK 1 FAILED!\n"); 
 	            exit(1);
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || defined(__OSF__) || defined(__osf__) || defined(__bsdi__)
         case 0:     setpgrp(0,0);
 #else
         case 0:     setpgrp();
@@ -816,23 +844,22 @@ if (!DEBUG)
                     exit(0);  /* kill parent */
       }
 
+#if !defined(__CYGWIN32__)
+
    /*-------------------------------------------------------*/
    /* Fork the process away from the tty terminal           */
+   /* We don't do this on cygwin because it doesn't work!   */
    /*-------------------------------------------------------*/  
    switch(fork()) 
       {
-        case -1:    print_to_syslog("FORK 2 FAILED!\n"); 
+        case -1:    write_log(BOOTLOG,YESTIME,"FORK: FORK 2 FAILED!\n"); 
 	            exit(2);
         case 0:     break;  /* child becomes server */
         default:    sleep(1);
                     exit(0);  /* kill parent */
       }
 
-	/* Get OS version */
-	uname(&uname_info);
-	strcpy(thisos,uname_info.sysname);
-	strcat(thisos," ");
-	strcat(thisos,uname_info.release);
+#endif
 
 	/*------------------------------------------------*/
 	/* set up alarm, signals and signal handlers      */
@@ -863,17 +890,17 @@ sprintf(thisos,"Windows v%d.%d",myinfo.dwMajorVersion,myinfo.dwMinorVersion);
 
 #endif
 
+} /* end of !debug */
+
 /* Log startup */
 sysud(1,0);
-
-  } /* end of if !debug */
 
 /* Get local hostname */
  if (gethostname(thishost,100) != 0) {
     printf("\n   Cannot get local hostname!\n");
     strcpy(thishost,"");
    }
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 mess[0]=0;
 if (!getdomainname(mess,80)) {
   if (strcmp(mess,"(none)") && strlen(mess)) {
@@ -913,13 +940,7 @@ else {
 mess[0]=0;
 #endif
 
-sprintf(mess,
-"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: UP\nROOT_ID: %s\nVERSION: %s\nHOSTNAME: %s\nMAIN_PORT: %d\nWIZ_PORT: %d\nWHO_PORT: %d\nWWW_PORT: %d\nSYSTEM_EMAIL: %s\nNUM_USERS: %ld\nNEWUSER_STATUS: %d\nTHEME: %s\nEIGHTTPLUS: %d\nEND:\n\" > .tinfo",
-SYSTEM_NAME,(unsigned int)getpid(),ROOT_ID,VERSION,thishost,PORT,
-PORT+WIZ_OFFSET,PORT+WHO_OFFSET,PORT+WWW_OFFSET,SYSTEM_EMAIL,
-system_stats.tot_users,allow_new,TTHEME,EIGHTTPLUS);
-system(mess);
-system("mail tinfo@ncohafmuta.com < .tinfo");
+do_tracking(1, NULL);
 
 /* Initalize signal handlers                           */  
 init_signals();
@@ -931,6 +952,20 @@ init_signals();
 cbtbuff();
 cshbuff();
 
+if (restarting) {
+restarting=0;
+for (i=0; i<MAX_USERS; ++i) {
+if (ustr[i].sock==-1 || ustr[i].logging_in) continue;
+if (SHOW_SREBOOT==2) write_str(i," ^*** Soft-reboot complete!  Carry on ***^");
+}
+i=0;
+if (SHOW_SREBOOT==1) {
+sprintf(mess,"%s *** Soft-reboot complete!  Carry on ***",STAFF_PREFIX);
+writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, WIZT, 0);
+}
+write_log(BOOTLOG,YESTIME,"SOFT-REBOOT Complete!\n");
+}
+
 /*--------------------------*/
 /**** Main program loop *****/
 /*--------------------------*/
@@ -940,10 +975,12 @@ LOOP_FOREVER
 	noprompt=0;  
 	signl=0;
 	
-	/*-------------------------------------------*/
-	/* Set up bitmap readmask by clearing it out */
-	/*-------------------------------------------*/
+	/*-----------------------------------------------------------*/
+	/* Set up bitmap readmask and writemask by clearing them out */
+	/*-----------------------------------------------------------*/
 	FD_ZERO(&readmask);
+	FD_ZERO(&writemask);
+	nfds = 0;
 
 	/*----------------------------------*/
 	/* Set up timeout for select()      */
@@ -956,8 +993,11 @@ LOOP_FOREVER
         /* If so, add it to our mask          */
 	for (user = 0; user < MAX_WHO_CONNECTS; ++user)
 	  {
-            if (whoport[user].sock != -1)
+            if (whoport[user].sock != -1) {
              FD_SET(whoport[user].sock,&readmask);
+	     if (whoport[user].sock >= nfds)
+	     nfds = whoport[user].sock + 1;
+	    }
 	  }
 	user=0;
 
@@ -965,8 +1005,13 @@ LOOP_FOREVER
         /* If so, add it to our mask          */
 	for (user = 0; user < MAX_WWW_CONNECTS; ++user)
 	  {
-            if (wwwport[user].sock != -1)
+            if (wwwport[user].sock != -1) {
              FD_SET(wwwport[user].sock,&readmask);
+             if (wwwport[user].alloced_size)
+             FD_SET(wwwport[user].sock,&writemask);
+	     if (wwwport[user].sock >= nfds)
+	     nfds = wwwport[user].sock + 1;
+	    }
 	  }
 	user=0;
 
@@ -979,8 +1024,13 @@ LOOP_FOREVER
 
 	   /* If a connection exists, add the online users socket */
 	   /* to the read mask set                                */
-	   if (ustr[user].sock != -1)
+	    if (ustr[user].sock != -1) {
              FD_SET(ustr[user].sock,&readmask);
+             if (ustr[user].alloced_size)
+             FD_SET(ustr[user].sock,&writemask);
+	     if (ustr[user].sock >= nfds)
+	     nfds = ustr[user].sock + 1;
+            }
           }
 
        for (i=0;i<4;++i) {
@@ -990,6 +1040,8 @@ LOOP_FOREVER
 	else if (i==3) { if (WWW_OFFSET==0) continue; }
 	/* Add the listening sockets to the read mask set */
 	FD_SET(listen_sock[i],&readmask);
+	if (listen_sock[i] >= nfds)
+	nfds = listen_sock[i] + 1;
         }
 
 	/*--------------------------------------------------------------*/
@@ -1001,15 +1053,10 @@ LOOP_FOREVER
         /* avoid compiletime warnings about these args                  */
 	/*--------------------------------------------------------------*/
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
-	if (select(FD_SETSIZE, &readmask, 0, 0, 0) == SOCKET_ERROR) {
-#else
-	if (select(FD_SETSIZE, (void *) &readmask, (void *) 0, (void *) 0, 0) == -1) {
-#endif
+	if (select(nfds, (void *) &readmask, (void *) &writemask, (void *) 0, 0) == SOCKET_ERROR) {
 	 if (errno != EINTR) {
-	 	sprintf(mess,"Select failed: %s\n",strerror(errno));
-		print_to_syslog(mess);
-		shutdown_error(9);
+	 	write_log(ERRLOG,YESTIME,"SELECT: Select failed with error %s\n",get_error());
+		shutdown_error(log_error(9));
 	   }
 	 else continue;
 	}
@@ -1029,25 +1076,23 @@ LOOP_FOREVER
              {
 	       /* we can not open a new file descriptor */
                FD_CLR(listen_sock[2],&readmask);
-	       sprintf(mess,"ERROR -> create who socket : %d %s\n",errno,strerror(errno));
-	       print_to_syslog(mess);
+	       write_log(ERRLOG,YESTIME,"ACCEPT: ERROR creating who socket %s\n",get_error());
 	      if (errno==EINTR || errno==EAGAIN)
 		continue;
 	      else
-               shutdown_error(1);
+               shutdown_error(log_error(1));
              }
             else
              {
               port='3';
               /* Set socket to non-blocking */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 	      if (ioctlsocket(as, FIONBIO, &arg) == -1) {
 #else
               if (fcntl(as,F_SETFL,NBLOCK_CMD)== -1) {
 #endif
-	       sprintf(mess,"ERROR -> set who socket to non-blocking : %s\n",strerror(errno));
-	       print_to_syslog(mess);
-               shutdown_error(2);
+	       write_log(ERRLOG,YESTIME,"BLOCK: ERROR setting who socket to non-blocking %s\n",get_error());
+               shutdown_error(log_error(2));
               }
 
              /*---------------------------------*/
@@ -1092,26 +1137,24 @@ LOOP_FOREVER
              {
 	       /* we can not open a new file descriptor */
                FD_CLR(listen_sock[3],&readmask);
-	       sprintf(mess,"ERROR -> create www socket : %d %s\n",errno,strerror(errno));
-	       print_to_syslog(mess);
+	       write_log(ERRLOG,YESTIME,"ACCEPT: ERROR creating www socket %s\n",get_error());
 	      if (errno==EINTR || errno==EAGAIN)
 		continue;
 	      else
-               shutdown_error(3);
+               shutdown_error(log_error(3));
              }
             else
              {
               port='4';
 
               /* Set socket to non-blocking */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
               if (ioctlsocket(as, FIONBIO, &arg) == -1) {
 #else
               if (fcntl(as,F_SETFL,NBLOCK_CMD)== -1) {
 #endif
-	       sprintf(mess,"ERROR -> set www socket to non-blocking : %s\n",strerror(errno));
-	       print_to_syslog(mess);
-               shutdown_error(4);
+	       write_log(ERRLOG,YESTIME,"BLOCK: ERROR setting www socket to non-blocking %s\n",get_error());
+               shutdown_error(log_error(4));
               }
 
              /*---------------------------------*/
@@ -1122,6 +1165,7 @@ LOOP_FOREVER
               if ( (new_user = find_free_slot(port) ) == -1 ) {
 	         while (CLOSE(as) == -1 && errno == EINTR)
 			; /* empty while */
+		 write_log(ERRLOG,YESTIME,"WWW: Web port connections maxed out!\n");
                  continue;
                 }
 
@@ -1154,12 +1198,11 @@ LOOP_FOREVER
                  {
 	       /* we can not open a new file descriptor */
                FD_CLR(listen_sock[0],&readmask);
-	       sprintf(mess,"ERROR -> accept can't create user socket : %d %s\n",errno,strerror(errno));
-	       print_to_syslog(mess);
+	       write_log(ERRLOG,YESTIME,"ACCEPT: ERROR creating user socket %s\n",get_error());
 		  if (errno==EINTR || errno==EAGAIN)
 		   continue;
 		  else
-                   shutdown_error(5);
+                   shutdown_error(log_error(5));
                 }
               port = '1';
             }
@@ -1172,26 +1215,24 @@ LOOP_FOREVER
                  {
 	       /* we can not open a new file descriptor */
                FD_CLR(listen_sock[1],&readmask);
-	       sprintf(mess,"ERROR -> accept can't create wiz socket : %d %s\n",errno,strerror(errno));
-	       print_to_syslog(mess);
+	       write_log(ERRLOG,YESTIME,"ACCEPT: ERROR creating wiz socket %s\n",get_error());
 		  if (errno==EINTR || errno==EAGAIN)
 		   continue;
 		  else
-                   shutdown_error(6);
+                   shutdown_error(log_error(6));
                  }
                port = '2';
              }
 	} /* end of WIZ_OFFSET if */
              
               /* Set socket to non-blocking */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
               if (ioctlsocket(as, FIONBIO, &arg) == -1) {
 #else
               if (fcntl(as,F_SETFL,NBLOCK_CMD)== -1) {
 #endif
-	       sprintf(mess,"ERROR -> set user or wiz socket to non-blocking : %s\n",strerror(errno));
-	       print_to_syslog(mess);
-               shutdown_error(7);
+	       write_log(ERRLOG,YESTIME,"BLOCK: ERROR setting user/wiz socket to non-blocking %s\n",get_error());
+               shutdown_error(log_error(7));
               }
 
 	   
@@ -1286,10 +1327,8 @@ LOOP_FOREVER
 	     
              if (check_restriction(new_user, ANY) == 1) 
                {
-                sprintf(mess,"%s: Connection attempt, RESTRICTed site %s:%s\n",get_time(0,0),ustr[new_user].site,
-		ustr[new_user].net_name);
-		print_to_syslog(mess);
-                user_quit(new_user);
+                write_log(BANLOG,YESTIME,"MAIN: Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",ustr[new_user].site,ustr[new_user].net_name,ustr[new_user].sock,new_user);
+                user_quit(new_user,1);
 		mess[0]=0;
                 continue;
                }     
@@ -1305,8 +1344,37 @@ LOOP_FOREVER
 	/** based on their status					**/
 	for (user=0; user < MAX_USERS; ++user) {
 
-		strcpy(inpstr,get_input(user,ustr[user].attach_port,0));
-		if (!strcmp(inpstr,"_someerr")) continue;
+		retval=get_input(user,ustr[user].attach_port,0);
+		if (ustr[user].sock==-1) continue;
+		strcpy(inpstr,t_inpstr);
+		if (retval < 0) {
+		switch(retval) {
+		case -1: /* socket doesnt exist - just in case */ break;
+		case -6: /* buffer overload */ break;
+		case -7: /* fatal read error */ break;
+		default:
+		if (FD_ISSET(ustr[user].sock,&writemask)) {
+			if (!queue_flush(user)) {
+#if defined(QFLUSH_DEBUG)
+			write_log(DEBUGLOG,YESTIME,"Calling user_quit from !queue_flush retval %d\n",retval);
+#endif
+			user_quit(user,0);
+			}
+		} /* end of FD_ISSET */
+		break;
+		} /* end of switch */
+			continue;
+		} /* end of if retval */
+		else {
+		if (FD_ISSET(ustr[user].sock,&writemask)) {
+			if (!queue_flush(user)) {
+#if defined(QFLUSH_DEBUG)
+			write_log(DEBUGLOG,YESTIME,"Calling user_quit from !queue_flush2\n");
+#endif
+			user_quit(user,0);
+			}
+		} /* end of FD_ISSET */
+		} /* end of else */
 
 		ustr[user].last_input    = time(0);  /* ie now        */
 		ustr[user].warning_given = 0;        /* reset warning */
@@ -1372,13 +1440,22 @@ LOOP_FOREVER
 		      ustr[user].line_count=0; 
 		      ustr[user].number_lines=0; 
 		      ustr[user].numbering=0;
+			if (ustr[user].log_stage) {
+			/* User ended the log read, reset ourselves */
+				ustr[user].log_stage=0;
+				ustr[user].temp_buffer[0]=0;
+			}
                       continue;
 		     }
 		     
 		   cat(ustr[user].page_file,user, 0); 
+			/* If we've hit the end of the file and are in	*/
+			/* an ALL read of logfiles, keep going		*/
+			if (ustr[user].file_posn==0 && ustr[user].log_stage) {
+			readlog(user,"");
+			}
 		   continue;
 		  }
-
 
               /*---------------------------------------*/
               /*  See if user is entering a profile    */
@@ -1447,6 +1524,7 @@ LOOP_FOREVER
 		   continue;
 		  }
 
+
 		/*--------------------------------------------*/
 		/* see if input is answer to clear_mail query */
 		/*--------------------------------------------*/
@@ -1487,7 +1565,7 @@ LOOP_FOREVER
 		/* send speech to speaker & everyone else in same area */
 		/*-----------------------------------------------------*/
 		commands++;
-		say(user, inpstr, 0);
+                say(user, inpstr, 0);
 	      } /* end of MAIN USER FOR */
 
 	user=0;
@@ -1495,11 +1573,38 @@ LOOP_FOREVER
 	/** cycle through web server users **/
 	for (user=0; user < MAX_WWW_CONNECTS; ++user) {
 
-		strcpy(inpstr,get_input(user,'4',1));
-		if (!strcmp(inpstr,"_someerr")) continue;
+		retval=get_input(user,'4',1);
+/*
+write_log(DEBUGLOG,YESTIME,"after get_input\n");
+write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\"\n",user,retval,ustr[user].sock,wwwport[user].sock,t_inpstr);
+*/
+		if (wwwport[user].sock==-1) continue;
+		strcpy(inpstr,t_inpstr);
+                if (retval < 0) {
+                switch(retval) {
+		case -1: /* socket doesnt exist - jsut in case */ break;
+		case -6: /* buffer overload */ break;
+		case -7: /* fatal read error */ break;
+                default:
+		if (FD_ISSET(wwwport[user].sock,&writemask)) {
+			if (!queue_flush_www(user)) {
+			free_sock(user,'4');
+			}
+		} /* end of FD_ISSET */
+		break;
+		} /* end of switch */
+		continue;
+		} /* end of if retval */
+		else {
+		if (FD_ISSET(wwwport[user].sock,&writemask)) {
+			if (!queue_flush_www(user)) {
+			free_sock(user,'4');
+			}
+		} /* end of FD_ISSET */
+		} /* end of else */
+
 		parse_input(user,inpstr);
 		continue;
-
 	   } /* end of web server users for */
 
 	user=0;
@@ -1514,7 +1619,7 @@ if (resolve_names==2) {
 
 	} /* end while LOOP_FOREVER */
 	
-    shutdown_error(8);
+    shutdown_error(log_error(8));
 
 }
 
@@ -1523,39 +1628,38 @@ if (resolve_names==2) {
 /*------------------------------------------------------------------------*/
 
 /* Read user input from a socket */
-char *get_input(int user, char port, int mode)
+int get_input(int user, char port, int mode)
 {
 int len=0;
 int complete_line;
+int gotcr=0;
 int buff_size;
-int yeah=0,serr=0;
-
 char *dest;
-char *err="_someerr";
+char astring[ARR_SIZE];
+unsigned char inpchar[2];   /* read() data from socket into this */
+int char_buffer_size = 0;
+char char_buffer[MAX_CHAR_BUFF];
 
-static char astring[ARR_SIZE];
-unsigned  char inpchar[2];   /* read() data from socket into this */
-
-        int  char_buffer_size = 0;
-        char char_buffer[MAX_CHAR_BUFF];
+char_buffer[0]=0;
+t_inpstr[0]=0;
 
                 /* if (ustr[user].area== -1 && !ustr[user].logging_in) */
                 /* continue; */
 if (mode==0) {
-                if (ustr[user].sock == -1) return err;
+                if (ustr[user].sock == -1) return -1;
 }
 else if (mode==1) {
-                if (wwwport[user].sock == -1) return err;
+                if (wwwport[user].sock == -1) return -1;
 }
 
                 /* see if any data on socket else continue */
 if (mode==0) {
-                if (!FD_ISSET(ustr[user].sock,&readmask)) return err;
+                if (!FD_ISSET(ustr[user].sock,&readmask)) return -2;
 }
 else if (mode==1) {
-                if (!FD_ISSET(wwwport[user].sock,&readmask)) return err;
+                if (!FD_ISSET(wwwport[user].sock,&readmask)) return -2;
 }
-                  
+
                /*--------------------------------------------*/
                /* reset the user input space                 */
                /*--------------------------------------------*/
@@ -1568,15 +1672,6 @@ else if (mode==1) {
                  /* see if the user is gone or has input    */
                  /*-----------------------------------------*/
 
-/* a win32 two-step */
-#if defined(WIN32) && !defined(__CYGWIN32__)
- yeah=1;
- serr=SOCKET_ERROR;
-#else
- yeah=0;
-#endif
-
-if (yeah==1) {
 	if (mode==0) {
                  len = S_READ(ustr[user].sock, inpchar, 1);
 	}
@@ -1584,32 +1679,26 @@ if (yeah==1) {
                  len = S_READ(wwwport[user].sock, inpchar, 1);
 	}
 
-                 if (!len || len==serr) {
-			if (mode==0)
-		                    user_quit(user);
-			else if (mode==1)
-				    free_sock(user,port);
+		if (!len) {
+                 if (mode==0) user_quit(user,1);
+                 else if (mode==1) free_sock(user,port);
+                 return -7;
+		} /* end of if */
+		else if (len==SOCKET_ERROR) {
+#if defined(QFLUSH_DEBUG)
+		 if (mode==0)
+		  write_log(DEBUGLOG,YESTIME,"Bad read() from user \"%s\" ret %d! %s\n",ustr[user].name,len,get_error());
+		 else if (mode==1)
+		  write_log(DEBUGLOG,YESTIME,"Bad www read() from socket %d ret %d! %s\n",wwwport[user].sock,len,get_error());
+#endif
+                 if (errno!=EAGAIN && errno!=EINTR) {
+			if (mode==0) user_quit(user,0);
+			else if (mode==1) free_sock(user,port);
+			return -7;
+		 }
+                 	return -3;
+                } /* end of else if */
 
-		                    return err;
-                	}
-
-  } /* end of if yeah */
-else {
-	if (mode==0) {
-                 if ( !( len = S_READ(ustr[user].sock, inpchar, 1) ) ) {
-                    user_quit(user);
-                    return err;
-                   }
-	}
-	else if (mode==1) {
-                 if ( !( len = S_READ(wwwport[user].sock, inpchar, 1) ) ) {
-		    free_sock(user,port);
-                    return err;
-                   }
-	}
-  } /* end of else yeah */
-              
-yeah=0;
 
                  /*-------------------------------------------*/
                  /* if there is input pending, read it        */
@@ -1631,12 +1720,12 @@ if (mode==0) {
                        case IAC:     do_telnet_commands(user);
                                      break;
 
-                       case '\001':  user_quit(user); break;    /* soh  */
-                       case '\002':  user_quit(user); break;    /* stx */
-                       case '\003':  user_quit(user); break;    /* etx */
-                       case '\004':  user_quit(user); break;
-                       case '\005':  user_quit(user); break;    /* enq  */
-                       case '\006':  user_quit(user); break;    /* ack */
+                       case '\001':  user_quit(user,1); break;    /* soh  */
+                       case '\002':  user_quit(user,1); break;    /* stx */
+                       case '\003':  user_quit(user,1); break;    /* etx */
+                       case '\004':  user_quit(user,1); break;
+                       case '\005':  user_quit(user,1); break;    /* enq  */
+                       case '\006':  user_quit(user,1); break;    /* ack */
 
                        case 127:                             /* delete */
                        case '\010':  ustr[user].char_buffer_size--;
@@ -1651,30 +1740,29 @@ if (mode==0) {
                                      break;
 
 
-                       case '\013':  user_quit(user); break;    /* enq */
-                       case '\014':  user_quit(user); break;    /* enq */
-                       case '\015':  break;
+                       case '\013':  user_quit(user,1); break;    /* enq */
+                       case '\014':  user_quit(user,1); break;    /* enq */
 
-                       case '\016':  user_quit(user); break;    /* enq */
-                       case '\017':  user_quit(user); break;    /* enq */
+                       case '\016':  user_quit(user,1); break;    /* enq */
+                       case '\017':  user_quit(user,1); break;    /* enq */
 
-                       case '\020':  user_quit(user); break;    /* dle */
-                       case '\021':  user_quit(user); break;    /* dc1 */
-                       case '\022':  user_quit(user); break;    /* dc2 */
-                       case '\023':  user_quit(user); break;    /* dc3 */
-                       case '\024':  user_quit(user); break;    /* dc4 */
-                       case '\025':  user_quit(user); break;    /* nak */
-                       case '\026':  user_quit(user); break;    /* syn */
-                       case '\027':  user_quit(user); break;    /* etb */
+                       case '\020':  user_quit(user,1); break;    /* dle */
+                       case '\021':  user_quit(user,1); break;    /* dc1 */
+                       case '\022':  user_quit(user,1); break;    /* dc2 */
+                       case '\023':  user_quit(user,1); break;    /* dc3 */
+                       case '\024':  user_quit(user,1); break;    /* dc4 */
+                       case '\025':  user_quit(user,1); break;    /* nak */
+                       case '\026':  user_quit(user,1); break;    /* syn */
+                       case '\027':  user_quit(user,1); break;    /* etb */
 
-                       case '\030':  user_quit(user); break;    /* can */
-                       case '\031':  user_quit(user); break;    /* em  */
-                       case '\032':  user_quit(user); break;    /* sub */
+                       case '\030':  user_quit(user,1); break;    /* can */
+                       case '\031':  user_quit(user,1); break;    /* em  */
+                       case '\032':  user_quit(user,1); break;    /* sub */
                        case '\033':  ; break;                   /* esc */
-                       case '\034':  user_quit(user); break;    /* fs  */
-                       case '\035':  user_quit(user); break;    /* gs  */
-                       case '\036':  user_quit(user); break;    /* rs  */
-                       case '\037':  user_quit(user); break;    /* us  */
+                       case '\034':  user_quit(user,1); break;    /* fs  */
+                       case '\035':  user_quit(user,1); break;    /* gs  */
+                       case '\036':  user_quit(user,1); break;    /* rs  */
+                       case '\037':  user_quit(user,1); break;    /* us  */
 
                        default:
                            ustr[user].char_buffer[ustr[user].char_buffer_size++] = inpchar[0];
@@ -1686,9 +1774,19 @@ if (mode==0) {
 		telnet_write_eor(user);
 		}
 
+		    if (inpchar[0] == '\015') {
+			/* Got a CR - Carriage return..possibly part of a CRLF combo	*/
+			/* if it is, the next check will take care of it		*/
+			/* if not, we set this variable so we can tell if its just a CR	*/
+			gotcr=1;
+		    }
+
                     if (inpchar[0] == '\012')
                         {
+			/* Got a LF - Line Feed..possibly part of a previous CRLF combo	*/
+			/* if it is or is just a LF ending, we take it the same way	*/
                          complete_line = 1;
+			 if (gotcr) gotcr=0;
                          ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
                         }
                       else
@@ -1706,6 +1804,12 @@ if (mode==0) {
                     if (complete_line == 0)
                       {
                        len = S_READ(ustr[user].sock, inpchar, 1);
+			if (len==-1 && gotcr==1) {
+			/* this is just a CR line termination */
+				complete_line = 1;
+				gotcr=0;
+				ustr[user].char_buffer[ustr[user].char_buffer_size++] = 0;
+			}
                       }
                    } /* end of while */
 
@@ -1726,7 +1830,7 @@ if (mode==0) {
     /*-----------------------------------------------------*/
     /* write_str_nr(user,ustr[user].char_buffer[ustr[user].char_buffer_size]); */
     /*-----------------------------------------------------*/
-                   return err;
+                   return -4;
                   }
 
                 /*--------------------------------------------*/
@@ -1738,7 +1842,7 @@ if (mode==0) {
                 ustr[user].char_buffer_size = 0;
 
                 if ((astring[0] == '\012') && (ustr[user].logging_in)
-		    && (ustr[user].logging_in < 11)) return err;
+		    && (ustr[user].logging_in < 11)) return -5;
 
                 /*----------------------------------------------------*/
                 /* some nice users were doing some things that would  */
@@ -1748,10 +1852,9 @@ if (mode==0) {
                 
                 if (buff_size > 8000)
                   {
-                    sprintf(mess,"HACK flood from site %21.21s possibly as %12s\n",
+                    write_log(WARNLOG,YESTIME,"HACK flood from site %21.21s possibly as %12s\n",
                                   ustr[user].site,
                                   ustr[user].say_name);
-                    print_to_syslog(mess);
                     
                     writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0); 
                     
@@ -1771,7 +1874,8 @@ if (mode==0) {
                     
                         auto_restrict(user);    
 
-                        user_quit(user);
+                        user_quit(user,1);
+                        return -6;
                        }
                       else
                        {
@@ -1780,16 +1884,17 @@ if (mode==0) {
                            write_str(user,"Notice: Buffer data has been lost. ");
                            write_str(user,"        Further lose of data will result in connection termination.");
                            ustr[user].locked = 1;
+                           return -3;
                           }
                          else
                           {
                            write_str(user,"Notice: Connection terminated due to loss of data.\n");
-                           user_quit(user);
+                           user_quit(user,1);
+                           return -6;
                           }
 
                        }
 
-                    return err;
                   } /* end of if buff size */
 
 } /* end of if mode USER */
@@ -1891,7 +1996,12 @@ else if (mode==1) {
     /*-----------------------------------------------------*/
     /* write_str_nr(user,char_buffer[char_buffer_size]); */
     /*-----------------------------------------------------*/
-                   return err;
+		   if (strlen(char_buffer)!=wwwport[user].req_length) {
+			/* we check for this because IE is a bastard child */
+			/* of a skinny, standard-deviating, nerdy twit */
+		   /* write_log(DEBUGLOG,YESTIME,"length doesn't match!\n"); */
+                   return -4;
+		   }
                   }
 
                 /*--------------------------------------------*/
@@ -1902,7 +2012,7 @@ else if (mode==1) {
                 buff_size = strlen(astring);
                 char_buffer_size = 0;
 
-                if (astring[0] == '\012') return err;
+                if (astring[0] == '\012') return -5;
 
                 /*----------------------------------------------------*/
                 /* some nice users were doing some things that would  */
@@ -1912,15 +2022,14 @@ else if (mode==1) {
                 
                 if (buff_size > 8000)
                   {
-                    sprintf(mess,"HACK flood from site %21.21s\n",
+                    write_log(WARNLOG,YESTIME,"WWW HACK flood from site %21.21s\n",
                                   wwwport[user].site);
-                    print_to_syslog(mess);
                     
 		    free_sock(user,port);
 
                     writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0); 
                     
-                    return err;
+                    return -6;
                   } /* end of if buff size */
 
 } /* end of if mode 1 */
@@ -1928,11 +2037,12 @@ else if (mode==1) {
                 /*-------------------------------------*/
                 /* terminate the string                */
                 /*-------------------------------------*/
-                
+
 		/* misc. operations */
 		terminate(user, astring);
 
-return astring;
+strcpy(t_inpstr,astring);
+return 0;
 }
 
 /*----------------------------------*/
@@ -1946,8 +2056,8 @@ void say(int user, char *inpstr, int mode)
 if (!mode) {
  /* Check if command was revoked from user - UNDER CONSTRUCTION */
  for (z=0;z<MAX_GRAVOKES;++z) {
-        if (!isrevoke(ustr[user].revokes[z])) continue;
-        if (strip_com(ustr[user].revokes[z])==sys[get_com_num(user,".say")].jump_vector) { gravoked=1; break; }
+	if (!isrevoke(ustr[user].revokes[z])) continue;
+	if (strip_com(ustr[user].revokes[z])==sys[get_com_num(user,".say")].jump_vector) { gravoked=1; break; }
    }
  if (gravoked==1) {
     write_str(user,NOT_WORTHY);
@@ -1956,7 +2066,7 @@ if (!mode) {
     }
 } /* end of !mode */
  
-  if (!strlen(inpstr) && strcmp(astr[area].name,BOT_ROOM))
+  if (!strlen(inpstr) && (bot==-5 || area!=ustr[bot].area))
     {
       write_str(user," [Default blank say action is a review]");
       review(user);
@@ -1970,7 +2080,7 @@ if (!mode) {
       write_str(user,"The command to leave is --> .quit");
       return;
       }
-  if ((!strcmp(inpstr,"help") && strcmp(astr[area].name,BOT_ROOM)) || 
+  if ((!strcmp(inpstr,"help") && (bot==-5 || area!=ustr[bot].area)) || 
       !strcmp(inpstr,"/help") ||
       !strcmp(inpstr,"HELP")) {
       write_str(user,HELP_HELP);
@@ -1992,6 +2102,12 @@ if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
 /*--------------------------------*/
   strncpy(conv[area][astr[area].conv_line],mess,MAX_LINE_LEN);
   astr[area].conv_line=(++astr[area].conv_line)%NUM_LINES;	
+
+  /* write to bot */
+  if (ustr[user].area == ustr[bot].area) {
+  sprintf(mess,"+++++ comm_say:%s %s",ustr[user].say_name,inpstr);
+  write_bot(mess);
+  }
 }
 
 
@@ -2022,11 +2138,11 @@ DIR *dirp;
  dirp=opendir((char *)filerid);
 
  if (dirp == NULL)
-   {  
-      sprintf(z_mess,"SYSTEM: Directory information not found for reset_userfors\n");
-	if (!startup)
-         print_to_syslog(z_mess);
-	else
+   {
+	sprintf(z_mess,"USERFORS: Can't open directory \"%s\" for reset_userfors! %s\n",filerid,get_error());
+        write_log(ERRLOG,YESTIME,z_mess);
+
+	if (startup)
 	 printf("%s",z_mess);
       return;
    }
@@ -2041,18 +2157,18 @@ DIR *dirp;
          strtolower(small_buffer);
          ret=read_user(small_buffer);
          if (ret==0) {
-          sprintf(z_mess,"Can't open userfile %s.  Permission problem probably\n",small_buffer);
-          if (!startup)
-           print_to_syslog(z_mess);
-          else
+          sprintf(z_mess,"USERFORS: Can't open userfile \"%s\" Permission problem probably\n",small_buffer);
+          write_log(ERRLOG,YESTIME,z_mess);
+
+          if (startup)
            printf("%s",z_mess);
           continue;
          }
          else if (ret==-1) {
-          sprintf(z_mess,"Can't open userfile %s.  0 length file!  Removed.  Continuing..\n",small_buffer);
-          if (!startup)
-           print_to_syslog(z_mess);
-          else
+          sprintf(z_mess,"USERFORS: Can't open userfile \"%s\" 0 length file! Removed. Continuing..\n",small_buffer);
+          write_log(ERRLOG,YESTIME,z_mess);
+
+          if (startup)
            printf("%s",z_mess);
           continue;
          }
@@ -2179,7 +2295,7 @@ a=0;
    }
 
 if (changed)
- print_to_syslog("Re-evaluated user abbreviations\n");
+ write_log(SYSTEMLOG,YESTIME,"Re-evaluated user abbreviations\n");
  
  (void) closedir(dirp);
 
@@ -2200,7 +2316,7 @@ return tempname;
 /* Return error description for error code for WIN32  */
 /* since we can't find function like strerror         */
 /*----------------------------------------------------*/
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 char *winerrstr(int type)
 {
 static char errdesc[80];
@@ -2264,6 +2380,23 @@ return errdesc;
 }
 #endif
 
+/* see if user wants to quit from talker addition */
+int is_quit(int user, char *str)
+{
+
+if (!strcmp(str,"q") || !strcmp(str,"Q")) {
+    ustr[user].t_ent=0;
+    ustr[user].t_num        = 0;
+    ustr[user].t_name[0]    = 0;
+    ustr[user].t_host[0]    = 0;
+    ustr[user].t_ip[0]      = 0;
+    ustr[user].t_port[0]    = 0;
+    write_str(user,"Talker addition aborted!");
+    return 1;
+    }
+return 0;
+}
+
 /*------------------------------------------*/
 /* Remove all files from the junk directory */
 /*------------------------------------------*/
@@ -2282,10 +2415,10 @@ DIR  *dirp;
 
  if (dirp == NULL)
    {
-    strcpy(t_mess,"SYSTEM: Directory information not found for remove_junk()\n");
-	if (!startup)
-	print_to_syslog(t_mess);
-	else
+    sprintf(t_mess,"RJUNK: Can't open directory \"%s\" for remove_junk! %s\n",filerid,get_error());
+    write_log(ERRLOG,YESTIME,t_mess);
+
+	if (startup)
 	printf("%s",t_mess);
     return;
    }
@@ -2310,10 +2443,8 @@ void auto_restrict(int user)
 {
 char timestr[30];
 char filename[FILE_NAME_LEN];
-time_t tm;
 FILE *fp;
 
-time(&tm);
                         sprintf(t_mess,"%s/%s", RESTRICT_DIR, ustr[user].site);
                         strncpy(filename, t_mess, FILE_NAME_LEN);
 
@@ -2322,7 +2453,7 @@ time(&tm);
                            return;
                           }
 
-                        sprintf(timestr,"%ld\n",(unsigned long)tm);
+                        sprintf(timestr,"%ld\n",(unsigned long)time(0));
                         fputs(timestr,fp);
                         FCLOSE(fp);
 
@@ -2345,10 +2476,11 @@ time(&tm);
                           {
                            return;
                           }
-                        sprintf(mess,"Site denied access for hacking, possibly user %s\n",ustr[user].say_name);
+                        sprintf(mess,"Site denied access for hacking, possibly user %s\n",ustr[user].login_name);
                         fputs(mess,fp);
                         FCLOSE(fp);
 
+write_log(BANLOG,YESTIME,"AUTO-RESTRICT of site %s, possibly user %s\n",ustr[user].site,ustr[user].login_name);
 }
 
 
@@ -2480,7 +2612,7 @@ int count=0;
     if (count != NUM_ABBRS) {
       printf("\nAbbreviation count in sys[] structure does not match that of NUM_ABBRS\n");
       printf("Aborting startup!\n");
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
       exit(0);
@@ -2671,7 +2803,7 @@ char *get_error(void)
 {
 static char errstr[256];
 
-sprintf(errstr,"(err: %d,%s)",errno,strerror(errno));
+sprintf(errstr,"(%d:%s)",errno,strerror(errno));
 return errstr;
 }
 
@@ -2909,8 +3041,7 @@ strcpy(filename2,get_temp_file());
 
 if (!(fp2=fopen(filename2,"w"))) {
   fclose(fp);
-  sprintf(l_mess,"%s: Could not open tempfile for writing in delete_verify! %s",get_time(0,0),get_error());
-  write_log(l_mess,ERROR_L,NEWLINE);
+  write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open tempfile(w) in delete_verify! %s\n",get_error());
   return;
   }
 
@@ -2943,7 +3074,6 @@ char name2[NAME_LEN+1];
 char junk[12];
 unsigned long diff=0;
 unsigned long timenum;
-time_t tm;
 FILE *fp;
 FILE *fp2;
 
@@ -2968,20 +3098,18 @@ fclose(fp);
   }
 } /* end of mode if */
 else if (mode==1) {
-time(&tm);
 
 strcpy(filename2,get_temp_file());
 
 if (!(fp2=fopen(filename2,"w"))) {
   fclose(fp);
-  sprintf(l_mess,"%s: Could not open tempfile for writing in check_verify! %s",get_time(0,0),get_error());
-  write_log(l_mess,ERROR_L,NEWLINE);
+  write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in check_verify! %s\n",get_error());
   return 0;
   }
 
 while (!feof(fp)) {
  fscanf(fp,"%s %s %ld\n",name2,junk,&timenum);
- diff = tm - timenum;
+ diff = (unsigned long)(time(0) - timenum);
  if (diff >= (3600*24)) { continue; }
  else { fprintf(fp2,"%s %s %ld\n",name2,junk,(unsigned long)timenum); }
  } /* end of while */
@@ -3005,20 +3133,15 @@ return 0;
 int write_verifile(int user, char *epass)
 {
 char filename[FILE_NAME_LEN];
-unsigned long timenum;
-time_t tm;
 FILE *fp;
 
 strcpy(filename,VERIFILE);
 if (!(fp=fopen(filename,"a"))) {
-  print_to_syslog("Could not open file to append to in write_verifile!\n");
+  write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open file(a) \"%s\" in write_verifile! %s\n",filename,get_error());
   return -1;
   }
 
-time(&tm);
-timenum = tm;
-
-sprintf(mess,"%s %s %ld\n",ustr[user].login_name,epass,(unsigned long)timenum);
+sprintf(mess,"%s %s %ld\n",ustr[user].login_name,epass,(unsigned long)time(0));
 fputs(mess,fp);
 fclose(fp);
 return 1;
@@ -3037,10 +3160,10 @@ FILE *fp;
 FILE *pp;
 
 line[0]=0;
-strcpy(filename,VERIEMAIL);
+strncpy(filename,VERIEMAIL,FILE_NAME_LEN);
 
 if (!(fp=fopen(filename,"r"))) {
-  print_to_syslog("Could not open VERIEMAIL file!\n");
+  write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open file(r) \"%s\" in mail_verify! %s\n",filename,get_error());
   return -1;
   }
 
@@ -3067,6 +3190,7 @@ if (!(pp=popen(filename2,"w")))
    sprintf(mess,"%s : fmail message cannot be written\n", syserror);
    fclose(fp);
    write_str(user,mess);
+   write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open popen(w) \"%s\" in mail_verify! %s\n",filename2,get_error());
    return -1;
   }
 
@@ -3082,12 +3206,16 @@ fprintf(pp,"%s new account info\n",SYSTEM_NAME);
 fgets(line,300,fp);
 strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
 strcpy(line,check_var(line,USER_VAR,ustr[user].login_name));
+strcpy(line,check_var(line,HOST_VAR,thishost));
+strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
 
 while (!feof(fp)) {
    fputs(line,pp);
    fgets(line,300,fp);
    strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
    strcpy(line,check_var(line,USER_VAR,ustr[user].login_name));
+   strcpy(line,check_var(line,HOST_VAR,thishost));
+   strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
   } /* end of while */
 fclose(fp);
 
@@ -3100,10 +3228,10 @@ fputs("\n\n",pp);
 
 /* Copy the AGREEFILE to the end of the mail since we wont */
 /* ask for it when they login for their new account        */
-strcpy(filename,AGREEFILE);
+strncpy(filename,AGREEFILE,FILE_NAME_LEN);
 
 if (!(fp=fopen(filename,"r"))) {
-  print_to_syslog("Could not open AGREEFILE file!\n");
+  write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open file(r) \"%s\" in mail_verify! %s\n",filename,get_error());
   }
 else {
   fgets(line,300,fp);
@@ -3120,12 +3248,10 @@ fputs(".\n",pp);
 pclose(pp);
 
 /* Write to log */
-sprintf(l_mess,"%s: EMAILVER %s %s:%s:%s",get_time(0,0),ustr[user].login_name,
+write_log(VEMAILLOG,YESTIME,"SENT VERIFY %s:%s:%s:%s\n",ustr[user].login_name,
              ustr[user].site,ustr[user].net_name,emailadd);
-write_log(l_mess,VEMAIL_L,NEWLINE);
 
-  return 1;
-
+return 1;
 }
 
 /* Convert userdata file from old version to new version */
@@ -3141,14 +3267,12 @@ FILE *wfp;
 
 fclose(f);
 if (!(rfp=fopen(filename,"r"))) {
-	sprintf(mess,"%s: Can't open userfile %s for converting!\n",get_time(0,0),filename);
-	print_to_syslog(mess);
+        write_log(ERRLOG,YESTIME,"CONVERT: Couldn't open userfile(r) \"%s\" in convert_file! %s\n",filename,get_error());
 	return 0;
 	}
 strcpy(tempfile,get_temp_file());
 if (!(wfp=fopen(tempfile,"w"))) {
-	sprintf(mess,"%s: Can't open tempfile to be used for converting!\n",get_time(0,0));
-	print_to_syslog(mess);
+        write_log(ERRLOG,YESTIME,"CONVERT: Couldn't open tempfile(w) \"%s\" to be used in convert_file! %s\n",tempfile,get_error());
 	return 0;
 	}
 
@@ -3385,6 +3509,7 @@ if (port=='3') {
 	         while (CLOSE(whoport[user].sock) == -1 && errno == EINTR)
 			; /* empty while */
                  FD_CLR(whoport[user].sock,&readmask);
+                 FD_CLR(whoport[user].sock,&writemask);
 
    whoport[user].sock=-1; 
    whoport[user].site[0]=0;
@@ -3393,7 +3518,8 @@ if (port=='3') {
 else if (port=='4') {
 	         while (CLOSE(wwwport[user].sock) == -1 && errno == EINTR)
 			; /* empty while */
-                 FD_CLR(wwwport[user].sock,&readmask);
+		 FD_CLR(wwwport[user].sock,&readmask);
+		 FD_CLR(wwwport[user].sock,&writemask);
    wwwport[user].sock=-1;
    wwwport[user].method=-1;
    wwwport[user].req_length=0;
@@ -3401,6 +3527,10 @@ else if (port=='4') {
    wwwport[user].file[0]=0;
    wwwport[user].site[0]=0;
    wwwport[user].net_name[0]=0;
+   if (wwwport[user].output_data) free(wwwport[user].output_data);
+   wwwport[user].output_data=NULL;
+   wwwport[user].write_offset=0;
+   wwwport[user].alloced_size=0;
   }
 
 }
@@ -3423,16 +3553,15 @@ DIR *dirp;
  if (dirp == NULL)
    {  
     if (mode==1) {
-      sprintf(z_mess,"\nSYSTEM: Directory information not found for tot_user_check");
+      sprintf(z_mess,"\nSYSTEM: Can't open directory \"%s\" for tot_user_check! %s",filerid,get_error());
       perror(z_mess);
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
       exit(0);
       }
     else {
-      sprintf(z_mess,"SYSTEM: Directory information not found for tot_user_check\n");
-      print_to_syslog(z_mess);
+      write_log(ERRLOG,YESTIME,"TOTUSERS: Can't open directory \"%s\" for tot_user_check! %s\n",filerid,get_error());
       return;
      }
    }
@@ -3488,7 +3617,7 @@ if (inpstr[0]=='@') {
   if (!strlen(inpstr)) {
    strcpy(filename,get_temp_file());
    if (!(fp=fopen(filename,"w"))) {
-     write_str(user,"Can't create file for list of Rwho sites!");
+     write_str(user,BAD_FILEIO);
      return 1;
      }
     fputs("Who listings are available from these talkers:\n",fp);
@@ -3521,12 +3650,12 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"quest")) {
     strcpy(info,"Vision Quest (talker.com 6000)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=6001;
     }
   else if (!strcmp(inpstr,"spell")) {
     strcpy(info,"Spellbinder (talker.com 9999)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=9990;
     }
   else if (!strcmp(inpstr,"trek")) {
@@ -3546,7 +3675,7 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"breck")) {
     strcpy(info,"BreckTown (talker.com 5000)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=5001;
     }
   else if (!strcmp(inpstr,"light")) {
@@ -3557,22 +3686,22 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"globe")) {
     strcpy(info,"The Globe (talker.com 9050)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=9051;
     }
   else if (!strcmp(inpstr,"grease")) {
     strcpy(info,"Grease (talker.com 9500)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=9510;
     }
   else if (!strcmp(inpstr,"jour")) {
     strcpy(info,"Journeys (talker.com 9000)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=8999;
     }
   else if (!strcmp(inpstr,"jungle")) {
     strcpy(info,"The Jungle (talker.com 3050)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=3051;
     }
   else if (!strcmp(inpstr,"pw")) {
@@ -3582,12 +3711,12 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"scu")) {
     strcpy(info,"State of Conf. Uni. (talker.com 3500)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=3501;
     }
   else if (!strcmp(inpstr,"sommer")) {
     strcpy(info,"Sommerland (talker.com 5555)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=5560;
     }
   else if (!strcmp(inpstr,"village")) {
@@ -3612,32 +3741,32 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"chakrams")) {
     strcpy(info,"Chakrams and Scrolls (talker.com 8000)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=8001;
     }
   else if (!strcmp(inpstr,"dark")) {
     strcpy(info,"Dark Tower (talker.com 5432)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=5433;
     }
   else if (!strcmp(inpstr,"flirt")) {
     strcpy(info,"Flirt Town (talker.com 3200)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=3201;
     }
   else if (!strcmp(inpstr,"invas")) {
     strcpy(info,"Invasions (talker.com 9786)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=9788;
     }
   else if (!strcmp(inpstr,"mega")) {
     strcpy(info,"Mega MoviePlex (talker.com 7000)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=7002;
     }
   else if (!strcmp(inpstr,"merlin")) {
     strcpy(info,"Merlin\'s Hideaway (talker.com 9876)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=9873;
     }
   else if (!strcmp(inpstr,"north")) {
@@ -3647,12 +3776,12 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"ocean")) {
     strcpy(info,"Oceanhome (talker.com 4000)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=4005;
     }
   else if (!strcmp(inpstr,"path")) {
     strcpy(info,"The Path Of The Unicorn (talker.com 4444)");
-    strcpy(addy,"208.220.34.34");
+    strcpy(addy,"216.227.143.34");
     portnum=4446;
     }
   else if (!strcmp(inpstr,"emerald")) {
@@ -3673,7 +3802,7 @@ if (inpstr[0]=='@') {
   else {
    strcpy(filename,get_temp_file());
    if (!(fp=fopen(filename,"w"))) {
-     write_str(user,"Can't create file for list of Rwho sites!");
+     write_str(user,BAD_FILEIO);
      return 1;
      }
     fputs("Who listings are available from these talkers:\n",fp);
@@ -3705,6 +3834,11 @@ if (ustr[user].rwho > 1) {
   return 1;
   }
 
+sprintf(mess,"^Getting listing from %s..^",info);
+write_str(user,mess);
+write_str(user,"^This MAY take time. You may play through the wait^");
+queue_flush(user);
+
 /* Here is where we break the remove who connection off so we dont hang the talker */
 /* if the connection fails. We do this with fork() to create a child process       */
 /* Things inherited by the child: process credentials, environment, memory, stack, */
@@ -3718,25 +3852,26 @@ if (ustr[user].rwho > 1) {
 
    switch(ustr[user].rwho = fork())
 	{
-	 case -1:	print_to_syslog("Rwho fork failed, case -1!\n");
+	 case -1:	write_log(ERRLOG,YESTIME,"RWHO: Fork failed, case -1! %s\n",get_error());
 			write_str(user,"^HR Rwho fork failed, Notify a staff member.^");
 			break;
 	 case 0:	/* We're the child..lets run along now */
 			get_rwho(user,addy,portnum,info,type);
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
 			/* Close all user sockets */
 			for (i=0;i<MAX_USERS;++i) {
 			if (ustr[i].sock != -1) {
+			queue_flush(i);
         		while (CLOSE(ustr[i].sock) == -1 && errno == EINTR)
 				; /* empty while */
                 	FD_CLR(ustr[i].sock,&readmask);
+                	FD_CLR(ustr[i].sock,&writemask);
 			}
 			}
 			_exit(0);
-	 default:	sprintf(mess,"%s: Child spawned with PID of %d\n",get_time(0,0),ustr[user].rwho);
-			print_to_syslog(mess);
+	 default:	write_log(SYSTEMLOG,YESTIME,"RWHO: Child spawned with PID of %d\n",ustr[user].rwho);
 			break;
 	}
 
@@ -3760,11 +3895,9 @@ void get_rwho(int user, char *host, int port, char *info, int type)
 	int			done = 0;
 	int			linenum = 0;
 	int			size=sizeof(struct sockaddr_in);
-	char			timebuf[30];
 	char			buffer[FILE_NAME_LEN];
 	char			*p;
 	char			rbuf;
-	time_t			tm;
 
 /* Close all the listening sockets */
 for (i=0;i<4;++i) {
@@ -3790,11 +3923,7 @@ i=0;
 		if((hp = gethostbyname(host)) == (struct hostent *)0) {
 			sprintf(buffer,"^HRUnknown hostname %s, can't get rwho list^",host);
 			write_str(user,buffer);
-			time(&tm);
-			strcpy(timebuf,ctime(&tm));
-			timebuf[strlen(timebuf)-6]=0;
-			sprintf(buffer,"%s: Unknown hostname %s, can't get rwho list\n",timebuf,host);
-			print_to_syslog(buffer);
+			write_log(ERRLOG,YESTIME,"RWHO: Unknown hostname %s, can't get rwho list\n",host);
 			return;
 		}
 
@@ -3806,17 +3935,13 @@ i=0;
 		if((f = inet_addr(host)) == -1L) {
 			sprintf(buffer,"^HRUnknown ip address %s, can't get rwho list^",host);
 			write_str(user,buffer);
-			time(&tm);
-			strcpy(timebuf,ctime(&tm));
-			timebuf[strlen(timebuf)-6]=0;
-			sprintf(buffer,"%s: Unknown ip address %s, can't get rwho list\n",timebuf,host);
-			print_to_syslog(buffer);
+			write_log(ERRLOG,YESTIME,"RWHO: Unknown ip address %s, can't get rwho list\n",host);
 			return;
 			}
 		(void)bcopy((char *)&f,(char *)&raddr.sin_addr,sizeof(f));
 	}
 
-	raddr.sin_port = htons(port);
+	raddr.sin_port = htons((unsigned short)port);
 	raddr.sin_family = AF_INET;
 
 	signal(SIGALRM,SIG_IGN);
@@ -3825,27 +3950,21 @@ i=0;
 	if ((fd = socket(AF_INET,SOCK_STREAM,0)) == INVALID_SOCKET) {
 		write_str(user,"^HRRwho socket cannot be made!^");
 
-		time(&tm);
-		strcpy(timebuf,ctime(&tm));
-		timebuf[strlen(timebuf)-6]=0;
-		sprintf(buffer,"%s: Rwho socket failed for %s %d : %s\n",timebuf,host,port,strerror(errno));
-		print_to_syslog(buffer);
-#if !defined(WIN32) || defined(__CYGWIN32__)
+		write_log(ERRLOG,YESTIME,"RWHO: Socket creation failed for %s %d! %s\n",host,port,get_error());
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 		reset_alarm();
 #endif
 		return;
 	}
 
+/*
         sprintf(buffer,"^Getting listing from %s..^",info);
 	write_str(user,buffer);
 	write_str(user,"^This MAY take time. You may play through the wait^");
         buffer[0]=0;
+*/
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
 	if (connect(fd, (struct sockaddr *)&raddr, sizeof(raddr)) == SOCKET_ERROR) {
-#else
-	if (connect(fd, (struct sockaddr *)&raddr, sizeof(raddr)) == -1) {
-#endif
 	   if (errno == ECONNREFUSED)
 		write_str(user,"^HRConnection refused to talker!  Talker may be down. Try again in a few minutes.^");
 	   else if (errno == ETIMEDOUT)
@@ -3855,17 +3974,12 @@ i=0;
 	   else if (errno != EINPROGRESS)
 		write_str(user,"^HRUnknown problem. Try later.^");
 
-		time(&tm);
-		strcpy(timebuf,ctime(&tm));
-		timebuf[strlen(timebuf)-6]=0;
-
 		/* Uncomment if you want connection errors logged
-		sprintf(buffer,"%s: Connection failed to %s %d : %s\n",timebuf,host,port,strerror(errno));
-		print_to_syslog(buffer);
+		write_log(ERRLOG,YESTIME,"RWHO: Connection failed to %s %d %s\n",host,port,get_error());
 		*/
 
 		CLOSE(fd);
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 		reset_alarm();
 #endif
 		return;
@@ -3927,7 +4041,7 @@ i=0;
 	point = 0;
 	buffer[0]=0;
 
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 	reset_alarm();
 #endif
 
@@ -3946,6 +4060,13 @@ return;
 /* This function is called after the MOTD is shown.  It allows      */
 /* the connector to login to the system as an old user or create a  */
 /* new user.                                                        */
+/* logging_in = 1   User at password confirmation for new user	    */
+/* logging_in = 2   User at first password prompt		    */
+/* logging_in = 3   User at username prompt			    */
+/* logging_in = 5   User at email verification prompt (enter addy)  */
+/* logging_in = 10  User at password prompt, back from emailver	    */
+/* logging_in = 11  User at info press-return prompt (normal)	    */
+/* logging_in = 12  User at info press-return prompt (new user)	    */
 /*------------------------------------------------------------------*/
 void login(int user, char *inpstr)
 {
@@ -3955,8 +4076,6 @@ void login(int user, char *inpstr)
   char         lowemail[71];
   char         email_pass[NAME_LEN];
   char         tempname[NAME_LEN+1];
-  char         z_mess[100];
-  char         buf[30];
   char         filename[FILE_NAME_LEN];
   int          f=0;
   int          su;
@@ -4002,7 +4121,7 @@ void login(int user, char *inpstr)
     if (mail_verify(user,email_pass,email) == -1) {
       write_str(user,"Mail message could not be sent. Try later.");
       email_pass[0]=0;
-      user_quit(user);
+      user_quit(user,1);
       return;
       }
 
@@ -4019,7 +4138,7 @@ void login(int user, char *inpstr)
     write_str(user,"Come back when you have received it to activate your account");
     write_str(user,"Thank you for stopping by!");
 
-    user_quit(user);
+    user_quit(user,1);
     return;
     }
 
@@ -4037,7 +4156,7 @@ void login(int user, char *inpstr)
        {
          write_str(user,NON_VERIFY);
          ustr[user].login_pass[0]=0;
-         user_quit(user);
+         user_quit(user,1);
          return;
        }
 
@@ -4069,10 +4188,10 @@ if (ustr[user].pause_login==1) {
       name[0]=0;
       sscanf(inpstr,"%s",name);
 	strtolower(name);
-	reset_user_struct(user);
+	reset_user_struct(user,0);
         if (!strcmp(name,"quit")) {
                 write_str(user,IF_QUIT_LOGIN);
-                user_quit(user);  return;
+                user_quit(user,1);  return;
                 }      
         if (!strcmp(name,"who")) {
              if (LONGLOGIN_WHO) {
@@ -4135,17 +4254,29 @@ if (ustr[user].pause_login==1) {
 
      strcpy(ustr[user].login_name,tempname);
 
+     /* Check to see if someone already has this name		*/
+     /* We don't want to check if they're a new user, but	*/
+     /* more specifically if they're a new user with a name	*/
+     /* someone else is trying to create at the same time	*/
+     if (!check_for_user(ustr[user].login_name)) {
+	f=check_for_creation(ustr[user].login_name);
+	if (f != -1) {
+		write_str(user,NO_CREATION);
+		write_log(SYSTEMLOG,YESTIME,"CREATE: User from %s:%s tried to create user %s\n",ustr[user].site,ustr[user].net_name,ustr[user].login_name);
+		write_log(SYSTEMLOG,YESTIME,"CREATE: but already in process of creation by %s:%s\n",ustr[f].site,ustr[f].net_name);
+		attempts(user);
+		return;
+		}
+     }
+
      /* Check to see if this user is returning with a password   */
      /* we emailed him. If so, check their site against new-bans */
      /* If they pass ask them for the password                   */
+   if (allow_new==1) {
      if (check_verify(user,0) == 1) {
 	     if (check_restriction(user, NEW) == 1)
 		{
-                sprintf(mess,"%s: Creation attempt (%s), BANNEWed site %s:%s\n",get_time(0,0),ustr[user].login_name,ustr[user].site,
-		ustr[user].net_name);
-		print_to_syslog(mess);
-                ustr[user].login_pass[0]=0;
-                ustr[user].password[0]=0;
+		write_log(BANLOG,YESTIME,"MAIN: Creation attempt by %s, back from emailver, BANNEWed site %s:%s:sck#%d:slt#%d\n",ustr[user].login_name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
 		attempts(user);
 		return;
 		}
@@ -4158,21 +4289,17 @@ if (ustr[user].pause_login==1) {
 	telnet_write_eor(user);
      ustr[user].logging_in=10;
      return;
+     } /* end of check_verify */
 
-       }
-
-     if (allow_new==1) {
-       /* See if user already exists */
-       if (!check_for_user(ustr[user].login_name)) {
         /* First check if new users are banned from this site */
         if (check_restriction(user, NEW) == 1)
          {
-                sprintf(mess,"%s: Creation attempt (%s), BANNEWed site %s:%s\n",get_time(0,0),ustr[user].login_name,ustr[user].site,
-		ustr[user].net_name);
-		print_to_syslog(mess);
+	  write_log(BANLOG,YESTIME,"MAIN: Creation attempt by %s, BANNEWed site %s:%s:sck#%d:slt#%d\n",ustr[user].login_name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
           attempts(user);
           return;
          }
+       /* See if user already exists */
+       if (!check_for_user(ustr[user].login_name)) {
         sprintf(filename,"%s",VERIINSTRUCT); 
         /* Print out the email verification instructions file */
         /* to the user */
@@ -4182,8 +4309,8 @@ if (ustr[user].pause_login==1) {
 	telnet_write_eor(user);
         ustr[user].logging_in=5;
         return;
-        }
-       }
+        } /* end of check_for_user */
+   } /* end of allow_new */
 
      ustr[user].logging_in=2;
      strtolower(ustr[user].login_name);
@@ -4264,24 +4391,15 @@ if (ustr[user].pause_login==1) {
 
      if ( strcmp(ustr[user].login_pass,ustr[user].password) )        
        {
-        time(&tm);
 	if (ustr[user].promptseq==0 && ustr[user].passhid==1) write_str(user,"");
         write_str(user,PASS_NOT_RIGHT);
-	sprintf(buf,"%s",ctime(&tm));
-        buf[strlen(buf)-6]=0; /* get rid of nl and year */
-        sprintf(z_mess,"%s: wrong passwd on %s from %s\n",
-                buf, ustr[user].login_name, ustr[user].site);
-        ustr[user].area = -1;
-        print_to_syslog(z_mess);
-
+        write_log(LOGINLOG,YESTIME,"wrong passwd from %s %s:%s:sck#%d:slt#%d\n", ustr[user].say_name, ustr[user].site, ustr[user].net_name, ustr[user].sock, user);
         attempts(user);
         return;
        }
       else
        {
      telnet_echo_on(user);
-     time(&tm);
-     tm_then=((time_t) ustr[user].rawtime);
 
 if (ustr[user].super < MIN_HIDE_LEVEL)
   {
@@ -4325,19 +4443,21 @@ if (astr[ustr[user].area].private)
    write_str(user,IS_PRIVATE);
   }
 write_str(user,"");
-sprintf(z_mess,"Welcome to ^%s^ %s %s",SYSTEM_NAME,ranks[ustr[user].super],ustr[user].say_name);
-write_str(user,z_mess);  
+sprintf(mess,"Welcome to ^%s^ %s %s",SYSTEM_NAME,ranks[ustr[user].super].lname,ustr[user].say_name);
+write_str(user,mess);  
 write_str(user,"");
 
 write_str(user," Last login from..");
-sprintf(z_mess,"  ^%s^ (^HG%s^)",ustr[user].last_name,ustr[user].last_site);
-write_str(user,z_mess);
-sprintf(z_mess,"  %s ago.",converttime((long)((tm-tm_then)/60)));
-write_str(user,z_mess);
+sprintf(mess,"  ^%s^ (^HG%s^)",ustr[user].last_name,ustr[user].last_site);
+write_str(user,mess);
+tm_then=((time_t) ustr[user].rawtime);
+time(&tm);
+sprintf(mess,"  %s ago.",converttime((long)((tm-tm_then)/60)));
+write_str(user,mess);
 write_str(user,"");
 write_str(user," This login from..");
-sprintf(z_mess,"  ^%s^ (^HG%s^)",ustr[user].net_name,ustr[user].site);
-write_str(user,z_mess);
+sprintf(mess,"  ^%s^ (^HG%s^)",ustr[user].net_name,ustr[user].site);
+write_str(user,mess);
 write_str(user,"");
 quotes(user);
 write_str(user,"+---------------------------------------------------------------------------+");   
@@ -4350,7 +4470,7 @@ write_str(user,"+---------------------------------------------------------------
 	if (how_many_users(ustr[user].name) > 1) {
          write_str(user,ALREADY_ON);
 	 if (!quit_multiples(user)) {
-		user_quit(user);
+		user_quit(user,1);
 		return;
 		}
 	 }
@@ -4373,9 +4493,7 @@ write_str(user,"+---------------------------------------------------------------
      /*---------------------------------------------*/      
      if (check_restriction(user, NEW) == 1)
        {
-                sprintf(mess,"%s: Creation attempt (%s), BANNEWed site %s:%s\n",get_time(0,0),ustr[user].login_name,ustr[user].site,
-		ustr[user].net_name);
-		print_to_syslog(mess);
+	write_log(BANLOG,YESTIME,"MAIN: Creation attempt by %s, BANNEWed site %s:%s:sck#%d:slt#%d\n",ustr[user].login_name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
         attempts(user);
         return;
        }
@@ -4444,14 +4562,7 @@ write_str(user,"+---------------------------------------------------------------
      telnet_echo_on(user);   
      write_str(user,NEW_CREATE);   
 
-        time(&tm);                                            
-	sprintf(buf,"%s",ctime(&tm));
-        buf[strlen(buf)-6]=0; /* get rid of nl and year */
-
-     sprintf(z_mess,"%s: NEW USER created - %s\n",buf,ustr[user].login_name);
-     print_to_syslog(z_mess);
-     strcpy(ustr[user].creation, ctime(&tm));
-     ustr[user].creation[24]=0;
+     write_log(SYSTEMLOG,YESTIME,"CREATE: NEW USER created - %s\n", ustr[user].login_name);
      strcpy(ustr[user].password,passwd);   
      init_user(user);
      copy_from_user(user);                        
@@ -4476,11 +4587,11 @@ void attempts(int user)
 {
 if (!--ustr[user].attleft) {
 	write_str(user,ATTEMPT_MESS);
-	user_quit(user); 
+	user_quit(user,1); 
 	return;
 	}
 
-reset_user_struct(user);
+reset_user_struct(user,0);
 ustr[user].logging_in=3;
 telnet_echo_on(user);
 write_str_nr(user,SYS_LOGIN);
@@ -4505,24 +4616,26 @@ if (ud) puts("Logging startup...");
 /* write to file */
 if (ud)  {
   time(&start_time);
-  sprintf(mess,"%s: BOOT on port %d using datadir: %s\n",get_time(start_time,0),PORT,datadir);
+  write_log(BOOTLOG,NOTIME,"%s: BOOT on port %d using datadir: %s with pid %u\n",get_time(start_time,0),PORT,datadir,(unsigned int)getpid());
   }
 else {
       if (user==-1) {
-      if (treboot)
-       sprintf(mess,"%s: REBOOT by the talker\n",get_time(0,0));
+      if (treboot==1)
+       write_log(BOOTLOG,YESTIME,"SOFT-REBOOT by the talker\n");
+      else if (treboot==2)
+       write_log(BOOTLOG,YESTIME,"HARD-REBOOT by the talker\n");
       else
-       sprintf(mess,"%s: SHUTDOWN by the talker\n",get_time(0,0));
+       write_log(BOOTLOG,YESTIME,"SHUTDOWN by the talker complete\n");
       }
       else {
-      if (treboot)
-       sprintf(mess,"%s: REBOOT by %s\n",get_time(0,0),ustr[user].say_name);
+      if (treboot==1)
+       write_log(BOOTLOG,YESTIME,"SOFT-REBOOT by %s\n",ustr[user].say_name);
+      else if (treboot==2)
+       write_log(BOOTLOG,YESTIME,"HARD-REBOOT by %s\n",ustr[user].say_name);
       else
-       sprintf(mess,"%s: SHUTDOWN by %s\n",get_time(0,0),ustr[user].say_name);
+       write_log(BOOTLOG,YESTIME,"SHUTDOWN by %s complete\n",ustr[user].say_name);
       }
      }
-
-print_to_syslog(mess);
 
 sprintf(filename,"%s.pid",thisprog);
 
@@ -4608,7 +4721,7 @@ int reload1=0;
 
 		ustr[user].conv_count = ustr[u].conv_count;
 		strcpy(ustr[user].phone_user,ustr[u].phone_user);
-		user_quit(u); 
+		user_quit(u,1); 
 	    } /* end of if */
 	} /* end of for */
 
@@ -4634,17 +4747,19 @@ void add_user(int user)
 int v;
 char room[32];
 time_t tm;
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 unsigned long arg = 1;
 #endif
 
  if (ustr[user].attach_port == '2' && ustr[user].super < WIZ_LEVEL)
    {
      write_str(user,NO_WIZ_ENTRY);
-     user_quit(user);
+     user_quit(user,1);
      return;
    }
- 
+
+ /* do we really need to clear these? */ 
+ /* doesn't reset_user_struct take care of this in the beginning? */
  ustr[user].locked=           0;
  
  ustr[user].clrmail=          -1;
@@ -4684,7 +4799,7 @@ num_of_users++;
 
 if (!strcmp(ustr[user].name,BOT_ID)) bot=user;
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 ioctlsocket(ustr[user].sock, FIONBIO, &arg);
 #else
 fcntl(ustr[user].sock, F_SETFL, NBLOCK_CMD); /* set socket to non-blocking */
@@ -4774,12 +4889,13 @@ else if (mode==1) {
 int cat_to_sock(char *filename, int accept_sock)
 {
 int n;
+int count=0;
 char line[257];
 FILE *fp;
 
 if (!(fp=fopen(filename,"rb"))) 
   {
-   print_to_syslog("Can't open binary file!\n");
+   write_log(ERRLOG,YESTIME,"Can't open binary file(rb) \"%s\" in cat_to_sock! %s\n",filename,get_error());
    return 0;
   }
 
@@ -4795,9 +4911,34 @@ while(!feof(fp)) {
 */
 
 while ((n = fread(line, 1, sizeof line,  fp)) != 0) {
-   S_WRITE(accept_sock,line,n);
+   count+=S_WRITE(accept_sock,line,n);
+
    } /* end of feof */
 
+fclose(fp);
+
+return 1;
+}
+
+/** page a file out to a socket **/
+int cat_to_www(char *filename, int user)
+{
+int n=0;
+char line[257];
+FILE *fp;
+
+if (!(fp=fopen(filename,"rb"))) 
+  {
+   write_log(ERRLOG,YESTIME,"Can't open binary file(rb) \"%s\" in cat_to_www! %s\n",filename,get_error());
+   return 0;
+  }
+
+line[0]=0;
+
+while ((n = fread(line, 1, 256, fp)) != 0) {
+   write_str_www(user,line,n);
+   line[0]=0;
+   } /* end of feof */
 fclose(fp);
 
 return 1;
@@ -4845,6 +4986,8 @@ mess[0]=0;
 fgets(mess, sizeof(mess)-25, fp);
 		   strcpy(mess,check_var(mess,SYS_VAR,SYSTEM_NAME));
 		   strcpy(mess,check_var(mess,USER_VAR,ustr[user].say_name));
+		   strcpy(mess,check_var(mess,HOST_VAR,thishost));
+		   strcpy(mess,check_var(mess,MAINPORT_VAR,itoa(PORT)));
 
 if (!ustr[user].cols) ustr[user].cols=80;
 
@@ -4874,6 +5017,8 @@ while(!feof(fp) && lines < max_lines)
    fgets(mess, sizeof(mess)-25, fp);
 		   strcpy(mess,check_var(mess,SYS_VAR,SYSTEM_NAME));
 		   strcpy(mess,check_var(mess,USER_VAR,ustr[user].say_name));
+		   strcpy(mess,check_var(mess,HOST_VAR,thishost));
+		   strcpy(mess,check_var(mess,MAINPORT_VAR,itoa(PORT)));
   }
   
 if (user== -1) goto SKIP;
@@ -5052,10 +5197,10 @@ strcat(str2,str);
 if (type == WIZT) {
 /* Check if command was revoked from user */
  for (z=0;z<MAX_GRAVOKES;++z) {
-        if (!isrevoke(ustr[u].revokes[z])) continue;
-        if (strip_com(ustr[u].revokes[z])==get_com_num_plain(".wiztell")) {
-                gravoked=1; break;
-        }
+	if (!isrevoke(ustr[u].revokes[z])) continue;
+	if (strip_com(ustr[u].revokes[z])==get_com_num_plain(".wiztell")) {
+		gravoked=1; break;
+	}
    }
 if (gravoked==1) { gravoked=0; continue; }
 gravoked=0;
@@ -5064,11 +5209,8 @@ z=0;
 /* Check if command was granted to user */
  if (ustr[u].super < WIZ_LEVEL && !ustr[u].logging_in && u != user && ustr[u].area!=-1) {
   for (z=0;z<MAX_GRAVOKES;++z) {
-                print_to_syslog("looking for is granted!\n");
-        if (!isgrant(ustr[u].revokes[z])) continue; 
-                print_to_syslog("past is grant!\n");
+        if (!isgrant(ustr[u].revokes[z])) continue;
         if (strip_com(ustr[u].revokes[z])==get_com_num_plain(".wiztell")) {
-                print_to_syslog("granted!\n");
                 gravoked=1; break;
           }
   } /* end of for */
@@ -5086,6 +5228,7 @@ z=0;
 	      write_str(u,str);
 	     }
           } /* end of if wiz level */
+	gravoked=0;
         } /* end of for */
     return;
    } /* end of if area */
@@ -5428,22 +5571,22 @@ return -1;
 int get_com_num_plain(char *inpstr)
 {
 int f=0;
-  
+
 for (f=0; sys[f].su_com != -1; ++f)
         if (!instr2(0,sys[f].command,inpstr,0) && strlen(inpstr)>1) return sys[f].jump_vector;
 
 return -1;
-}     
+}
 
 int get_rank(char *inpstr)
 {
 int f=0;
-  
+
 for (f=0; sys[f].su_com != -1; ++f)
         if (!instr2(0,sys[f].command,inpstr,0) && strlen(inpstr)>1) return sys[f].su_com;
 
 return 0;
-}     
+}
 
 /*---------------------------------------------------------*/
 /* keep an audit trail of user logins and logoffs          */
@@ -5457,11 +5600,7 @@ char filename[80];
 FILE *fp;
 
 /* write to file */
-time(&tm);
-strcpy(stm,ctime(&tm));
-stm[strlen(stm)-6]=0; /* get rid of nl and year */
-sprintf(mess,"%s:%1d: %s %s:%s:sock#%d\n",stm,onoff,ustr[user].name,ustr[user].site,ustr[user].net_name,ustr[user].sock);
-print_to_syslog(mess);
+write_log(LOGINLOG,YESTIME,"%s:%s:%s:%s:sck#%d:slt#%d\n",onoff == 1 ? "IN " : "OUT",ustr[user].name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
 
  if (onoff==1) {
 
@@ -5470,26 +5609,31 @@ print_to_syslog(mess);
     write_bot(mess);
 
   /* If user coming in in bot room, tell bot that user is here */
-  if (!strcmp(astr[ustr[user].area].name,BOT_ROOM)) {
+  if (ustr[user].area == ustr[bot].area) {
     sprintf(mess,"+++++ came in:%s", ustr[user].say_name);
     write_bot(mess);
     }
 
-  sprintf(filename,"%s",LASTLOGS);
+  sprintf(filename,"%s/%s",LOGDIR,LASTLOGS);
   if (!(fp=fopen(filename,"a"))) {
-       write_str(user,"Can't add you to lastlogs file.");
+       write_str(user,BAD_FILEIO);
+       write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in syssign! %s\n",filename,get_error()); 
        return;
        }
   strcpy(other_user,ustr[user].say_name);
   strcat(other_user," ");
   strcat(other_user,ustr[user].desc);
   strcpy(other_user, strip_color(other_user));  
+
+time(&tm);
+strcpy(stm,ctime(&tm));
+stm[strlen(stm)-6]=0; /* get rid of nl and year */
   sprintf(t_mess,"%s  %s\n",stm,other_user);
   other_user[0]=0;
   fputs(t_mess,fp);
   fclose(fp);
 
-  midcpy(stm,stm,11,12);
+midcpy(stm,stm,11,12);
   if (!strcmp(stm,"00"))
    logstat[0].logins++;
   else if (!strcmp(stm,"01"))
@@ -5542,7 +5686,7 @@ print_to_syslog(mess);
  }
  else {
   /* If user leaving from bot room, tell bot that user left */
-  if (!strcmp(astr[ustr[user].area].name,BOT_ROOM)) {
+  if (ustr[user].area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user].say_name);
     write_bot(mess);
     }
@@ -5581,23 +5725,19 @@ sprintf(buf,"%ld.%ld.%ld.%ld", (addr >> 24) & 0xff, (addr >> 16) & 0xff,
          (addr >> 8) & 0xff, addr & 0xff);
 
 if (type==1) {
-  sprintf(mess,"%s: WHO port connect %s:%s\n",stm,buf,namebuf);
+  write_log(LOGINLOG,YESTIME,"WHO: Connection %s:%s:sck#%d:slt#%d\n",buf,namebuf,whoport[user].sock,user);
   strcpy(whoport[user].site,buf);
   strcpy(whoport[user].net_name,namebuf);
   }
 else if (type==2) {
-  sprintf(mess,"%s: WWW port connect %s:%s\n",stm,buf,namebuf);
+  write_log(LOGINLOG,YESTIME,"WWW: Connection %s:%s:sck#%d:slt#%d\n",buf,namebuf,wwwport[user].sock,user);
   strcpy(wwwport[user].site,buf);
   strcpy(wwwport[user].net_name,namebuf);
   }
 
-print_to_syslog(mess);
-
 if (type==1) {
   if (check_misc_restrict(whoport[user].sock,buf,namebuf) == 1) {
-   sprintf(mess,"%s: WHO Connection attempt, RESTRICTed site %s:%s\n",get_time(0,0),
-   buf,namebuf);
-   print_to_syslog(mess);
+   write_log(BANLOG,YESTIME,"WHO : Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",buf,namebuf,whoport[user].sock,user);
    return -1;
    }
   else
@@ -5605,9 +5745,7 @@ if (type==1) {
   }
 else if (type==2) {
   if (check_misc_restrict(wwwport[user].sock,buf,namebuf) == 1) {
-   sprintf(mess,"%s: WWW Connection attempt, RESTRICTed site %s:%s\n",get_time(0,0),
-   buf,namebuf);
-   print_to_syslog(mess);
+   write_log(BANLOG,YESTIME,"WWW : Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",buf,namebuf,wwwport[user].sock,user);
    return -1;
    }
   else
@@ -5616,16 +5754,6 @@ else if (type==2) {
 return 1;
 }
 
-
-/*** log runtime errors in LOGFILE ***/
-void logerror(char *s)
-{
-char line[ARR_SIZE];
-
-s[500]=0;
-sprintf(line,"ERROR: %s\n",s);
-print_to_syslog(line);
-}
 
 
 /* mid copy copies chunk from string strf to string strt */
@@ -5740,12 +5868,11 @@ else {
 ustr[user].tempsuper=ustr[user].super;
 } /* end of not granted else */
 
-sprintf(filename,"%s",LASTFILE);
+sprintf(filename,"%s/%s",LOGDIR,LASTFILE);
 if (!(fp=fopen(filename,"w"))) {
-   sprintf(temp_mess," %s couldn't write lastcommand to file",syserror);
+   sprintf(temp_mess,"Couldn't write last command from %s, to file! %s",ustr[user].say_name,get_error());
    btell(user,temp_mess); 
-   sprintf(temp_mess,"Couldn't write last command from %s, to file",ustr[user].say_name);
-   logerror(temp_mess);
+   write_log(ERRLOG,YESTIME,"%s\n",temp_mess);
    FCLOSE(fp);
    }
 
@@ -5761,7 +5888,7 @@ commands++;
 remove_first(inpstr);  /* get rid of commmand word */
 
 switch(sys[com_num].jump_vector) {
-	case 0 : user_quit(user); break;
+	case 0 : user_quit(user,1); break;
 	case 1 : t_who(user,inpstr,0); break;
 	case 2 : shout(user,inpstr); break;
 	case 3 : tell_usr(user,inpstr,0); break;
@@ -5822,8 +5949,6 @@ switch(sys[com_num].jump_vector) {
 	case 58: display_ranks(user); break;
 	case 59: restrict(user,inpstr,ANY); break;
 	case 60: unrestrict(user,inpstr,ANY); break;
-	case 61: igtells(user); break;
-	case 62: heartells(user); break;
 	case 65: picture(user,inpstr); break;                 
 	case 66: preview(user,inpstr); break;                
 	case 67: password(user,inpstr); break;              
@@ -5954,7 +6079,7 @@ switch(sys[com_num].jump_vector) {
         case 186: auto_com(user,inpstr);  break;
         case 187: break;
         case 188: eight_ball(user,inpstr);  break;
-        case 189: warning(user,inpstr);  break;
+        case 189: warning(user,inpstr,1);  break;
         case 190: arrest(user,inpstr,1);  break;
         case 191: t_who(user,inpstr,3);  break;
         case 192: socials(user,inpstr,12); break; /* chuckle */
@@ -5988,6 +6113,7 @@ switch(sys[com_num].jump_vector) {
 	case 217: ttt_cmd(user,inpstr); break;
 	case 218: guess_hangman(user,inpstr);  break;
 	case 219: play_hangman(user,inpstr);  break;
+	case 220: backup_stuff(user,inpstr);  break;
         default: break;
 	}
 }
@@ -6007,10 +6133,9 @@ if (ustr[user].suspended)
   
 sprintf(filename,"%s",LASTFILE);
 if (!(fp=fopen(filename,"w"))) {
-   sprintf(temp_mess," %s couldn't write bot lastcommand to file",syserror);
+   sprintf(temp_mess,"Couldn't write last command from bot %s, to file! %s",ustr[user].say_name,get_error());
    btell(user,temp_mess); 
-   sprintf(temp_mess,"Couldn't write last command from bot %s, to file",ustr[user].say_name);
-   logerror(temp_mess);
+   write_log(ERRLOG,YESTIME,"%s\n",temp_mess);
    FCLOSE(fp);
    }
 
@@ -6032,16 +6157,58 @@ switch(botsys[com_num].jump_vector) {
 
 
 /*** closes socket & does relevant output to other users & files ***/
-void user_quit(int user)
+void user_hot_quit(int user)
 {
-int u,area=ustr[user].area;
-int min;
-int v=0;
-char nuke_name[NAME_LEN+1];
 time_t tm;
 
-ustr[user].char_buffer[0]   = 0;
-ustr[user].char_buffer_size = 0;
+time(&tm);
+strcpy(ustr[user].last_date,  ctime(&tm));
+  ustr[user].last_date[24]=0;
+strcpy(ustr[user].last_site, ustr[user].site);
+strcpy(ustr[user].last_name, ustr[user].net_name);
+ustr[user].rawtime = tm;
+
+/* Fix a user that has quit or has been killed while stuck in editing */
+if (ustr[user].pro_enter) {
+  free(ustr[user].pro_start);
+  ustr[user].pro_end='\0';
+  strcpy(ustr[user].flags,ustr[user].mutter);
+  }
+else if (ustr[user].vote_enter) {
+  free(ustr[user].vote_start);
+  ustr[user].vote_end='\0';
+  strcpy(ustr[user].flags,ustr[user].mutter);
+  }
+else if (ustr[user].roomd_enter) {
+  free(ustr[user].roomd_start);
+  ustr[user].roomd_end='\0';
+  strcpy(ustr[user].flags,ustr[user].mutter);
+  }
+
+queue_flush(user);
+if (ustr[user].logging_in) {
+        /* Close socket and clear from readmask */
+        while (CLOSE(ustr[user].sock) == -1 && errno == EINTR)
+                ; /* empty while */
+}
+else {
+copy_from_user(user);
+write_user(ustr[user].name);
+write_rebootdb(user);
+}
+
+        FD_CLR(ustr[user].sock,&readmask);
+        FD_CLR(ustr[user].sock,&writemask);
+	reset_user_struct(user,1);
+}
+
+/*** closes socket & does relevant output to other users & files ***/
+/*** If mode is 0 we run silent and dont output/flush anything   ***/
+void user_quit(int user, int mode)
+{
+int area=ustr[user].area;
+int min;
+time_t tm;
 
 /* see is user has quit before he logged in */
 if (ustr[user].logging_in) {
@@ -6054,132 +6221,31 @@ if (ustr[user].logging_in) {
         mess[0]=0;
         min=0;
    if (!strcmp(ustr[user].desc,DEF_DESC) && (ustr[user].super==0)) {
-        write_str(user,"");
-        write_str(user,"Description not set. GONNA HAFTA NUKE YOU. Sorry.");
-        write_str(user,"");
-        strtolower(ustr[user].login_name);
+	if (mode) {
+         write_str(user,"");
+         write_str(user,"Description not set. GONNA HAFTA NUKE YOU. Sorry.");
+         write_str(user,"");
+	}
         remove_exem_data(ustr[user].login_name);
         remove_user(ustr[user].login_name);
+        write_log(SYSTEMLOG,YESTIME,"AUTO-NUKE of %s\n",ustr[user].login_name);
         }
-	ustr[user].logging_in=0;
+
+	/* Flush data to socket */
+	if (mode) queue_flush(user);
 
 	/* Close socket and clear from readmask */
         while (CLOSE(ustr[user].sock) == -1 && errno == EINTR)
 		; /* empty while */
         FD_CLR(ustr[user].sock,&readmask);
-        ustr[user].sock= -1;
+        FD_CLR(ustr[user].sock,&writemask);
 
-        ustr[user].name[0]=0;
-        ustr[user].say_name[0]=0;
-        ustr[user].mutter[0]=0;
-        ustr[user].phone_user[0]=0;
-        ustr[user].creation[0]=0;
-        ustr[user].homepage[0]=0;
-        ustr[user].area= -1;
-        ustr[user].conv_count = 0;
-        ustr[user].numcoms = 0;
-        ustr[user].mail_num = 0;
-        ustr[user].numbering = 0;
-        ustr[user].rows = 24;
-        ustr[user].cols = 256;
-        ustr[user].abbrs        = 1;
-        ustr[user].times_on     = 0;
-        ustr[user].aver         = 0;
-        ustr[user].white_space  = 1;
-        ustr[user].totl         = 0;
-        ustr[user].autor        = 0;
-        ustr[user].autof        = 0;
-        ustr[user].automsgs     = 0;
-        ustr[user].gagcomm      = 0;
-        ustr[user].semail       = 0;
-        ustr[user].quote        = 1;
-        ustr[user].hilite       = 0;
-        ustr[user].new_mail     = 0;
-        ustr[user].color        = COLOR_DEFAULT;
-        ustr[user].friend_num   = 0;
-        ustr[user].revokes_num  = 0;
-        ustr[user].gag_num      = 0;
-        ustr[user].home_room[0] = 0;
-        ustr[user].nerf_shots   = 5;
-        ustr[user].nerf_energy  = 10;
-        ustr[user].nerf_kills   = 0;
-        ustr[user].nerf_killed  = 0;
-        ustr[user].passhid      = 0;
-        ustr[user].pbreak       = 0;
-        ustr[user].beeps        = 0;
-        ustr[user].mail_warn    = 0;
-        ustr[user].muz_time     = 0;
-        ustr[user].xco_time     = 0;
-        ustr[user].gag_time     = 0;
-        ustr[user].frog         = 0;
-        ustr[user].frog_time    = 0;
-        ustr[user].anchor       = 0;
-        ustr[user].anchor_time  = 0;
-        ustr[user].promote      = 0;
-        ustr[user].afkmsg[0]    = 0;
-        ustr[user].pro_enter    = 0;
-        ustr[user].roomd_enter  = 0;
-        ustr[user].vote_enter   = 0;
-        ustr[user].t_ent        = 0;
-        ustr[user].t_num        = 0;
-        ustr[user].t_name[0]    = 0;
-        ustr[user].t_host[0]    = 0;
-        ustr[user].t_ip[0]      = 0;
-        ustr[user].t_port[0]    = 0;
-        ustr[user].help         = 0;
-        ustr[user].who          = 0;
-        ustr[user].webpic[0]    = 0;
-        ustr[user].rwho         = 1;
-        ustr[user].tempsuper    = 0;
-	ustr[user].promptseq	= 0;
-        ustr[user].needs_hostname = 0;
-        ustr[user].ttt_kills    = 0;
-        ustr[user].ttt_killed   = 0;
-	ustr[user].ttt_board    = 0;
-	ustr[user].ttt_opponent = -3;
-	ustr[user].ttt_playing  = 0;
-        ustr[user].hang_wins    = 0;
-        ustr[user].hang_losses  = 0;
-	ustr[user].hang_stage=-1;
-	ustr[user].hang_word[0]='\0';
-	ustr[user].hang_word_show[0]='\0';
-	ustr[user].hang_guess[0]='\0';
-	ustr[user].icq[0]        = 0; 
-	ustr[user].miscstr1[0]   = 0;
-	ustr[user].miscstr2[0]   = 0;
-	ustr[user].miscstr3[0]   = 0;
-	ustr[user].miscstr4[0]   = 0;
-	ustr[user].pause_login   = 0;
-	ustr[user].miscnum2      = 0;
-	ustr[user].miscnum3      = 0;
-	ustr[user].miscnum4      = 0;
-	ustr[user].miscnum5      = 0;
-        listen_all(user);
-
-   for (v=0; v<MAX_ALERT; v++)
-     {
-      ustr[user].friends[v][0]=0;
-     }
-   v=0;
-   for (v=0; v<MAX_GAG; v++)
-     {
-      ustr[user].gagged[v][0]=0;
-     }
-   v=0;
-   for (v=0; v<MAX_GRAVOKES; v++)
-     {
-      ustr[user].revokes[v][0]=0;
-     }
-   v=0;
-   for (v=0; v<NUM_LINES; v++)
-     {
-      ustr[user].conv[v][0]=0;
-     }
-
+	/* reset user structure */
+	reset_user_struct(user,1);
 	return;
 	}
 
-write_str(user,BYE_MESS); 
+if (mode) write_str(user,BYE_MESS); 
 
 time(&tm);
 strcpy(ustr[user].last_date,  ctime(&tm));
@@ -6190,6 +6256,7 @@ ustr[user].rawtime = tm;
 
 min=(tm-ustr[user].time)/60;
 
+if (mode) {
 sprintf(mess,"%s %s@@",
              ustr[user].say_name,  ustr[user].desc);
 write_str(user,mess);
@@ -6200,6 +6267,7 @@ write_str(user,mess);
                                       
 sprintf(mess,USE_MESS,ustr[user].last_date,converttime((long)min));
 write_str(user,mess);
+} /* end of mode */
 
 /* kind of a fudge factor always have at least one */
 if (ustr[user].aver==0) ustr[user].aver = 1;  
@@ -6258,143 +6326,25 @@ syssign(user,0);
 sprintf(mess,"+++++ logoff:%s",ustr[user].say_name);
 write_bot(mess);
 
-ustr[user].area       = -1;
-ustr[user].logging_in = 0;
-if (autonuke) strcpy(nuke_name,ustr[user].name);
-ustr[user].name[0]       = 0;
-ustr[user].say_name[0]   = 0;
-ustr[user].mutter[0]     = 0;
-ustr[user].phone_user[0] = 0;
-ustr[user].creation[0]= 0;
-ustr[user].homepage[0]= 0;
-ustr[user].conv_count = 0;
-ustr[user].numcoms    = 0;
-ustr[user].mail_num   = 0;
-ustr[user].numbering  = 0;
-ustr[user].rows       = 24;
-ustr[user].cols       = 256;
-ustr[user].abbrs      = 1;
-ustr[user].white_space= 1;
-ustr[user].times_on   = 0;
-ustr[user].aver       = 0;
-ustr[user].totl       = 0;
-ustr[user].autor      = 0;
-ustr[user].autof      = 0;
-ustr[user].automsgs   = 0;
-ustr[user].gagcomm    = 0;
-ustr[user].semail     = 0;
-ustr[user].quote      = 1;
-for (u=0; u<NUM_LINES; u++)
-   {
-    ustr[user].conv[u][0]=0;
-   }
-u=0;
-for (u=0; u<NUM_MACROS; u++)
-   {
-    ustr[user].Macros[u].name[0]=0;
-    ustr[user].Macros[u].body[0]=0;
-   }
-
-ustr[user].hilite       = 0;
-ustr[user].new_mail     = 0;
-ustr[user].color        = COLOR_DEFAULT;
-ustr[user].friend_num   = 0;
-ustr[user].revokes_num  = 0;
-ustr[user].gag_num      = 0;
-ustr[user].home_room[0] = 0;
-ustr[user].nerf_shots   = 5;
-ustr[user].nerf_energy  = 10;
-ustr[user].nerf_kills   = 0;
-ustr[user].nerf_killed  = 0;
-ustr[user].passhid      = 0;
-ustr[user].pbreak       = 0;
-ustr[user].beeps        = 0;
-ustr[user].mail_warn    = 0;
-ustr[user].muz_time     = 0;
-ustr[user].xco_time     = 0;
-ustr[user].gag_time     = 0;
-ustr[user].frog         = 0;
-ustr[user].frog_time    = 0;
-ustr[user].anchor       = 0;
-ustr[user].anchor_time  = 0;
-ustr[user].promote      = 0;
-ustr[user].afkmsg[0]    = 0;
-ustr[user].pro_enter    = 0;
-ustr[user].roomd_enter  = 0;
-ustr[user].vote_enter   = 0;
-ustr[user].t_ent        = 0;
-ustr[user].t_num        = 0;
-ustr[user].t_name[0]    = 0;
-ustr[user].t_host[0]    = 0;
-ustr[user].t_ip[0]      = 0;
-ustr[user].t_port[0]    = 0;
-ustr[user].help         = 0;
-ustr[user].who          = 0;
-ustr[user].webpic[0]    = 0;
-ustr[user].tempsuper    = 0;
-ustr[user].promptseq    = 0;
-ustr[user].needs_hostname = 0;
-ustr[user].ttt_kills    = 0;
-ustr[user].ttt_killed   = 0;
-ustr[user].ttt_board    = 0;
 if (ustr[user].ttt_opponent != -3)
         ttt_abort(user); 
-ustr[user].ttt_opponent = -3;
-ustr[user].ttt_playing  = 0;
-ustr[user].hang_wins    = 0;
-ustr[user].hang_losses  = 0;
-ustr[user].hang_stage=-1;
-ustr[user].hang_word[0]='\0';
-ustr[user].hang_word_show[0]='\0';
-ustr[user].hang_guess[0]='\0';
-ustr[user].icq[0]        = 0; 
-ustr[user].miscstr1[0]   = 0;
-ustr[user].miscstr2[0]   = 0;
-ustr[user].miscstr3[0]   = 0;
-ustr[user].miscstr4[0]   = 0;
-ustr[user].pause_login   = 0;
-ustr[user].miscnum2      = 0;
-ustr[user].miscnum3      = 0;
-ustr[user].miscnum4      = 0;
-ustr[user].miscnum5      = 0;
-listen_all(user);
-
-   for (v=0; v<MAX_ALERT; v++)
-     {
-      ustr[user].friends[v][0]=0;
-     }
-   v=0;
-   for (v=0; v<MAX_GAG; v++)
-     {
-      ustr[user].gagged[v][0]=0;
-     }
-   v=0;
-   for (v=0; v<MAX_GRAVOKES; v++)
-     {
-      ustr[user].revokes[v][0]=0;
-     }
-   v=0;
-   for (v=0; v<NUM_LINES; v++)
-     {
-      ustr[user].conv[v][0]=0;
-     }
 
 if (user == fight.first_user || user == fight.second_user) reset_chal(0,"");
 
  if (autonuke) {
    if (!strcmp(ustr[user].desc,DEF_DESC) && (ustr[user].super==0)) {
+	if (mode) {
         write_str(user,"");
         write_str(user,"Description not set. GONNA HAFTA NUKE YOU. Sorry.");
         write_str(user,"");
-        strtolower(nuke_name);
-        remove_exem_data(nuke_name);
-        remove_user(nuke_name);
+	}
+        remove_exem_data(ustr[user].login_name);
+        remove_user(ustr[user].login_name);
+	write_log(SYSTEMLOG,YESTIME,"AUTO-NUKE of %s\n",ustr[user].say_name);
 
-        sprintf(mess,"%s %s has been AUTO-NUKED",STAFF_PREFIX,nuke_name);
-        mess[6]=toupper((int)mess[6]);
+        sprintf(mess,"%s %s has been AUTO-NUKED",STAFF_PREFIX,ustr[user].say_name);
         writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
       }
-   else ustr[user].super=0;
    }
 
 /* If bot logging off, clear bot id */
@@ -6404,17 +6354,38 @@ if (user==bot) {
   }
 
 if (ustr[user].rwho > 1) {
+/*
         write_str(user,"");
         write_str(user,"You're in the middle of a remote who. Your connection will not close until the task is done. Please wait.");
+*/
+	if (kill((pid_t)ustr[user].rwho,9)==-1) {
+	write_log(ERRLOG,YESTIME,"RWHO: Child kill() failed for PID of %u! %s\n",ustr[user].rwho,get_error());
+	/* ok, we failed, but lets try this stuff anyway before we	*/
+	/* return. We can't go past here and use the while CLOSE loop	*/
+	/* because we'll hang since errno will equal EINTR		*/
+	if (mode) queue_flush(user);
+	CLOSE(ustr[user].sock);
+	FD_CLR(ustr[user].sock,&readmask);
+	FD_CLR(ustr[user].sock,&writemask);
+	/* reset user structure */
+	reset_user_struct(user,1);
+	return;
+	}
+	write_log(SYSTEMLOG,YESTIME,"RWHO: Child killed with PID of %u\n",ustr[user].rwho);
+	ustr[user].rwho=1;
    }
+
+ /* Flush data to socket */
+if (mode) queue_flush(user);
 
  /* Close user's connection socket */
   while (CLOSE(ustr[user].sock) == -1 && errno == EINTR)
 	; /* empty while */
   FD_CLR(ustr[user].sock,&readmask);
+  FD_CLR(ustr[user].sock,&writemask);
 
-  ustr[user].sock= -1;
-  ustr[user].rwho         = 1;
+ /* reset user structure */
+  reset_user_struct(user,1);
 
 }
 
@@ -6423,11 +6394,10 @@ if (ustr[user].rwho > 1) {
 void t_who(int user, char *inpstr, int mode)
 {
 FILE   *fp=NULL;
-int    s,u,v,min,idl,invis=0,count=0;
+int    s,u,v,min,idl,invis=0,count=0,ranklen=0;
 int    z=0;
 int    vi=' ';
 int    with,num=0;
-char   *super=RANKS;
 char   ud[100],un[100],an[NAME_LEN],und[200],rank[50];
 char   temp[256];
 char   check[NAME_LEN+1];
@@ -6476,16 +6446,15 @@ if (mode == 2)
       }
   }
 
-time(&tm);
-
 if (ustr[user].pbreak) {
    strcpy(filename,get_temp_file());
    if (!(fp=fopen(filename,"w"))) {
-     write_str(user,"Can't create file for paged who listing!");
+     write_str(user,BAD_FILEIO);
      return;
      }
    }
 
+time(&tm);
 /* display current time */
 if (mode==1)
  sprintf(mess,WWHO_COLOR,ctime(&tm));
@@ -6538,8 +6507,8 @@ for (v=0;v<NUM_AREAS;++v) {
 	            continue; 
 	          }
 	   
-       	        min=(tm-ustr[u].time)/60;
-		idl=(tm-ustr[u].last_input)/60;
+       	        min=(int)((time(0)-ustr[u].time)/60);
+		idl=(int)((time(0)-ustr[u].last_input)/60);
 
 		if (ustr[user].who==1)
 		sprintf(un," %s",ustr[u].say_name);
@@ -6578,7 +6547,7 @@ for (v=0;v<NUM_AREAS;++v) {
 		
 		if (ustr[user].tempsuper >= WHO_LEVEL) 
 		   { 
-		    s=super[ustr[u].super];
+		    s=ranks[ustr[u].super].abbrev;
 		   }
 		  else
 		   s=' ';
@@ -6617,13 +6586,16 @@ for (v=0;v<NUM_AREAS;++v) {
                     } 
 
 	if (ustr[user].who==1) {
-	if (ustr[user].tempsuper >= WHO_LEVEL)
-	strcpy(rank,ranks[ustr[u].super]);
+	if (ustr[user].tempsuper >= WHO_LEVEL) {
+	strcpy(rank,ranks[ustr[u].super].sname);
+	ranklen=RANK_LEN;
+	}
 	else {
 	strcpy(rank,"  ");
 	strcat(rank,i_buff);
 	strcat(rank,"  ");
 	strcpy(i_buff,"");
+	ranklen=strlen(rank);
 	}
 	}
 
@@ -6642,7 +6614,7 @@ sprintf(mess,"len without mod        : %d\nlen of colors          : %d\nlen of r
 write_str(user,mess);
 */
 if (ustr[user].who==1)
-        sprintf(mess,"%-*s :%-*s:%-*s:%-3.3d m %s",count,und,RANK_LEN,rank,ROOM_LEN,an,min,i_buff);
+        sprintf(mess,"%-*s :%-*s:%-*s:%-3.3d m %s",count,und,ranklen,rank,ROOM_LEN,an,min,i_buff);
 else if (ustr[user].who==2)
         sprintf(mess,"%-*s %c%c%-*s %-5.5d %s %3.3d",ROOM_LEN,an,s,vi,count,und,min,i_buff,idl);
 else
@@ -6692,8 +6664,8 @@ for (v=0;v<NUM_AREAS;++v) {
 	            continue; 
 	          }
 	   
-       	        min=(tm-ustr[u].time)/60;
-		idl=(tm-ustr[u].last_input)/60;
+       	        min=(int)((time(0)-ustr[u].time)/60);
+		idl=(int)((time(0)-ustr[u].last_input)/60);
 
 		if (ustr[user].who==1)
 		sprintf(un," %s",ustr[u].say_name);
@@ -6732,7 +6704,7 @@ for (v=0;v<NUM_AREAS;++v) {
 		
 		if (ustr[user].tempsuper >= WHO_LEVEL) 
 		   { 
-		    s=super[ustr[u].super];
+		    s=ranks[ustr[u].super].abbrev;
 		   }
 		  else
 		   s=' ';
@@ -6771,13 +6743,16 @@ for (v=0;v<NUM_AREAS;++v) {
                     } 
 
 	if (ustr[user].who==1) {
-	if (ustr[user].tempsuper >= WHO_LEVEL)
-	strcpy(rank,ranks[ustr[u].super]);
+	if (ustr[user].tempsuper >= WHO_LEVEL) {
+	strcpy(rank,ranks[ustr[u].super].sname);
+	ranklen=RANK_LEN;
+	}
 	else {
 	strcpy(rank,"  ");
 	strcat(rank,i_buff);
 	strcat(rank,"  ");
 	strcpy(i_buff,"");
+	ranklen=strlen(rank);
 	}
 	}
 
@@ -6792,7 +6767,7 @@ for (v=0;v<NUM_AREAS;++v) {
 
 count=DESC_LEN+count_color(und,0);
 if (ustr[user].who==1)
-        sprintf(mess,"%-*s :%-*s:%-*s:%-3.3d min %s",count,und,RANK_LEN,rank,ROOM_LEN,an,min,i_buff);
+        sprintf(mess,"%-*s :%-*s:%-*s:%-3.3d min %s",count,und,ranklen,rank,ROOM_LEN,an,min,i_buff);
 else if (ustr[user].who==2)
         sprintf(mess,"%-*s %c%c%-*s %-5.5d %s %3.3d",ROOM_LEN,an,s,vi,count,und,min,i_buff,idl);
 else
@@ -6855,125 +6830,6 @@ else write_str(user," ");
 
 }
 
-
-/*** prints who is on the system to requesting user ***/
-void external_who(int as)
-{
-int    s,u,vi,min,idl,invis=0;
-char   ud[100],un[100],an[NAME_LEN],und[200];
-char   temp[256];
-char   i_buff[5];
-time_t tm;
-
-/*-------------------------------------------------------------------------*/
-/* write out title block                                                   */
-/*-------------------------------------------------------------------------*/
-if (EXT_WHO1) S_WRITE(as,EXT_WHO1, strlen(EXT_WHO1) );
-if (EXT_WHO2) S_WRITE(as,EXT_WHO2, strlen(EXT_WHO2) );
-if (EXT_WHO3) {
-  sprintf(mess,EXT_WHO3,PORT+WHO_OFFSET);
-  S_WRITE(as,mess, strlen(mess) );        
-  }
-if (EXT_WHO4) S_WRITE(as,EXT_WHO4, strlen(EXT_WHO4) );
-
-/* display current time */
-time(&tm);
-sprintf(mess,WHO_PLAIN,ctime(&tm));
-strcat(mess,"\n\r");
-S_WRITE(as, mess, strlen(mess));
-
-/* Give Display format */
-sprintf(mess,"Room             Time Stat Idl   Name/Description\n");
-S_WRITE(as, mess, strlen(mess));
-
-/* display user list */
-for (u=0;u<MAX_USERS;++u) {
-	if ((ustr[u].area!=-1) && (!ustr[u].logging_in))
-	  {
-		if (!ustr[u].vis)
-	          { 
-	            invis++;  
-	            continue; 
-	          }
-			 
-		min=(tm-ustr[u].time)/60;
-		idl=(tm-ustr[u].last_input)/60;
-
-		strcpy(un,ustr[u].say_name);
-    
-                if (ustr[u].afk==0)
-                 strcpy(ud,ustr[u].desc);
-                else if ((strlen(ustr[u].afkmsg) > 1) && (ustr[u].afk>=1))
-                 strcpy(ud,ustr[u].afkmsg);
-                else if (!strlen(ustr[u].afkmsg) && (ustr[u].afk>=1))
-                 strcpy(ud,ustr[u].desc);
- 		
-		strcpy(und,un);
-		strcat(und," ");		
-		strcat(und,ud);
-		
-		if (!astr[ustr[u].area].hidden)
-		  {
-		    strcpy(an,astr[ustr[u].area].name);
-		  }
-		 else
-		  { 
-		    strcpy(an, "        ");
-		  }
-		  
-		s=' ';
-		   
-		if (ustr[u].afk == 1) {
-                   strcpy(i_buff,"AFK ");
-                  }
-		 else if (ustr[u].afk == 2) {
-                      strcpy(i_buff,"BAFK");
-                     }
-                 else if (ustr[u].pro_enter) {
-                      strcpy(i_buff,"PROF");
-                     }
-                 else if (ustr[u].vote_enter) {
-                      strcpy(i_buff,"VOTE");
-                     }
-                 else if (ustr[u].roomd_enter) {
-                      strcpy(i_buff,"DESC");
-                     }
-		 else {
-                  if (idl < 3)
-                    strcpy(i_buff,"Actv");
-                  else if (idl >= 3 && idl < 60)
-                    strcpy(i_buff,"Awke");
-                  else if (idl >= 60 && idl < 180)
-		    strcpy(i_buff,"Idle"); 
-                  else if (idl >= 180)
-                    strcpy(i_buff,"Coma");
-                    } 
-
-		if (!ustr[u].vis) vi='_';
-                else vi=' ';
-
-	sprintf(mess,"%-*s %-5.5d %s %3.3d %c%c%s\n",ROOM_LEN,an,min,i_buff,idl,s,vi,und);
-	        
-		strncpy(temp,mess,256);
-		strtolower(temp);
-		
-		mess[0]=toupper((int)mess[0]);
-                strcpy(mess, strip_color(mess));
-		S_WRITE(as, mess, strlen(mess));
-	       }
-	}
-	
-if (invis) 
-  {
-   sprintf(mess,SHADOW_PLAIN,invis == 1 ? "is" : "are",invis,invis == 1 ? " " : "s");
-   S_WRITE(as, mess, strlen(mess));
-  }
-
-S_WRITE(as, "\n\n", 1);
-sprintf(mess,USERCNT_PLAIN,num_of_users,num_of_users == 1 ? "" : "s");
-S_WRITE(as, mess, strlen(mess) );
-S_WRITE(as, "\n\n\n", 2);
-}
 
 /*** prints who is on the system to requesting user ***/
 void swho(int user, char *inpstr)
@@ -7136,6 +6992,10 @@ sh_count = ( ++sh_count ) % NUM_LINES;
 writeall_str(mess, 0, user, 0, user, NORM, SHOUT, 0);
 sprintf(mess,YOU_SHOUT,inpstr);
 write_str(user,mess);
+
+  /* write to bot */
+  sprintf(mess,"+++++ comm_shout:%s %s",ustr[user].say_name,inpstr);
+  write_bot(mess);
 
 }
 
@@ -7324,7 +7184,7 @@ if (ustr[u].afk)
     write_str(user,t_mess);
   }
   
-if (ustr[u].igtell && ustr[user].tempsuper<WIZ_LEVEL) 
+if (!user_wants_message(u,TELLS) && ustr[user].tempsuper<WIZ_LEVEL) 
   {
    sprintf(mess,"%s is ignoring tells",ustr[u].say_name);
    write_str(user,mess);
@@ -7476,6 +7336,12 @@ else {
  write_hilite(u,mess);
  }
 
+  /* write to bot */
+  if (u==bot) {
+  sprintf(mess,"+++++ comm_tell:%s %s",ustr[user].say_name,inpstr);
+  write_bot(mess);
+  }
+
 } /* end of message compisition for loop */
 
 if (multi) {
@@ -7590,7 +7456,8 @@ else {
           {
             found = TRUE;
             area = new_area;
-           if (astr[new_area].hidden && ustr[user].tempsuper < GRIPE_LEVEL)
+           if (astr[new_area].hidden && ((ustr[user].tempsuper < GRIPE_LEVEL)
+		|| (ustr[user].security[new_area]!='Y')))
              {
               write_str(user,"^Secured room, peeking not allowed.^");
               return;
@@ -7842,10 +7709,13 @@ if (ustr[user].area == new_area)
 /* check for secure room                        */
 /*----------------------------------------------*/
 
-if (astr[new_area].hidden && ustr[user].security[new_area] == 'N')
+if (ustr[user].security[new_area] == 'X' && user_knock!=1) 
   {
-   write_str(user, NO_ROOM);
+   /* don't let in unless invited */
+   if (ustr[user].invite != new_area ) {
+   write_str(user,"Your security clearance does not let you enter there");
    return;
+   }
   }
   
 /*-----------------------------------------------*/
@@ -7922,17 +7792,6 @@ if (astr[new_area].private && ustr[user].invite != new_area )
    return;
   }
 
-/*--------------------------------------------------------------------*/
-/* if an area is hidden and the person is trying to get to it without */
-/* permission, tell them it does not exist                            */
-/*--------------------------------------------------------------------*/
-	
-if (astr[new_area].hidden && ustr[user].security[new_area] == 'N')  
-     {                                       
-      write_str(user, NO_ROOM); /* ok...it is kind of a lie */ 
-      return;     
-     }                                                           
-	
 /* record movement */
 if (teleport || astr[new_area].hidden)
   sprintf(mess,GO_TELEMESS,ustr[user].say_name);
@@ -7945,7 +7804,7 @@ if (teleport || astr[new_area].hidden)
 
 /* send output to old room & to conv file */
 if (!ustr[user].vis) {
-   if (!strcmp(astr[area].name,BOT_ROOM)) {
+   if (area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user].say_name);
     write_bot(mess);
     }
@@ -7957,7 +7816,7 @@ writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
 if (ustr[user].vis) {
    sprintf(mess,"%s has left the room.",ustr[user].say_name);
    writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
-   if (!strcmp(astr[area].name,BOT_ROOM)) {
+   if (area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user].say_name);
     write_bot(mess);
     }
@@ -8042,7 +7901,7 @@ else
  writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
 beep=0;
 
-   if (!strcmp(astr[new_area].name,BOT_ROOM)) {
+   if (new_area == ustr[bot].area) {
     sprintf(mess,"+++++ came in:%s", ustr[user].say_name);
     write_bot(mess);
     }
@@ -8193,6 +8052,7 @@ sprintf(mess,"<SOS> from %s: %s",ustr[user].say_name,inpstr);
 strcpy(mess, strip_color(mess));
 write_hilite(user,mess);
 writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, NONE, 0);
+write_log(SYSTEMLOG,YESTIME,"SOS: by %s, \"%s\"\n",ustr[user].say_name,mess);
 
 /*---------------------------*/
 /* store the sos in the buff */
@@ -8200,9 +8060,6 @@ writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, NONE, 0);
 
 strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
 bt_count = ( ++bt_count ) % NUM_LINES;
-
-strcat(mess,"\n");
-print_to_syslog(mess);
 }
 
 /** Enter profile ***/
@@ -8232,9 +8089,8 @@ if (!ustr[user].pro_enter) {
        return;
        }
         if (!(ustr[user].pro_start=(char *)malloc(82*PRO_LINES))) {
-        logerror("Couldn't allocate mem. in enter_pro()");
-        sprintf(mess,"%s : can't allocate buffer mem.",syserror);
-        write_str(user,mess);
+        write_str(user,BAD_MALLOC);
+	write_log(ERRLOG,YESTIME,"Can't malloc memory in enter_pro! %s\n",get_error());
         redo=0;
         return;
         }
@@ -8497,10 +8353,9 @@ if ((mode==3) || (mode==4) || (mode==5) || (mode==6)) {
 if ((mode==3) || (mode==4)) {
 FCLOSE(fp);
 if (!(fp=fopen(filename,"a"))) {
-        sprintf(mess,"Couldn't open %s's profile file to read in inedit_file()",ustr[user].name);
-        logerror(mess);
-        sprintf(mess,"%s : can't append to file",syserror);
-        write_str(user,mess);  return;
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in inedit_file! %s\n",filename,get_error());
+	return;
         }
    if (mode==3) { fputs(inpstr,fp); }
    else if (mode==4) { }
@@ -8542,10 +8397,8 @@ if (!strlen(inpstr)) {
 else {
 strcpy(filename2,get_temp_file());
 if (!(fp2=fopen(filename2,"a"))) {
-        sprintf(mess,"Couldn't open tempfile for %s to append to in inedit_file()",ustr[user].name);
-        logerror(mess);
-        sprintf(mess,"%s : can't append to tempfile",syserror);
-        write_str(user,mess);
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open tempfile(a) for %s to append to in inedit_file()! %s\n",ustr[user].name,get_error());
         FCLOSE(fp); return;
         }
  if (mode==1) {
@@ -8689,10 +8542,9 @@ FILE *fp;
 
 sprintf(filename,"%s/%s",PRO_DIR,ustr[user].name);
 if (!(fp=fopen(filename,"w"))) {
-        sprintf(mess,"Couldn't open %s's profile file to write in write_pro()",ustr[user].name);
-        logerror(mess);
-        sprintf(mess,"%s : can't write to file",syserror);
-        write_str(user,mess);   return 0;
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in write_pro! %s\n",filename,get_error());
+	return 0;
         }
 for (c=ustr[user].pro_start;c<ustr[user].pro_end;++c) putc(*c,fp);
 fclose(fp);
@@ -8732,9 +8584,8 @@ if (!ustr[user].roomd_enter) {
        return;
        }
         if (!(ustr[user].roomd_start=(char *)malloc(82*ROOM_DESC_LINES))) {
-        logerror("Couldn't allocate mem. in descroom()");
-        sprintf(mess,"%s : can't allocate buffer mem.",syserror);
-        write_str(user,mess);
+        write_str(user,BAD_MALLOC);
+	write_log(ERRLOG,YESTIME,"Can't malloc memory in descroom! %s\n",get_error());
         return;
         }
 
@@ -8964,10 +8815,9 @@ if ((mode==3) || (mode==4) || (mode==5) || (mode==6)) {
 if ((mode==3) || (mode==4)) {
 FCLOSE(fp);
 if (!(fp=fopen(filename,"a"))) {
-        sprintf(mess,"Couldn't open desc. file for room %s in inedit_file2()",astr[ustr[user].area].name);
-        logerror(mess);
-        sprintf(mess,"%s : can't append to file",syserror);
-        write_str(user,mess);  return;
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in inedit_file2! %s\n",filename,get_error());
+	return;
         }
    if (mode==3) { fputs(inpstr,fp); }
    else if (mode==4) { }
@@ -9005,10 +8855,8 @@ if (!strlen(inpstr)) {
 else {
 strcpy(filename2,get_temp_file());
 if (!(fp2=fopen(filename2,"a"))) {
-        sprintf(mess,"Couldn't open tempfile for %s to append to in inedit_file2()",ustr[user].name);
-        logerror(mess);
-        sprintf(mess,"%s : can't append to tempfile",syserror);
-        write_str(user,mess);
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open tempfile(a) for %s to append to in inedit_file2! %s\n",ustr[user].name,get_error());
         FCLOSE(fp); return;
         }
  if (mode==1) {
@@ -9141,10 +8989,9 @@ FILE *fp;
 
 sprintf(filename,"%s/%s",datadir,astr[ustr[user].area].name);
 if (!(fp=fopen(filename,"w"))) {
-        sprintf(mess,"Couldn't open %s's file to write in write_room()",ustr[user].name);
-        logerror(mess);
-        sprintf(mess,"%s : can't write to file",syserror);
-        write_str(user,mess);   return 0;
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in write_room! %s\n",filename,get_error());
+	return 0;
         }
 for (c=ustr[user].roomd_start;c<ustr[user].roomd_end;++c) putc(*c,fp);
 fclose(fp);
@@ -9159,10 +9006,9 @@ FILE *fp;
 
 sprintf(filename,"%s/%s",LIBDIR,"votefile");
 if (!(fp=fopen(filename,"w"))) {
-        sprintf(mess,"Couldn't open %s to write in write_vote()",filename);
-        logerror(mess);
-        sprintf(mess,"%s : can't write to file",syserror);
-        write_str(user,mess);   return 0;
+        write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in write_vote! %s\n",filename,get_error());
+	return 0;
         }
 for (c=ustr[user].vote_start;c<ustr[user].vote_end;++c) putc(*c,fp);
 fclose(fp);
@@ -9230,7 +9076,7 @@ if (found) return;
 
 for (uu=0;uu<MAX_USERS;++uu) {
 	if (ustr[uu].sock==u && ustr[uu].logging_in) {
-        user_quit(uu);
+        user_quit(uu,1);
         sprintf(mess,"Line %d cleared\n",uu);
         write_str(user,mess);
 	found=1; break;
@@ -9256,7 +9102,7 @@ if (!strlen(inpstr)) {
   }
 sprintf(mess,"^BL *** [ %s ] ***^",inpstr);
 writeall_str(mess, 0, user, 1, user, BEEPS, BCAST, 0);
-print_to_syslog("BLINKING BROADCAST\n");
+write_log(SYSTEMLOG,YESTIME,"BBCAST: by %s\n",ustr[user].say_name);
 }
 
 /** version command **/
@@ -9424,6 +9270,11 @@ sh_count = ( ++sh_count ) % NUM_LINES;
 
 writeall_str(mess, 0, user, 0, user, NORM, SHOUT, 0);
 write_str(user,mess);
+
+  /* write to bot */
+  sprintf(mess,"+++++ comm_shemote:%s %s",ustr[user].say_name,inpstr);
+  write_bot(mess);
+
 }
 
 
@@ -9565,7 +9416,7 @@ change_exem_data(other_user,newname);
   nuke(user,other_user,0);
   sprintf(mess,"%s Had the name ^%s^, but is renamed now to ^%s^ by ^HR%s^"
               ,lowername,other_user,newname,ustr[user].say_name);
-  warning(user,mess);
+  warning(user,mess,0);
   newname[0]=0;
   lowername[0]=0;
 }
@@ -9841,9 +9692,7 @@ char cmess[600];
 char dmess[600];
 char emess[200];
 char fmess[200];
-time_t tm;
 
-time(&tm);
 strcpy(amess,"");
 strcpy(bmess,"");
 strcpy(cmess,"");
@@ -9862,7 +9711,7 @@ for (v=0;v<NUM_AREAS;++v)
 	              continue; 
 	              }
 			 
-		 idl=(tm-ustr[u].last_input)/60;
+		 idl=(int)((time(0)-ustr[u].last_input)/60);
 		
 		 strcpy(un,ustr[u].say_name);
                  strcat(un," ");
@@ -9924,7 +9773,6 @@ void last_u(int user, char *inpstr)
 int on_now=0;
 int u;
 char other_user[ARR_SIZE],ldate[20];
-time_t tm;
 time_t tm_then;
 
 if (!strlen(inpstr)) {
@@ -9952,9 +9800,8 @@ midcpy(t_ustr.last_date,ldate,0,15);
 write_str(user,"");
 sprintf(mess,"^LR-->^    %s was last here on %s",t_ustr.say_name,ldate);
 write_str(user,mess);
-time(&tm);
 tm_then=((time_t) t_ustr.rawtime);
-sprintf(mess,"^LR-->^    That was %s ago.",converttime((long)((tm-tm_then)/60)));
+sprintf(mess,"^LR-->^    That was %s ago.",converttime((long)((time(0)-tm_then)/60)));
 write_str(user,mess);
 write_str(user,"");
 }
@@ -10007,6 +9854,8 @@ if (!ustr[user].t_ent) {
  if (!strcmp(inpstr,"-a")) {
    START:
     ustr[user].t_ent=1;
+    write_str(user,"Enter a \"q\" by itself on any line to abort");
+    write_str(user,"");
     write_str_nr(user,"Enter the name of the talker: ");
 	 telnet_write_eor(user);
     noprompt=1; return;
@@ -10033,8 +9882,8 @@ if (!ustr[user].t_ent) {
     }
    strcpy(filename2,get_temp_file());
    if (!(fp2=fopen(filename2,"a"))) { 
-     write_str(user,"Can't open temp file for writing!");
-     logerror("Can't open temp file for writing in talker()");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(a) in talker! %s\n",get_error());
      return;
     }
    strcpy(line,"");
@@ -10118,21 +9967,25 @@ if (!ustr[user].t_ent) {
  } /* end of if t_ent */
 else {
     if ((strlen(inpstr) < 5) && ustr[user].t_ent>0 && ustr[user].t_ent<4) {
+	if (is_quit(user,inpstr)) return;
       if (ustr[user].t_ent==1) {
        write_str(user,"Name too short.");
-       write_str(user,"Enter the name of the talker: ");
+       write_str_nr(user,"Enter the name of the talker: ");
+	telnet_write_eor(user);
        noprompt=1; return;
        }
       else if (ustr[user].t_ent==2) {
        write_str(user,"Hostname too short.");
        write_str(user,"Use \"unknown\" if you dont know the name address");
-       write_str(user,"Enter the hostname address (w/o port): ");
+       write_str_nr(user,"Enter the hostname address (w/o port): ");
+	telnet_write_eor(user);
        noprompt=1; return;
        }
       else if (ustr[user].t_ent==3) {
         write_str(user,"Address too short.");
         write_str(user,"Use \"unknown\" if you dont know the numeric address");
-        write_str(user,"Enter the talker numeric address (w/o port): ");
+        write_str_nr(user,"Enter the talker numeric address (w/o port): ");
+	telnet_write_eor(user);
         noprompt=1; return;
        }
      } /* end of if strlen inpstr */
@@ -10140,21 +9993,24 @@ else {
       inpstr[23]=0;
       strcpy(ustr[user].t_name,inpstr);
       if (isalpha((int)ustr[user].t_name[0])) ustr[user].t_name[0]=toupper((int)ustr[user].t_name[0]);
-      write_str(user,"Enter hostname address (w/o port): ");
+      write_str_nr(user,"Enter hostname address (w/o port): ");
+	telnet_write_eor(user);
       ustr[user].t_ent=2;
       noprompt=1; return;
      }
    else if (ustr[user].t_ent==2) {
       inpstr[30]=0;
       strcpy(ustr[user].t_host,inpstr);
-      write_str(user,"Enter the talker numeric address (w/o port): ");
+      write_str_nr(user,"Enter the talker numeric address (w/o port): ");
+	telnet_write_eor(user);
       ustr[user].t_ent=3;
       noprompt=1; return;
      }
    else if (ustr[user].t_ent==3) {
       inpstr[15]=0;
       strcpy(ustr[user].t_ip,inpstr);
-      write_str(user,"Enter the talker port number: ");
+      write_str_nr(user,"Enter the talker port number: ");
+	telnet_write_eor(user);
       ustr[user].t_ent=4;
       noprompt=1; return;
      }
@@ -10185,8 +10041,8 @@ else {
 
        strcpy(filename2,get_temp_file());
    if (!(fp2=fopen(filename2,"a"))) { 
-     write_str(user,"Can't open temp file for writing!");
-     logerror("Can't open temp file for writing in talker()");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(a) in talker! %s\n",get_error());
         alpha=0;
         ustr[user].t_ent        = 0;
         ustr[user].t_num        = 0;
@@ -10500,7 +10356,7 @@ if (ustr[u].afk)
     write_str(user,t_mess);
   }
 
-if (ustr[u].igtell && ustr[user].tempsuper<WIZ_LEVEL) 
+if (!user_wants_message(u,TELLS) && ustr[user].tempsuper<WIZ_LEVEL) 
   {
    sprintf(mess,"%s is ignoring tells, semotes, and sthinks",ustr[u].say_name);
    write_str(user,mess);
@@ -10765,7 +10621,7 @@ if (ustr[u].afk)
     return;
   }
 
-if (ustr[u].igtell) 
+if (!user_wants_message(u,TELLS)) 
   {
    sprintf(mess,"%s is ignoring tells",ustr[u].say_name);
    write_str(user,mess);
@@ -10843,7 +10699,7 @@ if (ustr[u].afk)
     write_str(user,t_mess);
   }
 
-if (ustr[u].igtell) 
+if (!user_wants_message(u,TELLS)) 
   {
    sprintf(mess,"%s is ignoring tells",ustr[u].say_name);
    write_str(user,mess);
@@ -11188,8 +11044,7 @@ else if (!strstr(inpstr,".") || !strstr(inpstr,"@")) {
 else strcpy(mail_addr,inpstr);
 
 if (!(fp=fopen(filename2,"r"))) {
-  sprintf(mess,"%s: Could not open mailfile in fmail for user %s!\n",get_time(0,0),ustr[user].say_name);
-  print_to_syslog(mess);
+  write_log(ERRLOG,YESTIME,"Couldn't open mailfile(r) \"%s\" in fmail! %s\n",filename2,get_error());
   return;
   }
 
@@ -11216,6 +11071,7 @@ if (!(pp=popen(filename,"w")))
    sprintf(mess,"%s : fmail message cannot be written\n", syserror);
    fclose(fp);
    write_str(user,mess);
+   write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in fmail! %s\n",filename,get_error());
    return;
   }
 
@@ -11333,7 +11189,6 @@ if (!file_count_lines(filename)) remove(filename);
 /*-----------------------------------------------*/
 void anchor_user(int user, char *inpstr)
 {
-char buf[256];
 char other_user[ARR_SIZE];
 int u,inlen;
 unsigned int i;
@@ -11411,13 +11266,13 @@ if (strlen(inpstr) && strcmp(inpstr,"0")) {
   ustr[u].anchor_time=atoi(inpstr);
   ustr[u].anchor = 1;
     write_str(u,ANCHORON_MESS);
-    sprintf(mess,"ANCHOR ON : %s by %s for %s\n",ustr[u].say_name, ustr[user].say_name, converttime((long)ustr[u].anchor_time));
+    sprintf(mess,"ANCHOR: ON for %s by %s for %s\n",ustr[u].say_name, ustr[user].say_name, converttime((long)ustr[u].anchor_time));
 }
 else {
     ustr[u].anchor = 1;
     ustr[u].anchor_time=0;
     write_str(u,ANCHORON_MESS);
-    sprintf(mess,"ANCHOR ON : %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"ANCHOR: ON for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
   }
 }     /* end of if anchored */
 
@@ -11425,16 +11280,12 @@ else {
     ustr[u].anchor = 0;
     ustr[u].anchor_time=0;
     write_str(u,ANCHOROFF_MESS);
-    sprintf(mess,"ANCHOR OFF: %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"ANCHOR: OFF for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
   } 
 
 btell(user, mess);
 
- strcpy(buf,get_time(0,0));    
- strcat(buf," ");
- strcat(buf,mess);
-print_to_syslog(buf);
-
+write_log(SYSTEMLOG,YESTIME,mess);
 write_str(user,"Ok");
 }
 
@@ -11505,14 +11356,16 @@ write_str(user,"^HG+----------------------------------------------------------+^
 write_str(user,"");
 
   strcpy(filename,get_temp_file());
-  sprintf(mess,"tail -10 %s",LASTLOGS);
+  sprintf(mess,"tail -10 %s/%s",LOGDIR,LASTLOGS);
  
  if (!(pp=popen(mess,"r"))) {
-	write_str(user,"Can't open pipe to get those logs!");
+	write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open popen(r) \"%s\" in list_last! %s\n",mess,get_error());
 	return;
 	}
  if (!(fp=fopen(filename,"w"))) {
-	write_str(user,"Can't open temp file for writing!");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in list_last! %s\n",get_error());
 	return;
 	}
 while (fgets(line,256,pp) != NULL) {
@@ -11547,14 +11400,16 @@ write_str(user,"^HG+----------------------------------------------------------+^
 write_str(user,"");
 
   strcpy(filename,get_temp_file());
-  sprintf(mess,"tail -%d %s",num,LASTLOGS);
+  sprintf(mess,"tail -%d %s/%s",num,LOGDIR,LASTLOGS);
  
  if (!(pp=popen(mess,"r"))) {
-	write_str(user,"Can't open pipe to get those logs!");
+	write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open popen(r) \"%s\" in list_last! %s\n",mess,get_error());
 	return;
 	}
  if (!(fp=fopen(filename,"w"))) {
-	write_str(user,"Can't open temp file for writing!");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in list_last! %s\n",get_error());
 	return;
 	}
 while (fgets(line,256,pp) != NULL) {
@@ -11580,6 +11435,12 @@ pclose(pp);
  ** 12/27/91: fixed up usercmp to deal with restricted tolower XXX
  ** 5/6/91 DJB baseline authuser 3.1. Public domain.
  */
+
+/* CLORETS returns the errno we encountered. We first save the	*/
+/* error in case CLOSE() returns an error, we wont lose it	*/
+#define CLORETS(e) { saveerrno = errno; CLOSE(s); errno = saveerrno; return e; }
+
+
 static void clearsa(struct sockaddr_in *sa)
 {
     register char *x;
@@ -11587,6 +11448,7 @@ static void clearsa(struct sockaddr_in *sa)
 	*x = 0;
 }
 
+/* Not currently in use, but called by auth_xline	*/
 static int usercmp(register char *u,register char *v)
 {
     register char uc;
@@ -11607,6 +11469,7 @@ static int usercmp(register char *u,register char *v)
 
 static char authline[SIZ];
 
+/* I have no idea what this does. Ask Arctic	*/
 char *auth_xline(register char *user, register int fd, register unsigned long *in)
 {
     unsigned short local;
@@ -11626,6 +11489,8 @@ char *auth_xline(register char *user, register int fd, register unsigned long *i
     return authline;
 }
 
+/* We pass the target user's socket here.			  */
+/* We estable ports and addresses on both sides first in auth_fd2 */
 int auth_fd(register int fd, register unsigned long *in, register unsigned short *local, register unsigned short *remote)
 {
     unsigned long inlocal;
@@ -11638,18 +11503,23 @@ int auth_fd2(register int fd, register unsigned long *inlocal, register unsigned
     socklen_t dummy;
     
     dummy = sizeof(sa);
-    if (getsockname(fd,(struct sockaddr *)&sa,&dummy) == -1)
+    if (getsockname(fd,(struct sockaddr *)&sa,&dummy) == -1) {
+	write_log(ERRLOG,YESTIME,"IDENT: Socket getsockname failed! %s\n",get_error());
 	return -1;
+    }
     if (sa.sin_family != AF_INET)
     {
 	errno = EAFNOSUPPORT;
+	write_log(ERRLOG,YESTIME,"IDENT: Socket family not supported! %s\n",get_error());
 	return -1;
     }
     *local = ntohs(sa.sin_port);
     *inlocal = sa.sin_addr.s_addr;
     dummy = sizeof(sa);
-    if (getpeername(fd,(struct sockaddr *)&sa,&dummy) == -1)
+    if (getpeername(fd,(struct sockaddr *)&sa,&dummy) == -1) {
+	write_log(ERRLOG,YESTIME,"IDENT: Socket getpeername failed! %s\n",get_error());
 	return -1;
+    }
     *remote = ntohs(sa.sin_port);
     *inremote = sa.sin_addr.s_addr;
     return 0;
@@ -11659,53 +11529,21 @@ static char ruser[SIZ];
 static char realbuf[SIZ];
 static char *buf;
 
+/* Here we start calling functions for the remote connection	   */
+/* This is a wrapper to the following function ONLY FOR auth_xline */
 char *auth_tcpuser(register unsigned in, register unsigned short local, register unsigned short remote)
 {
     return auth_tcpuser2(0,in,local,remote);
 }
 
-#define CLORETS(e) { saveerrno = errno; CLOSE(s); errno = saveerrno; return e; }
-
-int auth_tcpsock(register unsigned long inlocal, register unsigned long inremote)
-{
-    struct sockaddr_in sa;
-    register int s;
-    register int fl;
-    register int saveerrno;
-    
-    if ((s = socket(AF_INET,SOCK_STREAM,0)) == INVALID_SOCKET)
-	return -1;
-    if (inlocal)
-    {
-	clearsa(&sa);
-#if defined(__FreeBSD__)
-	sa.sin_len = sizeof(sa);
-#endif /* __FreeBSD__ */
-	sa.sin_family = AF_INET;
-	sa.sin_port = 0;
-	sa.sin_addr.s_addr = inlocal;
-	if (bind(s,(struct sockaddr *)&sa,sizeof(sa)) == -1)
-	    CLORETS(-1)
-	    }
-
-    if ((fl = fcntl(s,F_GETFL,0)) == -1)
-	CLORETS(-1);
-    if (fcntl(s,F_SETFL,NBLOCK_CMD | fl) == -1)
-	CLORETS(-1);
-    clearsa(&sa);
-    sa.sin_family = AF_INET;
-    sa.sin_port = htons(auth_tcpport);
-    sa.sin_addr.s_addr = inremote;
-#if defined(WIN32) && !defined(__CYGWIN32__)
-    if (connect(s,(struct sockaddr *)&sa,sizeof(sa)) == SOCKET_ERROR)
-#else
-    if (connect(s,(struct sockaddr *)&sa,sizeof(sa)) == -1)
-#endif
-	if (errno != EINPROGRESS)
-	    CLORETS(-1)
-		return s;
-}
-
+/* Here we call auth_tcpsock to start the connection	*/
+/* to the target user's host and ident port.		*/
+/* Then we call auth_sockuser to start select()ing	*/
+/* the connection. We select() so that we can check	*/
+/* that the remote sock is writable			*/
+/* Then we select() the sock for readability, if this	*/
+/* suceeds. We timeout on readability after x seconds	*/
+/* so as to not hang ourselves on a slow connection!	*/
 char *auth_tcpuser2(register unsigned long inlocal, register unsigned long inremote, register unsigned short local, register unsigned short remote)
 {
     register int s;
@@ -11716,100 +11554,145 @@ char *auth_tcpuser2(register unsigned long inlocal, register unsigned long inrem
     return auth_sockuser(s,local,remote);
 }
 
-char *auth_tcpuser3(register unsigned long inlocal, register unsigned long inremote, register unsigned short local, register unsigned short remote, register int ctimeout)
+/* Make the remote connection. Return an error unless in progress */
+int auth_tcpsock(register unsigned long inlocal, register unsigned long inremote)
 {
-    return auth_tcpuser4(inlocal,
-			 inremote,
-			 local,
-			 remote,
-			 ctimeout,
-			 auth_rtimeout);
-}
-
-
-char *auth_tcpuser4(register unsigned long inlocal, register unsigned long inremote, register unsigned short local, register unsigned short remote, register int ctimeout, register int rtimeout)
-{
+    struct sockaddr_in sa;
     register int s;
-    struct timeval ctv;
-    fd_set wfds;
-    register int r;
+/*    register int fl; */
     register int saveerrno;
-    /* void *old_sig; */
-    char *retval;
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+    unsigned long arg = 1;
+#endif
     
-    
-    /* old_sig = signal(SIGPIPE, SIG_IGN); */
-    
-    s = auth_tcpsock(inlocal,inremote);
-    if (s == -1)
-    {
-	/* signal(SIGPIPE, old_sig); */
-	return 0;
+    if ((s = socket(AF_INET,SOCK_STREAM,0)) == INVALID_SOCKET) {
+	write_log(ERRLOG,YESTIME,"IDENT: Socket creation failed! %s\n",get_error());
+	return -1;
     }
-    ctv.tv_sec = ctimeout;
-    ctv.tv_usec = 0;
-    FD_ZERO(&wfds);
-    FD_SET(s,&wfds);
-    r = select(s + 1,(void *) 0,(void *)&wfds,(void *) 0,&ctv);
-    /* XXX: how to handle EINTR? */
-    if (r == -1)
+    if (inlocal)
     {
-	/* signal(SIGPIPE, old_sig); */
-	CLORETS(0);
-    }
-    if (!FD_ISSET(s,&wfds))
-    {
-	CLOSE(s);
-	FD_CLR(s,&wfds);
-	errno = ETIMEDOUT;
-	/* signal(SIGPIPE, old_sig); */
-	return 0;
-    }
-    retval = auth_sockuser2(s,local,remote,rtimeout);
-    /* signal(SIGPIPE, old_sig); */
-    
-    return retval;
+	clearsa(&sa);
+#if defined(__FreeBSD__)
+	sa.sin_len = sizeof(sa);
+#endif /* __FreeBSD__ */
+	sa.sin_family = AF_INET;
+	sa.sin_port = (unsigned short)0;
+	sa.sin_addr.s_addr = inlocal;
+
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+	      if (ioctlsocket(s, FIONBIO, &arg) == -1) {
+#else
+              if (fcntl(s,F_SETFL,NBLOCK_CMD)== -1) {
+#endif
+		write_log(ERRLOG,YESTIME,"BLOCK: IDENT error setting binding socket to non-blocking %s\n",get_error());
+		CLORETS(-1);
+              }
+
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+	if (bind(s,(struct sockaddr *)&sa,sizeof(sa)) != 0) {
+#else
+	if (bind(s,(struct sockaddr *)&sa,sizeof(sa)) == -1) {
+#endif
+		write_log(ERRLOG,YESTIME,"IDENT: Socket bind failed! %s\n",get_error());
+		CLORETS(-1);
+	    }
+
+/*
+    if ((fl = fcntl(s,F_GETFL,0)) == -1)
+	CLORETS(-1);
+    if (fcntl(s,F_SETFL,NBLOCK_CMD | fl) == -1)
+	CLORETS(-1);
+*/
+    clearsa(&sa);
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons((unsigned short)auth_tcpport);
+    sa.sin_addr.s_addr = inremote;
+    if (connect(s,(struct sockaddr *)&sa,sizeof(sa)) == SOCKET_ERROR) {
+	if (errno != EINPROGRESS) {
+		write_log(ERRLOG,YESTIME,"IDENT: Connection failed to remote host! %s\n",get_error());
+		CLORETS(-1);
+	} /* end of errno if */
+
+	} /* end of if */
+
+    } /* end of in local */
+
+	/* We're connected or in progress */
+	return s;
 }
- 
+
+/* Here we select()ing the remote sock for writability so we	*/
+/* can send our IDENT query.					*/
+/* This is a wrapper to the following function			*/
 char *auth_sockuser(register int s, register unsigned short local, register unsigned short remote)
 {
-    return auth_sockuser2(s, local, remote, auth_rtimeout);
+    return auth_sockuser2(s, local, remote, auth_rtimeout, auth_wtimeout);
 }
 
-char *auth_sockuser2(register int s, register unsigned short local, register unsigned short remote, int rtimeout)
+/* Check the remote sock for writeability. If so, write our	*/
+/* query to it, looping the write.				*/
+/* Then let's check for a response. If we get one, parse it	*/
+/* out and return the idented username to real_user()		*/
+char *auth_sockuser2(register int s, register unsigned short local, register unsigned short remote, int rtimeout, int wtimeout)
 {
     register int buflen;
     register int w;
     register int saveerrno;
+    register int retval; /* CYGNUS */
     char ch;
     unsigned short rlocal;
     unsigned short rremote;
-    register int fl;
+/*    register int fl; */
+    fd_set rd_fds;
     fd_set wfds;
-    /* void *old_sig; */
     struct timeval rtv;
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+    unsigned long arg = 1;
+#endif
     
     /* old_sig = signal(SIGPIPE, SIG_IGN); */
+	rtv.tv_sec = wtimeout;
+	rtv.tv_usec = 0;
     
     FD_ZERO(&wfds);
     FD_SET(s,&wfds);
-    
-    select(s + 1,
-	   (void *) 0,
-	   (void *)&wfds,(void *) 0,
-	   (struct timeval *) 0);
-    
+
+retval=select(s+1,(void *)0,(void *)&wfds,(void *)0,&rtv);
+if (retval == SOCKET_ERROR) {
+	write_log(ERRLOG,YESTIME,"IDENT: Select failed to write/connect to target host! %s\n", get_error());
+	FD_CLR(s,&wfds);
+	CLORETS(0);
+	}
+
+    if (!FD_ISSET(s,&wfds))
+    {
+	errno = ETIMEDOUT;
+	write_log(ERRLOG,YESTIME,"IDENT: Select timed out connecting to target host! %s\n", get_error());
+	FD_CLR(s,&wfds);
+	CLORETS(0);
+    }
+
     /* now s is writable */
+/*
     if ((fl = fcntl(s,F_GETFL,0)) == -1)
     {
-	/* signal(SIGPIPE, old_sig); */
+	FD_CLR(s,&wfds);
 	CLORETS(0);
     }
     if (fcntl(s,F_SETFL,~NBLOCK_CMD & fl) == -1)
     {
-	/* signal(SIGPIPE, old_sig); */
 	CLORETS(0);
     }
+*/
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+	      if (ioctlsocket(s, FIONBIO, &arg) == -1) {
+#else
+              if (fcntl(s,F_SETFL,NBLOCK_CMD)== -1) {
+#endif
+		write_log(ERRLOG,YESTIME,"BLOCK: IDENT error setting ident socket to non-blocking %s\n",get_error());
+		CLORETS(0);
+              }
+
     buf = realbuf;
     sprintf(buf,"%u , %u\r\n",(unsigned int) remote,(unsigned int) local);
     /* note the reversed order---the example in RFC 931 is misleading */
@@ -11817,7 +11700,8 @@ char *auth_sockuser2(register int s, register unsigned short local, register uns
     while ((w = S_WRITE(s,buf,buflen)) < buflen)
 	if (w == -1) /* should we worry about 0 as well? */
 	{
-	    /* signal(SIGPIPE, old_sig); */
+	    write_log(ERRLOG,YESTIME,"IDENT: Connection failed/ERROR writing to ident socket! %s\n",get_error());
+	    FD_CLR(s,&wfds);
 	    CLORETS(0);
 	}
 	else
@@ -11829,20 +11713,16 @@ char *auth_sockuser2(register int s, register unsigned short local, register uns
     
     do
     {
-	fd_set rd_fds;
-	
 	rtv.tv_sec = rtimeout;
 	rtv.tv_usec = 0;
     
 	FD_ZERO(&rd_fds);
 	FD_SET(s, &rd_fds);
-	if (select(s+1,
-		   (void *)&rd_fds,
-		   (void *) 0,
-		   (void *) 0,
-		   &rtv) == 0)
-	{
+
+retval=select(s+1,(void *)&rd_fds,(void *)0,(void *)0,&rtv);
+if ((retval == SOCKET_ERROR) || (!retval)) {
 	    w = -1;
+	    write_log(ERRLOG,YESTIME,"IDENT: Select timed out reading from target host! %s\n", get_error());
 	    goto END;
 	}
 	
@@ -11857,34 +11737,82 @@ char *auth_sockuser2(register int s, register unsigned short local, register uns
     } while (w == 1);
     
     END: 
-    /* signal(SIGPIPE, old_sig); */
-    if (w == -1)
-	CLORETS(0)
+    if (w == -1) {
+	CLORETS(0);
+    }
+
 	    *buf = 0;
     
     if (sscanf(realbuf, "%hd,%hd: USERID :%*[^:]:%s",
 	       &rremote, &rlocal, ruser) < 3)
     {
-	CLOSE(s);
-	FD_CLR(s,&wfds);
-	errno = EIO;
 	/* makes sense, right? well, not when USERID failed to match ERROR */
 	/* but there's no good error to return in that case */
-	return 0;
+	errno = EIO;
+	write_log(ERRLOG,YESTIME,"IDENT: sscanf didn't return enough data! %s\n", get_error());
+	CLORETS(0);
     }
     if ((remote != rremote) || (local != rlocal))
     {
-	CLOSE(s);
-	FD_CLR(s,&wfds);
 	errno = EIO;
-	return 0;
+	write_log(ERRLOG,YESTIME,"IDENT: Host info returned doesn't match! %s\n", get_error());
+	CLORETS(0);
     }
     /* we're not going to do any backslash processing */
     CLOSE(s);
     FD_CLR(s,&wfds);
+    write_log(SYSTEMLOG,YESTIME,"IDENT: Ident performed and returned \"%s\"\n", ruser);
     return ruser;
 }
 
+/* We dont actually use these next 2 functions */
+char *auth_tcpuser3(register unsigned long inlocal, register unsigned long inremote, register unsigned short local, register unsigned short remote)
+{
+    return auth_tcpuser4(inlocal,
+			 inremote,
+			 local,
+			 remote,
+			 auth_wtimeout,
+			 auth_rtimeout);
+}
+
+
+char *auth_tcpuser4(register unsigned long inlocal, register unsigned long inremote, register unsigned short local, register unsigned short remote, register int wtimeout, register int rtimeout)
+{
+    register int s;
+    struct timeval ctv;
+    fd_set wfds;
+    register int r;
+    register int saveerrno;
+    char *retval;
+    
+    s = auth_tcpsock(inlocal,inremote);
+    if (s == -1)
+    {
+	return 0;
+    }
+    ctv.tv_sec = wtimeout;
+    ctv.tv_usec = 0;
+    FD_ZERO(&wfds);
+    FD_SET(s,&wfds);
+    r = select(s + 1,(void *) 0,(void *)&wfds,(void *) 0,&ctv);
+    /* XXX: how to handle EINTR? */
+    if (r == -1)
+    {
+	CLORETS(0);
+    }
+    if (!FD_ISSET(s,&wfds))
+    {
+	CLOSE(s);
+	FD_CLR(s,&wfds);
+	errno = ETIMEDOUT;
+	return 0;
+    }
+    retval = auth_sockuser2(s,local,remote,rtimeout,wtimeout);
+    
+    return retval;
+}
+ 
 /*-----------------------------------------------------------------*/
 /*  The realuser command. returns the real login of a user if the  */
 /*  site the user telnet from runs an ident daemon port 113 tcp	   */
@@ -11919,12 +11847,15 @@ void real_user(int user, char *inpstr)
    
  /*------------------------------------------*/
  /* if ident has not been run on this user,  */
- /* run now                                  */
+ /* or if use has no ident, force a run now  */
  /*------------------------------------------*/
  
- if (ustr[u].real_id[0] == 0)
+ if ((ustr[u].real_id[0] == 0) || !strcmp(ustr[u].real_id,"NO IDENT"))
    {
-    auth_fd2(ustr[u].sock, &inlocal, &inremote, &local, &remote);
+    if (auth_fd2(ustr[u].sock, &inlocal, &inremote, &local, &remote) == -1) {
+	write_str(user,"Ident failed, initial socket error");
+	return;
+    }
  
     if ( (real_name = auth_tcpuser2(inlocal, inremote, local, remote)) == NULL ) 
       {
@@ -11979,10 +11910,12 @@ void pukoolsn(int user, char *inpstr)
  
  if (!(pp=popen(mess,"r"))) {
 	write_str(user,"Can't open pipe to do an nslookup!");
+	write_log(ERRLOG,YESTIME,"Couldn't open popen(r) \"%s\" in pukoolsn! %s\n",mess,get_error());
 	return;
 	}
  if (!(fp=fopen(filename,"w"))) {
-	write_str(user,"Can't open temp file for writing!");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in pukoolsn! %s\n",get_error());
 	return;
 	}
 while (fgets(line,256,pp) != NULL) {
@@ -11993,7 +11926,7 @@ pclose(pp);
 
 if (!cat(filename,user,0))
     write_str(user,"No info.");
-print_to_syslog("NSLOOKUP QUERY TO HOST\n");
+write_log(SYSTEMLOG,YESTIME,"NSLOOKUP: Query for host %s\n",inpstr);
 write_str(user,"Done.");
 }
 
@@ -12021,10 +11954,12 @@ strcpy(filename,get_temp_file());
 sprintf(mess,"finger %s 2> /dev/null",inpstr);
  if (!(pp=popen(mess,"r"))) {
 	write_str(user,"Can't open pipe to do a finger!");
+	write_log(ERRLOG,YESTIME,"Couldn't open popen(r) \"%s\" in regnif! %s\n",mess,get_error());
 	return;
 	}
  if (!(fp=fopen(filename,"w"))) {
-	write_str(user,"Can't open temp file for writing!");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in regnif! %s\n",get_error());
 	return;
 	}
 while (fgets(line,256,pp) != NULL) {
@@ -12035,13 +11970,14 @@ pclose(pp);
 
 if (!cat(filename,user,0))
     write_str(user,"No info.");
-print_to_syslog("FINGER QUERY TO HOST\n");
+write_log(ERRLOG,YESTIME,"FINGER: Query for user %s\n",inpstr);
 write_str(user,"Done.");
 }
 
 /*** Use system's whois command to find what a domain name is ***/
 void siohw(int user, char *inpstr)
 {
+   int i=0;
    char line[257];
    char filename[FILE_NAME_LEN];
    FILE *fp;
@@ -12061,18 +11997,33 @@ void siohw(int user, char *inpstr)
        return;
        }
 strcpy(filename,get_temp_file());
+i=0;
 #if defined(__linux__)
-sprintf(mess,"fwhois %s 2> /dev/null",inpstr);
+if (strstr(inpstr,"@"))
+ sprintf(mess,"fwhois %s@whois.networksolutions.com 2> /dev/null",inpstr);
+else
+ sprintf(mess,"fwhois %s 2> /dev/null",inpstr);
 #else
-sprintf(mess,"whois -h rs.internic.net %s 2> /dev/null",inpstr);
+if (strstr(inpstr,"@")) {
+ for (i=0;i<strlen(inpstr);++i) {
+	if (inpstr[i]=='@') break;
+ }
+ midcpy(inpstr,line,i+1,255);
+ inpstr[i]=0;
+ sprintf(mess,"whois -h %s %s 2> /dev/null",line,inpstr);
+}
+else
+ sprintf(mess,"whois -h whois.networksolutions.com %s 2> /dev/null",inpstr);
 #endif
 
  if (!(pp=popen(mess,"r"))) {
 	write_str(user,"Can't open pipe to do a whois!");
+	write_log(ERRLOG,YESTIME,"Couldn't open popen(r) \"%s\" in siohw! %s\n",mess,get_error());
 	return;
 	}
  if (!(fp=fopen(filename,"w"))) {
-	write_str(user,"Can't open temp file for writing!");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in siohw! %s\n",get_error());
 	return;
 	}
 while (fgets(line,256,pp) != NULL) {
@@ -12083,7 +12034,7 @@ pclose(pp);
 
 if (!cat(filename,user,0))
     write_str(user,"No info.");
-print_to_syslog("WHOIS QUERY TO HOST\n");
+write_log(ERRLOG,YESTIME,"WHOIS: Query for host %s\n",inpstr);
 write_str(user,"Done.");
 }
 
@@ -12288,7 +12239,6 @@ char buffer2[ARR_SIZE];
 char small_buff[ARR_SIZE];
 char filerid[FILE_NAME_LEN];
 char filename[FILE_NAME_LEN];
-time_t tm;
 struct dirent *dp;
 FILE *fp;
 DIR  *dirp;
@@ -12365,14 +12315,10 @@ a=0;
     return;
    }
 
- time(&tm);   /* for time ago from rawtime */
-
    strcpy(filename,get_temp_file());
    if (!(fp=fopen(filename,"w"))) {
-     sprintf(mess,"%s Can't create file for paged same_site listing!",ctime(&tm));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in same_site! %s\n",get_error());
      (void) closedir(dirp);
      return;
      }
@@ -12388,7 +12334,7 @@ a=0;
        strcpy(buffer2,t_ustr.last_site);
        if (strstr(buffer2,buffer))  /* Search for string in user's last site */
         {
-            sprintf(mess,"%-18s from %14s, %s ago",t_ustr.say_name,t_ustr.last_site,converttime((long)((tm-t_ustr.rawtime)/60)) );
+            sprintf(mess,"%-18s from %14s, %s ago",t_ustr.say_name,t_ustr.last_site,converttime((long)((time(0)-t_ustr.rawtime)/60)) );
             fputs(mess,fp);
             fputs("\n",fp);
             t_ustr.last_site[0]=0;
@@ -12402,7 +12348,7 @@ a=0;
        strtolower(buffer2);
        if (strstr(buffer2,buffer))  /* Search for string in user's last hostname */
         {
-            sprintf(mess,"%-18s from %s\n\r%s ago\n\r",t_ustr.say_name,t_ustr.last_name,converttime((long)((tm-t_ustr.rawtime)/60)) );
+            sprintf(mess,"%-18s from %s\n\r%s ago\n\r",t_ustr.say_name,t_ustr.last_name,converttime((long)((time(0)-t_ustr.rawtime)/60)) );
             fputs(mess,fp);
             fputs("\n",fp);
             t_ustr.last_name[0]=0;
@@ -12426,10 +12372,8 @@ a=0;
  (void) closedir(dirp);
 
  if (!cat(filename,user,0)) {
-     sprintf(mess,"%s Can't cat same_site file!",ctime(&tm));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't cat file \"%s\" in same_site! %s",filename,get_error());
     }
 
  return;
@@ -12441,15 +12385,12 @@ a=0;
 void gag(int user, char *inpstr)
 {
 int i=0,found=0,u;
-unsigned long diff=0;
 char other_user[ARR_SIZE];
 char check[50];
-time_t tm;
 
 if (!strlen(inpstr)) {
     write_str(user,"Users that you have gagged");
     write_str(user,"+-----------------------------------------------------------+");
-    time(&tm);
      for (i=0;i<MAX_GAG;++i) {
        if (strlen(ustr[user].gagged[i])) {
              strcpy(check,ustr[user].gagged[i]);
@@ -12461,18 +12402,16 @@ if (!strlen(inpstr)) {
               write_str(user,mess);
               found=1; continue;
               }
-             diff=tm-t_ustr.rawtime;
-             sprintf(mess,"%-18s last on %s ago",t_ustr.say_name,converttime((long)(diff/60)));
+             sprintf(mess,"%-18s last on %s ago",t_ustr.say_name,converttime((long)((time(0)-t_ustr.rawtime)/60)));
              write_str(user,mess);
-             diff=0; t_ustr.rawtime=0;
+             t_ustr.rawtime=0;
              }
              else {
 		if (!ustr[u].vis) {
 		  if (ustr[user].tempsuper >= MIN_HIDE_LEVEL)
                    sprintf(mess,"^HY%-18s^ is online right NOW!",ustr[user].gagged[i]);
 		  else {
-                    diff=tm-ustr[u].rawtime;
-                    sprintf(mess,"%-18s last on %s ago",ustr[user].gagged[i],converttime((long)(diff/60)));
+                    sprintf(mess,"%-18s last on %s ago",ustr[user].gagged[i],converttime((long)((time(0)-ustr[u].rawtime)/60)));
 		   }
 		  } /* end of vis if */
 		else {
@@ -12562,15 +12501,12 @@ write_user(ustr[user].name);
 void alert(int user, char *inpstr)
 {
 int i=0,found=0,u;
-unsigned long diff=0;
 char other_user[ARR_SIZE];
 char check[50];
-time_t tm;
 
 if (!strlen(inpstr)) {
     write_str(user,"Users that you are being alerted of");
     write_str(user,"+-----------------------------------------------------------+");
-    time(&tm);
      for (i=0;i<MAX_ALERT;++i) {
        if (strlen(ustr[user].friends[i])) {
              strcpy(check,ustr[user].friends[i]);
@@ -12582,18 +12518,16 @@ if (!strlen(inpstr)) {
               write_str(user,mess);
               found=1; continue;
               }
-             diff=tm-t_ustr.rawtime;
-             sprintf(mess,"%-18s last on %s ago",t_ustr.say_name,converttime((long)(diff/60)));
+             sprintf(mess,"%-18s last on %s ago",t_ustr.say_name,converttime((long)((time(0)-t_ustr.rawtime)/60)));
              write_str(user,mess);
-             diff=0; t_ustr.rawtime=0;
+             t_ustr.rawtime=0;
              }
              else {
 		if (!ustr[u].vis) {
 		  if (ustr[user].tempsuper >= MIN_HIDE_LEVEL)
                    sprintf(mess,"^HY%-18s^ is online right NOW!",ustr[user].friends[i]);
 		  else {
-                    diff=tm-ustr[u].rawtime;
-                    sprintf(mess,"%-18s last on %s ago",ustr[user].friends[i],converttime((long)(diff/60)));
+                    sprintf(mess,"%-18s last on %s ago",ustr[user].friends[i],converttime((long)((time(0)-ustr[u].rawtime)/60)));
 		   }
 		  } /* end of vis if */
 		else {
@@ -12887,6 +12821,7 @@ else if (!strcmp(n_option,"-n")) {
  if (nuke_user==1) {
   sprintf(mess,"did a user expire, %d user%s %s nuked.",num,num == 1 ? "" : "s", num == 1 ? "was" : "were");
   btell(user,mess);
+  write_log(SYSTEMLOG,YESTIME,"EXPIRE: User MANUAL-EXPIRE by %s: %d user%s %s nuked\n",ustr[user].say_name,num,num == 1 ? "" : "s", num == 1 ? "was" : "were");
   sprintf(mess,"Nuked %d user%s",num,num == 1 ? "" : "s");
   }
  else {
@@ -12965,13 +12900,13 @@ if (autoexpire==0) return;
 
     if ((diff >= limit) && ((autoexpire==2) || (autoexpire==3)))
         {
-            t_ustr.last_site[0]=0;
-            t_ustr.rawtime=0;
-            remove_exem_data(small_buff);
-            remove_user(small_buff);
-            /* nuke(user,small_buff,1); */
-            system_stats.tot_expired++;
-            num++;
+	t_ustr.last_site[0]=0;
+	t_ustr.rawtime=0;
+	remove_exem_data(small_buff);
+	remove_user(small_buff);
+	write_log(SYSTEMLOG,YESTIME,"EXPIRE: AUTO-EXPIRE-NUKE of %s\n",small_buff);   
+	system_stats.tot_expired++;
+	num++;
         }  /* end of if */
     else {
 	if ((TIME_TO_GO > 0) && ((autoexpire==1) || (autoexpire==2))) {
@@ -12990,8 +12925,7 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 	    } /* email not set correctly or at all */
 	    else {
 		if (!(fp=fopen(NUKEWARN,"r"))) {
-		  sprintf(mess,"%s: Could not open nukewarn file to email to user %s!\n",get_time(0,0),t_ustr.say_name);
-		  print_to_syslog(mess);
+		  write_log(ERRLOG,YESTIME,"EXPIRE: Couldn't open file(r) \"%s\" in auto_expire! %s\n",NUKEWARN,get_error());
 		  t_ustr.last_site[0]=0;
 		  t_ustr.rawtime=0;
 		  continue;
@@ -13012,8 +12946,7 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 
 		if (!(pp=popen(filename,"w")))
 		  {
-		   sprintf(mess,"%s : nukewarn message cannot be written to mail program!\n", syserror);
-		   print_to_syslog(mess);
+		   write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in auto_expire! %s\n",filename,get_error());
 		   fclose(fp);
 		   continue;
 		  }    
@@ -13030,6 +12963,8 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 		fgets(line,300,fp);
 		strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
 		strcpy(line,check_var(line,USER_VAR,t_ustr.say_name));
+		strcpy(line,check_var(line,HOST_VAR,thishost));
+		strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
 		strcpy(line,check_var(line,"%var1%",itoa(TIME_TO_GO)));
 
 		while (!feof(fp)) {
@@ -13037,6 +12972,8 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 		   fgets(line,300,fp);
 		   strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
 		   strcpy(line,check_var(line,USER_VAR,t_ustr.say_name));
+		   strcpy(line,check_var(line,HOST_VAR,thishost));
+		   strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
 		   strcpy(line,check_var(line,"%var1%",itoa(TIME_TO_GO)));
 		  } /* end of while */
 		fclose(fp);
@@ -13046,8 +12983,7 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 		fputs(".\n",pp);
 		pclose(pp);
 
-		sprintf(mess,"%s: Sent out nukewarn to %s at %s\n",get_time(0,0),t_ustr.say_name,t_ustr.email_addr);
-		print_to_syslog(mess);
+		write_log(SYSTEMLOG,YESTIME,"EXPIRE: Sent out nukewarn to %s at %s\n",t_ustr.say_name,t_ustr.email_addr);
 		warns++;
 	    } /* end of else email address ok */
 	    } /* end of if over limit */
@@ -13062,6 +12998,7 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 
   sprintf(mess,"%s Talker user expire: %d user%s %s nuked, %d %s warned",STAFF_PREFIX,num,num == 1 ? "" : "s", num == 1 ? "was" : "were", warns, warns == 1 ? "was" : "were");
   writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0);
+  write_log(SYSTEMLOG,YESTIME,"EXPIRE: Talker AUTO-EXPIRE: %d user%s %s nuked, %d %s warned\n",num,num == 1 ? "" : "s", num == 1 ? "was" : "were", warns, warns == 1 ? "was" : "were");
  num=0;
  warns=0;
  i=0;
@@ -13136,14 +13073,11 @@ if (!strcmp(inpstr,ROOT_ID)) {
 /*----------------------------------------------------*/
 void player_create(int user, char *inpstr)
 {
-int i=0;
-int f=0;
-int level=0;
+int new_user,f=0,level=0;
 char newname[ARR_SIZE];
 char lowername[ARR_SIZE];
 char newpass[ARR_SIZE];
 char levelstr[ARR_SIZE];
-time_t tm;
 
 if (!strlen(inpstr)) {
    write_str(user,"Syntax: .pcreate <user_name> <level> <password>");
@@ -13282,172 +13216,52 @@ sscanf(inpstr,"%s",newpass);
     }
   
   st_crypt(newpass);                                   
-  strcpy(t_ustr.password,newpass);   
 
-/* Set new structures */
-time(&tm);
-   strcpy(t_ustr.name,       lowername);
-   strcpy(t_ustr.say_name,   newname);
+  if ( (new_user = find_free_slot('1') ) == -1 )
+    {
+     write_str(user,"Could not get free user slot to write user details! Aborted!");
+     write_log(ERRLOG,YESTIME,"PCREATE: Could not get free user slot to write user details for \"%s\"\n",newname);
+     return;
+    }
 
-   strcpy(t_ustr.email_addr, DEF_EMAIL);
-   strcpy(t_ustr.desc,       "was just created");
-   strcpy(t_ustr.sex,        DEF_GENDER);
-   strcpy(t_ustr.init_date,  ctime(&tm));
-   t_ustr.init_date[24]=0;
-   strcpy(t_ustr.last_date,  ctime(&tm));
-   t_ustr.last_date[24]=0;
-   strcpy(t_ustr.init_site,    "127.0.0.1");
-   strcpy(t_ustr.last_site,    "127.0.0.1");
-   strcpy(t_ustr.last_name,    "localhost");
-   strcpy(t_ustr.init_netname, "localhost");
-   strcpy(t_ustr.succ,       DEF_SUCC);
-   strcpy(t_ustr.fail,       DEF_FAIL);
-   strcpy(t_ustr.entermsg,   DEF_ENTER);
-   strcpy(t_ustr.exitmsg,    DEF_EXIT);
-   strcpy(t_ustr.homepage,   DEF_URL);
-   strcpy(t_ustr.webpic,     DEF_PICURL);
-   strcpy(t_ustr.home_room, astr[new_room].name);
-   strcpy(t_ustr.creation,  ctime(&tm));
-   t_ustr.creation[24]=0;
-   t_ustr.rawtime   = tm;
 
-  if (level > 0)
-   t_ustr.promote   = 1;
-  else
-   t_ustr.promote   = 0;
+/* We got free slot, let's reset the struct for this slot */
+reset_user_struct(new_user,1);
 
-   for (i=0;i<MAX_AREAS;i++)
-     {
-      t_ustr.security[i]='N';
-     }
-   i=0;
-   for (i=0; i<MAX_ALERT; i++)
-     {
-      t_ustr.friends[i][0]=0;
-     }
-   i=0;
-   for (i=0; i<MAX_GAG; i++)
-     {
-      t_ustr.gagged[i][0]=0;
-     }
-   for (i=0; i<MAX_GRAVOKES; i++)
-     {
-      t_ustr.revokes[i][0]=0;
-     }
-   for (i=0; i<NUM_LINES; i++)
-     {
-      t_ustr.conv[i][0]=0;
-     }
+/* Now to be safe set logging_in to 1 so this slot can't */
+/* taken from us while we're using it			 */
+ustr[new_user].logging_in=1;
 
-if (level > 0)
- t_ustr.super=            level;
-else 
- t_ustr.super=            0;
+/* Get init_user to set default stuff for us */
+init_user(new_user);
 
-t_ustr.area=             new_room;
-t_ustr.shout=            1;
-t_ustr.vis=              1;
-t_ustr.locked=           0;
-t_ustr.suspended=        0;
-t_ustr.monitor=          0;
-t_ustr.rows=             24;
-t_ustr.cols=             256;
-t_ustr.car_return=       1;
-t_ustr.abbrs =           1;
-t_ustr.times_on =        0;
-t_ustr.white_space =     1;
-t_ustr.aver =            0;
-t_ustr.totl =            0;
-t_ustr.autor =           0;
-t_ustr.autof =           0;
-t_ustr.automsgs =        0;
-t_ustr.gagcomm =         0;
-t_ustr.semail =          0;
-t_ustr.quote =           1;
-t_ustr.hilite =          1;
-t_ustr.new_mail =        0;
-t_ustr.color =           COLOR_DEFAULT;
-t_ustr.passhid =         0;
-t_ustr.pbreak =          0;
-t_ustr.numcoms =         0;
-t_ustr.mail_num =        0;
-t_ustr.numbering =       0;
-t_ustr.friend_num =      0;
-t_ustr.revokes_num =     0;
-t_ustr.gag_num =         0;
-t_ustr.nerf_kills =      0;
-t_ustr.nerf_killed =     0;
-t_ustr.muz_time =        0;
-t_ustr.xco_time =        0;
-t_ustr.gag_time =        0;
-t_ustr.frog =            0;
-t_ustr.frog_time =       0;
-t_ustr.anchor =          0;
-t_ustr.anchor_time =     0;
-t_ustr.beeps =           0;
-t_ustr.mail_warn =       0;
-t_ustr.ttt_kills =       0;
-t_ustr.ttt_killed =      0;
-t_ustr.ttt_board =       0;
-t_ustr.ttt_opponent =   -3;
-t_ustr.ttt_playing =     0;
-t_ustr.hang_wins =       0;
-t_ustr.hang_losses =     0;
-t_ustr.hang_stage =      -1;   
-t_ustr.hang_word[0] =    '\0';
-t_ustr.hang_word_show[0]='\0';
-t_ustr.hang_guess[0] =   '\0';
-strcpy(t_ustr.icq,	DEF_ICQ); 
-strcpy(t_ustr.miscstr1,	"NA");
-strcpy(t_ustr.miscstr2, "NA");
-strcpy(t_ustr.miscstr3, "NA");
-strcpy(t_ustr.miscstr4, "NA");
-t_ustr.pause_login   = 1;
-t_ustr.miscnum2      = 0;
-t_ustr.miscnum3      = 0;
-t_ustr.miscnum4      = 0;
-t_ustr.miscnum5      = 0;
+/* Set some stuff that it doesn't set for our situation */
 
-/* code copied right from initabbrs */
-f=0;
-i=0;
-	for (i=0;i<NUM_ABBRS;++i)
-	{
-		t_ustr.custAbbrs[i].abbr[0] = 0;
-		t_ustr.custAbbrs[i].com[0] = 0;
-	}
+   strcpy(ustr[new_user].name,         lowername);
+   strcpy(ustr[new_user].say_name,     newname);
+   strcpy(ustr[new_user].password,     newpass);   
 
-        i=0;
+   strcpy(ustr[new_user].desc,         "was just created");
+   strcpy(ustr[new_user].init_site,    "127.0.0.1");
+   strcpy(ustr[new_user].last_site,    "127.0.0.1");
+   strcpy(ustr[new_user].last_name,    "localhost");
+   strcpy(ustr[new_user].init_netname, "localhost");
 
-        for (i=0;i<NUM_ABBRS;++i)
-        {
+  if (level > 0) {
+   ustr[new_user].promote   = 1;
+   ustr[new_user].super     = level;
+  }
 
-         REDO:
-          if (strlen(sys[f].cabbr) > 0) {
-            strcpy(t_ustr.custAbbrs[i].com,sys[f].command);
-            strcpy(t_ustr.custAbbrs[i].abbr,sys[f].cabbr);
-            f++;
-           }
-          else {
-            f++;
-            goto REDO;
-           }
+/* Ok, we're done, copy over to temp struct */
+copy_from_user(new_user);
 
-        }	
-
-i=0;
-
- for (i=0; i<NUM_MACROS; i++) {
-  t_ustr.Macros[i].name[0]=0;
-  t_ustr.Macros[i].body[0]=0;
- }
-
-listen_all(-1);
-
-/* write out data to new file */
+/* Write out data to new file */
 write_user(lowername);
 
- write_str(user,"User created.");
+write_str(user,"User created.");
+
+/* Reset user structure */
+reset_user_struct(new_user,1);
 
 }
 
@@ -13603,7 +13417,12 @@ else {
        write_str(user,"That level doesn't exist!");
        return;
        }
-     if ((ustr[user].tempsuper <= num) && strcmp(ustr[user].name,ROOT_ID)) {
+     if (num == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+	  write_str(user,"You dont have that much power!");
+	  found=0; a=0; num=0; i=0;
+	  return;
+	  }
+     if (num > ustr[user].tempsuper) {
 	  write_str(user,"You dont have that much power!");
 	  found=0; a=0; num=0; i=0;
 	  return;
@@ -13624,7 +13443,12 @@ if (type==-1) {
 		return;
 		}
 
-	if ((ustr[user].tempsuper <= t_ustr.super) && strcmp(ustr[user].name,ROOT_ID)) {
+	if (t_ustr.super == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+	  write_str(user,"You dont have that much power!");
+	  found=0; a=0; num=0; i=0;
+	  return;
+	  }
+	if (t_ustr.super > ustr[user].tempsuper) {
 	  write_str(user,"You dont have that much power!");
 	  found=0; a=0; num=0; i=0;
 	  return;
@@ -13750,7 +13574,8 @@ else if (type==-2) {
 	/* Check to see if we want to clear it or take it */
 	
 	/* cant take it from own level or above */
-	if ((ustr[user].tempsuper <= t_ustr.super) && strcmp(ustr[user].name,ROOT_ID)) continue;
+	if (t_ustr.super == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) continue;
+	if (t_ustr.super > ustr[user].tempsuper) continue;
 
 	/* does the user already have this command revoked */
         	for (a=0; a < MAX_GRAVOKES; ++a) {
@@ -13860,7 +13685,8 @@ else {
 	if (t_ustr.super != type) continue;
 
 	/* cant take it from own level or above */
-	if ((ustr[user].tempsuper <= t_ustr.super) && strcmp(ustr[user].name,ROOT_ID)) continue;
+	if (t_ustr.super == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) continue;
+	if (t_ustr.super > ustr[user].tempsuper) continue;
 
 	/* does the user already have this command revoked */
                 for (a=0; a < MAX_GRAVOKES; ++a) {
@@ -14073,7 +13899,11 @@ if (!found) {
 found=0;
 remove_first(inpstr);
 
-if (ustr[user].tempsuper <= sys[i].su_com) {  
+if (sys[i].su_com == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+	write_str(user,"You dont have that much power to give that command!");
+	return;
+  }
+if (sys[i].su_com > ustr[user].tempsuper) {
 	write_str(user,"You dont have that much power to give that command!");
 	return;
   }
@@ -14131,7 +13961,12 @@ else {
        write_str(user,"That level doesn't exist to affect!");
        return;
        }
-     if ((ustr[user].tempsuper <= num) && strcmp(ustr[user].name,ROOT_ID)) {
+     if (num == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+	  write_str(user,"You dont have that much power to affect that level!");
+	  found=0; a=0; num=0; i=0;
+	  return;
+	  }
+     if (num > ustr[user].tempsuper) {
 	  write_str(user,"You dont have that much power to affect that level!");
 	  found=0; a=0; num=0; i=0;
 	  return;
@@ -14181,7 +14016,12 @@ if (type==-1) {
 		}
 
 	/* cant give from own level or above */
-	if ((ustr[user].tempsuper <= t_ustr.super) && strcmp(ustr[user].name,ROOT_ID)) {
+	if (t_ustr.super == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+		write_str(user,"You dont have that much power!");
+		found=0; a=0; num=0; i=0;
+		return;
+		}
+	if (t_ustr.super > ustr[user].tempsuper) {
 		write_str(user,"You dont have that much power!");
 		found=0; a=0; num=0; i=0;
 		return;
@@ -14214,7 +14054,13 @@ if (type==-1) {
 if (was_revoked==-1) {
 	/* can we give them this much access to that command */
 	if (level > sys[i].su_com) {
-		if (ustr[user].tempsuper <= level && strcmp(ustr[user].name,ROOT_ID)) {
+		if (level == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+		/* we cant give out access at or above our level */
+		write_str(user,"You cant give that much power!");
+		found=0; a=0; num=0; i=0;
+		return;
+		}
+		if (level > ustr[user].tempsuper) {
 		/* we cant give out access at or above our level */
 		write_str(user,"You cant give that much power!");
 		found=0; a=0; num=0; i=0;
@@ -14318,7 +14164,8 @@ else if (type==-2) {
 	read_user(small_buff);
 
 	/* cant give from own level or above */
-	if ((ustr[user].tempsuper <= t_ustr.super) && strcmp(ustr[user].name,ROOT_ID)) continue;
+	if ((t_ustr.super == ustr[user].tempsuper) && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) continue;
+	if (t_ustr.super > ustr[user].tempsuper) continue;
 
         /* Check to see if user has had this command granted */
         /* if so, nothing changes */
@@ -14343,7 +14190,11 @@ else if (type==-2) {
 
 if (was_revoked==-1) {
         if (level > sys[i].su_com) {
-                if (ustr[user].tempsuper <= level && strcmp(ustr[user].name,ROOT_ID)) {
+                if (level == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+                /* we cant give out access at or above our level */
+		continue;
+                }
+                if (level > ustr[user].tempsuper) {
                 /* we cant give out access at or above our level */
 		continue;
                 }
@@ -14462,7 +14313,11 @@ else {
 
 if (was_revoked==-1) {
         if (level > sys[i].su_com) {
-                if (ustr[user].tempsuper <= level && strcmp(ustr[user].name,ROOT_ID)) {
+                if (level == ustr[user].tempsuper && GRANT_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID)) {
+                /* we cant give out access at or above our level */
+                continue;
+                }
+                if (level > ustr[user].tempsuper) {
                 /* we cant give out access at or above our level */
                 continue;
                 }
@@ -14545,6 +14400,10 @@ int num;
 int len=0;
 int type=0;
 int n_option=0,timenum,search=0;
+char list[20][NAME_LEN+20];
+int i=0,j=0,MAXPOS=0;
+long value=0,diff=0;
+char day[3],month[4],year[5],datetime[10];
 char small_buff[64];
 char option[7];
 char timebuf[23];
@@ -14557,15 +14416,16 @@ char line2[ARR_SIZE];
 time_t tm;
 time_t tm_then;
 struct dirent *dp;
+struct tm tmBuf;
 FILE *fp;
 FILE *fp2;
 DIR  *dirp;
- 
+
  if (!strlen(inpstr)) {
     write_str(user,"These are the topics you can search under..");
     write_str(user,"+-----------------------------------------+");
     write_hilite(user,"  rank    email    homepage    desc");
-    write_hilite(user,"  bans    newbans");
+    write_hilite(user,"  bans    newbans  top");
     return;
     }
 
@@ -14598,6 +14458,42 @@ else if (!strcmp(option,"email")) {
        write_str(user,mess);
        return; 
        }
+   }
+else if (!strcmp(option,"top")) {
+    remove_first(inpstr);
+    if (!strlen(inpstr)) {
+	write_str(user,"You can see the following highest things:");
+	write_str(user," age        (oldest on the talker)");
+	write_str(user," commands   (number of commands)");
+	write_str(user," hangman    (hangman win %)");
+	write_str(user," logavg     (login average)");
+	write_str(user," logins     (most logins)");
+	write_str(user," time       (cumulative time online)");
+	write_str(user," ttt        (tic-tac-toe win %)");
+	return;
+        }
+    else if (!strcmp(inpstr,"age")) search=1;
+    else if (!strcmp(inpstr,"commands")) search=2;
+    else if (!strcmp(inpstr,"logins")) search=3;
+    else if (!strcmp(inpstr,"time")) search=4;
+    else if (!strcmp(inpstr,"logavg")) search=5;
+    else if (!strcmp(inpstr,"hangman")) search=6;
+    else if (!strcmp(inpstr,"ttt")) search=7;
+    else { 
+	write_str(user,"Invalid option!");
+	write_str(user,"You can see the following highest things:");
+	write_str(user," age        (oldest on the talker)");
+	write_str(user," commands   (number of commands)");
+	write_str(user," hangman    (hangman win %)");
+	write_str(user," logavg     (login average)");
+	write_str(user," logins     (most logins)");
+	write_str(user," time       (cumulative time online)");
+	write_str(user," ttt        (tic-tac-toe win %)");
+	return;
+       }
+	type=6;
+	MAXPOS=sizeof(list)/sizeof(list[0]);
+	for (i=0;i<20;++i) strcpy(list[i],"0 ");
    }
 else if (!strcmp(option,"homepage")) {
     remove_first(inpstr);
@@ -14689,7 +14585,7 @@ else {
     write_str(user,"These are the topics you can search under..");
     write_str(user,"+-----------------------------------------+");
     write_hilite(user,"  rank    email    homepage    desc");
-    write_hilite(user,"  bans    newbans");
+    write_hilite(user,"  bans    newbans  top");
     return;
    }
 
@@ -14714,10 +14610,8 @@ else {
 
  strcpy(filename,get_temp_file());
  if (!(fp=fopen(filename,"w"))) {
-     sprintf(mess,"%s Cant create file for paged clist listing!",get_time(0,0));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) \"%s\" in clist! %s\n",filename,get_error());
      (void) closedir(dirp);
      return;
      }
@@ -14883,6 +14777,69 @@ else {
        line[0]=0; line2[0]=0;
        len=0;
      } /* end of type else if */
+    else if (type==6) {
+      if (search==1) {
+       /* we have to try and convert the creation time which is a */
+       /* string to a time format so we can retrieve unix time    */
+       /* to do calculations                                      */
+	strcpy(line,t_ustr.creation);
+	remove_first(line); /* day of the week */
+	sscanf(line,"%s ",month);
+	remove_first(line);
+	sscanf(line,"%s ",day);
+	remove_first(line);
+	sscanf(line,"%s ",datetime);
+	remove_first(line);
+	strcpy(year,line);
+	sprintf(line,"%s-%s-%s %s",day,month,year,datetime);
+	memset(&tmBuf, 0, sizeof(struct tm));
+	if (strptime(line, "%d-%b-%Y %H:%M:%S", &tmBuf) == NULL) {
+	write_str(user,"Can't convert time! Aborting!");
+	write_log(ERRLOG,YESTIME,"Can't convert time creation \"%s\" line \"%s\" for \"%s\"\n",t_ustr.creation,line,t_ustr.name);
+	diff=0;
+	}
+	else {
+	 tm_then = mktime(&tmBuf);
+	 time(&tm);
+	 diff=(long)(tm-tm_then);
+	}
+       }
+else if (search==2) diff = t_ustr.numcoms;
+else if (search==3) diff = (long)t_ustr.times_on;
+else if (search==4) diff = t_ustr.totl;
+else if (search==5) diff = t_ustr.aver;
+else if (search==6) {
+if (t_ustr.hang_wins==0) diff=0;
+else diff = (long)(((float)((float)t_ustr.hang_wins/(float)(t_ustr.hang_wins+t_ustr.hang_losses))) * 100);
+}
+else if (search==7) {
+if (t_ustr.ttt_kills==0) diff=0;
+else diff = (long)(((float)((float)t_ustr.ttt_kills/(float)(t_ustr.ttt_kills+t_ustr.ttt_killed))) * 100);
+}
+
+	for (i=0;i<20;++i) {
+        sscanf(list[i],"%ld ",&value);
+	  if (diff >= value) {
+		if (i < MAXPOS-1) {
+        	for (j=MAXPOS-1;j>(i-1);--j) {
+        	strcpy(list[j],list[j-1]);
+        	}
+		}
+
+		sprintf(list[i],"%ld %-18s",diff,t_ustr.say_name);
+		break;
+	  } /* end of if greater than or equal to */
+	} /* end of for */
+		if (search==1) t_ustr.creation[0]=0;
+		else if (search==2) t_ustr.numcoms=0;
+		else if (search==3) t_ustr.times_on=0;
+		else if (search==4) t_ustr.totl=0;
+		else if (search==5) t_ustr.aver=0;
+		else if (search==6) { t_ustr.hang_wins=0; t_ustr.hang_losses=0; }
+		else if (search==7) { t_ustr.ttt_kills=0; t_ustr.ttt_killed=0; }
+		line[0]=0;
+		continue;
+     } /* end of type else if */    
    }       /* End of while */
  
 if (type==0)
@@ -14899,6 +14856,38 @@ else if (type==3) {
  t_ustr.desc[0]=0;
  line[0]=0; line2[0]=0;
  }
+else if (type==6) {
+ t_ustr.creation[0]=0;
+ line[0]=0; line2[0]=0;
+ switch(search) {
+ case 1: fputs("20 oldest users\n",fp); break;
+ case 2: fputs("Top 20 command users\n",fp); break;
+ case 3: fputs("Top 20 login users\n",fp); break;
+ case 4: fputs("Top 20 cumulative time users\n",fp); break;
+ case 5: fputs("Top 20 average login users\n",fp); break;
+ case 6: fputs("Top 20 hangman winners (by %)\n",fp); break;
+ case 7: fputs("Top 20 tic-tac-toe winners (by %)\n",fp); break;
+ default: break;
+ }
+ for (i=0;i<20;++i) {
+  sscanf(list[i],"%ld ",&value);
+  if (!value) continue;
+  remove_first(list[i]);
+ switch(search) {
+ case 1: sprintf(mess,"%-18s %s old",list[i],converttime((long)(value/60))); break;
+ case 2: sprintf(mess,"%-18s %-8ld commands",list[i],value); break;
+ case 3: sprintf(mess,"%-18s %-5ld logins",list[i],value); break;
+ case 4: sprintf(mess,"%-18s %s cumul. time",list[i],converttime(value)); break;
+ case 5: sprintf(mess,"%-18s %s average time",list[i],converttime(value)); break;
+ case 6: sprintf(mess,"%-18s %-3ld%%",list[i],value); break;
+ case 7: sprintf(mess,"%-18s %-3ld%%",list[i],value); break;
+ default: break;
+ }
+ fputs(mess,fp);
+ fputs("\n",fp);
+ num++;
+ } /* end of for */
+}
 
  if ((type==4) || (type==5))
   sprintf(mess,"Displayed %d banned site%s",num,num == 1 ? "" : "s");
@@ -14913,10 +14902,8 @@ else if (type==3) {
  (void) closedir(dirp);
 
  if (!cat(filename,user,0)) {
-     sprintf(mess,"%s Cant cat clist listing file!",get_time(0,0));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't cat file \"%s\" in clist! %s\n",filename,get_error());
      }
 
  return;
@@ -14948,7 +14935,7 @@ if (!strlen(inpstr)) {
       return;
       }
    write_str(user," ");
-if (!strcmp(ustr[user].name,ROOT_ID)) {
+if (ustr[user].tempsuper >= VOTE_LEVEL) {
    write_str(user,"Current tally");
    sprintf(filename,"%s/%s",LIBDIR,"votetallies");
    if (!(fp2=fopen(filename,"r")))
@@ -15040,13 +15027,12 @@ else if ( (!strcmp(inpstr,"1")) || (!strcmp(inpstr,"2"))
    fputs("\n",fp2);
    FCLOSE(fp2);
 
-  write_str(user,"*CHIK* *CHIK* Thanx for your vote!");
-sprintf(mess,"VOTE: by %s\n",ustr[user].say_name);
-print_to_syslog(mess);
+write_str(user,"*CHIK* *CHIK* Thanx for your vote!");
+write_log(SYSTEMLOG,YESTIME,"VOTE: by %s\n",ustr[user].say_name);
 return;
 }
 
-else if ( (!strcmp(inpstr,"-c")) && (ustr[user].tempsuper==MAX_LEVEL) ) {
+else if ( (!strcmp(inpstr,"-c")) && (ustr[user].tempsuper >= VOTE_LEVEL) ) {
    sprintf(filename,"%s/%s",LIBDIR,"voteusers");
    remove(filename);
    sprintf(filename,"%s/%s",LIBDIR,"votefile");
@@ -15060,12 +15046,11 @@ else if ( (!strcmp(inpstr,"-c")) && (ustr[user].tempsuper==MAX_LEVEL) ) {
    fputs("0\n0\n0\n",fp2);
    FCLOSE(fp2);
    write_str(user,"Users and tallies erased..Files reset.");
-   sprintf(mess,"VOTE RESET: by %s\n",ustr[user].say_name);
-   print_to_syslog(mess);
+   write_log(SYSTEMLOG,YESTIME,"VOTE: RESET by %s\n",ustr[user].say_name);
    return;
    }
 
-else if ( (!strcmp(inpstr,"-d")) && (ustr[user].tempsuper==MAX_LEVEL) ) {
+else if ( (!strcmp(inpstr,"-d")) && (ustr[user].tempsuper >= VOTE_LEVEL) ) {
      inpstr[0]=0;
      enter_votedesc(user,inpstr);
      return;
@@ -15091,9 +15076,8 @@ STARTVOTED:
 
 if (!ustr[user].vote_enter) {
         if (!(ustr[user].vote_start=(char *)malloc(82*VOTE_LINES))) {
-        logerror("Couldn't allocate mem. in enter_votedesc()");
-        sprintf(mess,"%s : cant allocate buffer mem.",syserror);
-        write_str(user,mess);
+        write_str(user,BAD_MALLOC);
+        write_log(ERRLOG,YESTIME,"Can't malloc memory in enter_votedesc! %s\n",get_error());
         return;
         }
     ustr[user].vote_enter=1;
@@ -15342,7 +15326,7 @@ if (online) {
   read_user(ustr[u].login_name);
   t_ustr.abbrs = ustr[u].abbrs;
   write_user(ustr[u].login_name);
-sprintf(mess,"%s FORCED %s with abbrs_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with abbrs_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.abbrs)
@@ -15355,10 +15339,9 @@ else {
       write_str(user, "They can now use abbreviations");
       t_ustr.abbrs = 1;
     }
-sprintf(mess,"%s FORCED %s with abbrs_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with abbrs_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 AUTOR:
@@ -15386,7 +15369,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Autoread_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Autoread_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.autor==3)
@@ -15410,10 +15393,9 @@ else {
       t_ustr.autor = 1;
     }
 
-sprintf(mess,"%s FORCED %s with Autoread_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Autoread_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 AUTOF:
@@ -15436,7 +15418,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Autofwd_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Autofwd_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.autof==2)
@@ -15455,10 +15437,9 @@ else {
       t_ustr.autof = 2;
     }
 
-sprintf(mess,"%s FORCED %s with Autofwd_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Autofwd_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 CAR:
@@ -15491,7 +15472,7 @@ else {
  } /* end of else */
   copy_from_user(u);
   write_user(ustr[u].login_name);
-sprintf(mess,"%s FORCED %s with Carriages_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Carriages_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strlen(inpstr)) {
@@ -15519,10 +15500,9 @@ else {
   }   
  } /* end of else */
 
-sprintf(mess,"%s FORCED %s with Carriages_set\n",ustr[user].say_name,t_ustr.say_name);
-  write_user(other_user);
+write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Carriages_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 COLOR:
@@ -15539,7 +15519,7 @@ if (!strcmp(inpstr,"off") || !strcmp(inpstr,"OFF")) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Color_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Color_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strcmp(inpstr,"on") || !strcmp(inpstr,"ON")) {
@@ -15552,10 +15532,9 @@ if (!strcmp(inpstr,"off") || !strcmp(inpstr,"OFF")) {
    t_ustr.color=0;
    }
 
-sprintf(mess,"%s FORCED %s with Color_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Color_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 COLS:
@@ -15576,14 +15555,13 @@ if (online) {
   ustr[u].cols = value;
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Cols_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Cols_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   t_ustr.cols     = value;
-sprintf(mess,"%s FORCED %s with Cols_set\n",ustr[user].say_name,t_ustr.say_name);
-write_user(other_user);
+  write_user(other_user);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Cols_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 DESC:
@@ -15608,7 +15586,7 @@ copy_from_user(u);
 write_user(ustr[u].login_name);
 sprintf(mess,"Their new desc: %s",ustr[u].desc);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with Desc_set\n",ustr[user].say_name,ustr[u].say_name);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Desc_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strlen(inpstr))
@@ -15629,10 +15607,9 @@ strcat(inpstr,"@@");
 strcpy(t_ustr.desc,inpstr);
 sprintf(mess,"Their new desc: %s",t_ustr.desc);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with Desc_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Desc_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 EMAIL:
@@ -15682,7 +15659,7 @@ if (online) {
   strcpy(ustr[u].email_addr,inpstr);
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Email_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Email_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   /* Check for illegal characters in email addy */
@@ -15728,10 +15705,9 @@ else {
 
   SKIP2:
   strcpy(t_ustr.email_addr,inpstr);
-  sprintf(mess,"%s FORCED %s with Email_set\n",ustr[user].say_name,t_ustr.say_name);
   write_user(other_user);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Email_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 ENTER:
@@ -15747,8 +15723,7 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     copy_from_user(u);
     write_user(ustr[u].name);
     write_str(user,"Their entermsg now set to default.");
-    sprintf(mess,"%s FORCED %s with EnterMess_set\n",ustr[user].say_name,ustr[u].say_name);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with EnterMess_set\n",ustr[user].say_name,ustr[u].say_name);
     goto END;
     }
 if (strlen(inpstr) > MAX_ENTERM-2) {
@@ -15762,7 +15737,7 @@ copy_from_user(u);
 write_user(ustr[u].name);
 sprintf(mess,"Their new entermsg: %s",ustr[u].entermsg);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with EnterMess_set\n",ustr[user].say_name,ustr[u].say_name);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with EnterMess_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strlen(inpstr)) {
@@ -15774,9 +15749,8 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     !strcmp(inpstr,"-c")) {
     strcpy(t_ustr.entermsg,DEF_ENTER);
     write_str(user,"Their entermsg now set to default.");
-    sprintf(mess,"%s FORCED %s with EnterMess_set\n",ustr[user].say_name,t_ustr.say_name);
     write_user(other_user);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with EnterMess_set\n",ustr[user].say_name,t_ustr.say_name);
     goto END;
     }
 if (strlen(inpstr) > MAX_ENTERM-2) {
@@ -15788,10 +15762,9 @@ strcpy(t_ustr.entermsg,inpstr);
 strcat(t_ustr.entermsg,"@@");
 sprintf(mess,"Their new entermsg: %s",t_ustr.entermsg);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with EnterMess_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with EnterMess_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 EXITM:
@@ -15807,8 +15780,7 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     copy_from_user(u);
     write_user(ustr[u].name);
     write_str(user,"Their exitmsg now set to default.");
-    sprintf(mess,"%s FORCED %s with ExitMess_set\n",ustr[user].say_name,ustr[u].say_name);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with ExitMess_set\n",ustr[user].say_name,ustr[u].say_name);
     goto END;
     }
 if (strlen(inpstr) > MAX_EXITM-2) {
@@ -15822,7 +15794,7 @@ copy_from_user(u);
 write_user(ustr[u].name);
 sprintf(mess,"Their new exitmsg: %s",ustr[u].exitmsg);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with ExitMess_set\n",ustr[user].say_name,ustr[u].say_name);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with ExitMess_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strlen(inpstr)) {
@@ -15834,9 +15806,8 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     !strcmp(inpstr,"-c")) {
     strcpy(t_ustr.exitmsg,DEF_EXIT);
     write_str(user,"Their exitmsg now set to default.");
-    sprintf(mess,"%s FORCED %s with ExitMess_set\n",ustr[user].say_name,t_ustr.say_name);
     write_user(other_user);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with ExitMess_set\n",ustr[user].say_name,t_ustr.say_name);
     goto END;
     }
 if (strlen(inpstr) > MAX_EXITM-2) {
@@ -15848,10 +15819,9 @@ strcpy(t_ustr.exitmsg,inpstr);
 strcat(t_ustr.exitmsg,"@@");
 sprintf(mess,"Their new exitmsg: %s",t_ustr.exitmsg);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with ExitMess_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with ExitMess_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 FAIL:
@@ -15867,8 +15837,7 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     copy_from_user(u);
     write_user(ustr[u].name);
     write_str(user,"Fail message cleared.");
-    sprintf(mess,"%s FORCED %s with Fail_set\n",ustr[user].say_name,ustr[u].say_name);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Fail_set\n",ustr[user].say_name,ustr[u].say_name);
     return;
     }
 
@@ -15883,7 +15852,7 @@ copy_from_user(u);
 write_user(ustr[u].name);
 sprintf(mess,"Their new fail: %s",ustr[u].fail);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with Fail_set\n",ustr[user].say_name,ustr[u].say_name);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Fail_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strlen(inpstr)) {
@@ -15895,9 +15864,8 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     !strcmp(inpstr,"-c")) {
     strcpy(t_ustr.fail,"");
     write_str(user,"Fail message cleared.");
-    sprintf(mess,"%s FORCED %s with Fail_set\n",ustr[user].say_name,t_ustr.say_name);
     write_user(other_user);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Fail_set\n",ustr[user].say_name,t_ustr.say_name);
     return;
     }
 
@@ -15910,10 +15878,9 @@ strcpy(t_ustr.fail,inpstr);
 strcat(t_ustr.fail,"@@");
 sprintf(mess,"Their new fail: %s",t_ustr.fail);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with Fail_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Fail_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 GENDER:
@@ -15931,7 +15898,7 @@ strcat(inpstr,"@@");
   strcpy(ustr[u].sex,inpstr);
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Gender_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Gender_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (strlen(inpstr)>29)
@@ -15945,10 +15912,9 @@ strcat(inpstr,"@@");
   write_str(user,mess);
 
   strcpy(t_ustr.sex,inpstr);
-sprintf(mess,"%s FORCED %s with Gender_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Gender_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 HILI:
@@ -15971,7 +15937,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Hi_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Hi_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.hilite==2)
@@ -15990,10 +15956,9 @@ else {
       t_ustr.hilite = 1;
     }
 
-sprintf(mess,"%s FORCED %s with Hi_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Hi_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 PASS:
@@ -16011,7 +15976,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Passhid_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Passhid_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.passhid)
@@ -16025,10 +15990,9 @@ else {
       t_ustr.passhid = 1;
     }
 
-sprintf(mess,"%s FORCED %s with Passhid_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Passhid_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 P_BREAK:
@@ -16046,7 +16010,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Pbreak_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Pbreak_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.pbreak)
@@ -16060,10 +16024,9 @@ else {
       t_ustr.pbreak = 1;
     }
 
-sprintf(mess,"%s FORCED %s with Pbreak_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Pbreak_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 BEEPSET:
@@ -16081,7 +16044,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with beep_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with beep_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.beeps)
@@ -16095,10 +16058,9 @@ else {
       t_ustr.beeps = 1;
     }
 
-sprintf(mess,"%s FORCED %s with beep_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with beep_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 QUOTEP:
@@ -16116,7 +16078,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Quote_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Quote_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.quote)
@@ -16130,10 +16092,9 @@ else {
       t_ustr.quote = 1;
     }
 
-sprintf(mess,"%s FORCED %s with Quote_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Quote_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 ROWS:
@@ -16154,14 +16115,13 @@ if (online) {
   ustr[u].rows = value;
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Rows_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Rows_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   t_ustr.rows     = value;
-sprintf(mess,"%s FORCED %s with Rows_set\n",ustr[user].say_name,t_ustr.say_name);
-write_user(other_user);
+  write_user(other_user);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Rows_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 HOMEP:
@@ -16189,7 +16149,7 @@ if (online) {
   strcpy(ustr[u].homepage,inpstr);
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Homepage_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Homepage_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (!strlen(inpstr)) {
@@ -16213,10 +16173,9 @@ else {
   write_str(user,mess);
 
   strcpy(t_ustr.homepage,inpstr);
-sprintf(mess,"%s FORCED %s with Homepage_set\n",ustr[user].say_name,t_ustr.say_name);
-write_user(other_user);
+  write_user(other_user);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Homepage_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 ICQSET:
@@ -16244,7 +16203,7 @@ if (online) {
   strcpy(ustr[u].icq,inpstr);
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with ICQ_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with ICQ_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (!strlen(inpstr)) {
@@ -16268,10 +16227,9 @@ else {
   write_str(user,mess);
 
   strcpy(t_ustr.icq,inpstr);
-sprintf(mess,"%s FORCED %s with ICQ_set\n",ustr[user].say_name,t_ustr.say_name);
-write_user(other_user);
+  write_user(other_user);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with ICQ_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 SPACE:
@@ -16289,7 +16247,7 @@ if (online) {
 
   copy_from_user(u);
   write_user(ustr[u].name);
-sprintf(mess,"%s FORCED %s with Space_set\n",ustr[user].say_name,ustr[u].say_name);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Space_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   if (t_ustr.white_space)
@@ -16303,10 +16261,9 @@ else {
       t_ustr.white_space = 1;
     }
 
-sprintf(mess,"%s FORCED %s with Space_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Space_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 SUCC:
@@ -16322,8 +16279,7 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     copy_from_user(u);
     write_user(ustr[u].name);
     write_str(user,"Success message cleared.");
-    sprintf(mess,"%s FORCED %s with Succ_set\n",ustr[user].say_name,ustr[u].say_name);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Succ_set\n",ustr[user].say_name,ustr[u].say_name);
     return;
     }
 if (strlen(inpstr) > MAX_ENTERM-2) {
@@ -16337,7 +16293,7 @@ copy_from_user(u);
 write_user(ustr[u].name);
 sprintf(mess,"Their new success: %s",ustr[u].succ);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with Succ_set\n",ustr[user].say_name,ustr[u].say_name);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Succ_set\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
 if (!strlen(inpstr)) {
@@ -16349,9 +16305,8 @@ if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
     !strcmp(inpstr,"-c")) {
     strcpy(t_ustr.succ,"");
     write_str(user,"Success message cleared.");
-    sprintf(mess,"%s FORCED %s with Succ_set\n",ustr[user].say_name,t_ustr.say_name);
-    print_to_syslog(mess);
     write_user(other_user);
+    write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Succ_set\n",ustr[user].say_name,t_ustr.say_name);
     return;
     }
 if (strlen(inpstr) > MAX_ENTERM-2) {
@@ -16363,24 +16318,21 @@ strcpy(t_ustr.succ,inpstr);
 strcat(t_ustr.succ,"@@");
 sprintf(mess,"Their new success: %s",t_ustr.succ);
 write_str(user,mess);
-sprintf(mess,"%s FORCED %s with Succ_set\n",ustr[user].say_name,t_ustr.say_name);
 write_user(other_user);
+write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Succ_set\n",ustr[user].say_name,t_ustr.say_name);
 }
-print_to_syslog(mess);
 goto END;
 
 PROFDEL:
 if (online) {
   sprintf(filename,"%s/%s",PRO_DIR,ustr[u].name);
   remove(filename);
-  sprintf(mess,"%s FORCED %s with Profile_Delete\n",ustr[user].say_name,ustr[u].say_name);
-  print_to_syslog(mess);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Profile_Delete\n",ustr[user].say_name,ustr[u].say_name);
 }
 else {
   sprintf(filename,"%s/%s",PRO_DIR,t_ustr.name);
   remove(filename);
-  sprintf(mess,"%s FORCED %s with Profile_Delete\n",ustr[user].say_name,t_ustr.say_name);
-  print_to_syslog(mess);
+  write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with Profile_Delete\n",ustr[user].say_name,t_ustr.say_name);
 }
   write_str(user,"User profile deleted.");
   goto END;
@@ -16403,8 +16355,7 @@ COMMS:
 		if (com_num_two != -1) 
 		  {
 		   last_user=u;
-		   sprintf(mess,"%s FORCED %s with COM %s\n",ustr[user].say_name,ustr[u].say_name,inpstr);
-		   print_to_syslog(mess);
+		   write_log(SYSTEMLOG,YESTIME,"FORCE: %s FORCED %s with COM %s\n",ustr[user].say_name,ustr[u].say_name,inpstr);
                    if ((!strcmp(ustr[u].name,BOT_ID) || !strcmp(ustr[u].name,ROOT_ID)) && inpstr[0]=='_')
 			bot_com(com_num_two,u,inpstr);
                    else
@@ -16422,33 +16373,168 @@ online=0;
 /*** Read the system log, search for string if specified ***/
 void readlog(int user, char *inpstr)
 {
-int occured=0;
-char word[ARR_SIZE],filename[FILE_NAME_LEN],line[ARR_SIZE],line2[ARR_SIZE];
+int occured=0,mode=0,i=0,found=0;
+char word[ARR_SIZE],line[ARR_SIZE],line2[ARR_SIZE];
+char filename[FILE_NAME_LEN],filenamer[FILE_NAME_LEN];
 FILE *fp;
 FILE *pp;
 
+if (ustr[user].log_stage) {
+ /* we're coming back */
+ if (!strlen(ustr[user].temp_buffer)) mode=1;
+ else if (ustr[user].temp_buffer[0]=='-') mode=2;
+ else mode=3;
+ goto STARTL;
+}
+else {
+ /* we're just starting */
+ ustr[user].temp_buffer[0]=0;
+ inpstr[80]=0;
+ }
+
 if (!strlen(inpstr)) 
   {
-   sprintf(filename,"%s",LOGFILE);
-   if (!cat(filename,user,0)) {
-      write_str(user,"System log doesn't exist!");
+   sprintf(filenamer,logfacil[SYSTEMLOG].file,LOGDIR);
+   if (!cat(filenamer,user,0)) {
+      write_str(user,BAD_FILEIO);
       return;
       }
    return;
   }
-  
+
 sscanf(inpstr,"%s ",word);
 strtolower(word);
 
-if (word[0]=='-') {
+if (!strcmp(word,"all")) {
+remove_first(inpstr);
+ if (!strlen(inpstr)) { ustr[user].temp_buffer[0]=0; mode=1; }
+ else {
+ sscanf(inpstr,"%s ",word);
+ strtolower(word);
+ if (word[0]=='-') {
+    strcpy(ustr[user].temp_buffer,word);
+    midcpy(word,word,1,3);
+    mode=2;
+ }
+ else {
+    strcpy(ustr[user].temp_buffer,word);
+    mode=3;
+    }
+ } /* end of strlen else */
+
+STARTL:
+for (i=ustr[user].log_stage;logfacil[i].loglevel!=-1;++i) {
+   sprintf(filenamer,logfacil[i].file,LOGDIR);
+   if (!check_for_file(filenamer)) { ustr[user].log_stage++; continue; }
+   sprintf(mess," ::%s::",logfacil[i].name);
+   write_str(user,mess);
+ if (mode==1) {
+   if (!cat(filenamer,user,0)) { ustr[user].log_stage++; continue; }
+   ustr[user].log_stage++;
+   if (ustr[user].file_posn==0) continue;
+   return;
+ }
+ else if (mode==2) {
+   midcpy(ustr[user].temp_buffer,word,1,3);
+   strcpy(filename,get_temp_file());
+   sprintf(mess,"tail -%s %s",word,filenamer);
+ if (!(pp=popen(mess,"r"))) {
+	write_str(user,"Can't open pipe to get the log!");
+        ustr[user].log_stage=0;
+        ustr[user].temp_buffer[0]=0;
+	return;
+	}
+ if (!(fp=fopen(filename,"w"))) {
+	pclose(pp);
+	write_str(user,"Can't open temp file for writing!");
+        ustr[user].log_stage=0;
+        ustr[user].temp_buffer[0]=0;
+	return;
+	}
+while (fgets(line,256,pp) != NULL) {
+	fputs(line,fp);
+      } /* end of while */
+fclose(fp);
+pclose(pp);
+
+   if (!cat(filename,user,0)) { ustr[user].log_stage++; continue; }
+   ustr[user].log_stage++;
+   if (ustr[user].file_posn==0) continue;
+   return;
+ }
+ else if (mode==3) {
+ occured=0;
+	if (!(fp=fopen(filenamer,"r"))) { 
+           write_str(user,BAD_FILEIO);
+           ustr[user].log_stage=0;
+           ustr[user].temp_buffer[0]=0;
+           return;
+           }
+	fgets(line,256,fp);
+	while(!feof(fp)) {
+		strcpy(line2,line);
+	        strtolower(line);
+		if (instr2(0,line,ustr[user].temp_buffer,0)== -1) goto NEXT;
+                   line2[strlen(line2)-1]=0;
+		   write_str(user,line2);	
+		   ++occured;
+		NEXT:
+		fgets(line,256,fp);
+		}
+	FCLOSE(fp);
+  if (!occured) write_str(user,"No occurences found");
+ }
+} /* end of for */
+ustr[user].log_stage=0;
+return;
+} /* END OF IF ALL */
+else if (!strcmp(word,"-l")) {
+write_str(user,"Availble logs to search");
+write_str(user,"------------------------");
+
+for (i=0;logfacil[i].loglevel!=-1;++i) {
+   write_str(user,logfacil[i].name);
+}
+
+write_str(user,"");
+return;
+} /* END OF IF -l */
+else {
+sscanf(inpstr,"%s ",word);
+
+for (i=0;logfacil[i].loglevel!=-1;++i) {
+   if (!strcmp(logfacil[i].name,word)) { found=1; break; }
+}
+if (!found) {
+  write_str(user,"There is no log by that name!");
+  return;
+  }
+else found=0;
+ 
+ sprintf(filenamer,logfacil[i].file,LOGDIR);
+ remove_first(inpstr);
+ sprintf(mess," ::%s::",logfacil[i].name);
+ write_str(user,mess);
+
+if (!strlen(inpstr)) {
+   /* cat entire file */
+   if (!cat(filenamer,user,0))
+     write_str(user,BAD_FILEIO);
+   return;
+}
+else {
+   sscanf(inpstr,"%s ",word);
+   strtolower(word);
+  if (word[0]=='-') {
    midcpy(word,word,1,3);
    strcpy(filename,get_temp_file());
-   sprintf(mess,"tail -%s %s",word,LOGFILE);
+   sprintf(mess,"tail -%s %s",word,filenamer);
  if (!(pp=popen(mess,"r"))) {
 	write_str(user,"Can't open pipe to get the log!");
 	return;
 	}
  if (!(fp=fopen(filename,"w"))) {
+	pclose(pp);
 	write_str(user,"Can't open temp file for writing!");
 	return;
 	}
@@ -16459,32 +16545,33 @@ fclose(fp);
 pclose(pp);
 
    if (!cat(filename,user,0))
-     write_str(user,"Syslog empty");
+     write_str(user,BAD_FILEIO);
    return;
-   }
 
-/* look through syslog */
-	sprintf(t_mess,"%s",LOGFILE);
-	strncpy(filename,t_mess,FILE_NAME_LEN);
 
-	if (!(fp=fopen(filename,"r"))) { 
-           write_str(user,"Cant open file.");
+ } /* end of tail if */
+ else {
+	if (!(fp=fopen(filenamer,"r"))) { 
+           write_str(user,BAD_FILEIO);
            return;
            }
 	fgets(line,256,fp);
 	while(!feof(fp)) {
 		strcpy(line2,line);
 	        strtolower(line);
-		if (instr2(0,line,word,0)== -1) goto NEXT;
+		if (instr2(0,line,word,0)== -1) goto NEXT2;
                    line2[strlen(line2)-1]=0;
 		   write_str(user,line2);	
 		   ++occured;
-		NEXT:
+		NEXT2:
 		fgets(line,256,fp);
 		}
 	FCLOSE(fp);
+  if (!occured) write_str(user,"No occurences found");
+ } /* end of search else */
+} /* end of strlen else */
+} /* END OF MAIN ELSE */
 
-if (!occured) write_str(user,"No occurences found");
 }
 
 /** Send a user to his or her home room */
@@ -16554,7 +16641,7 @@ if (!ustr[user].vis)
 
 writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
 
-   if (!strcmp(astr[area].name,BOT_ROOM)) {
+   if (area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user].say_name);
     write_bot(mess);
     }
@@ -16582,7 +16669,7 @@ ustr[user].area = new_area;
 
 writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
 
-   if (!strcmp(astr[new_area].name,BOT_ROOM)) {
+   if (new_area == ustr[bot].area) {
     sprintf(mess,"+++++ came in:%s", ustr[user].say_name);
     write_bot(mess);
     }
@@ -16714,7 +16801,7 @@ else {
                 sprintf(t_mess, "*** %s was nerfed by %s ***\n", ustr[user2].say_name, ustr[user].say_name);
                 writeall_str(t_mess,0,user,0,user,NORM,NERFS,0);
                 ustr[user2].nerf_killed++;
-                user_quit(user2);
+                user_quit(user2,1);
                 }
         else {
                 sprintf(t_mess, "You nerf %s", ustr[user2].say_name);
@@ -17902,7 +17989,6 @@ tot_mem=
 	+2 /* suspended */
 	+2 /* area */
 	+2 /* shout */
-	+2 /* igtell */
 	+2 /* color */
 	+2 /* clrmail */ 
 	+2 /* sock */
@@ -17973,6 +18059,7 @@ tot_mem=
 	+2 /* miscnum3 */
 	+2 /* miscnum4 */
 	+2 /* miscnum5 */
+	+2 /* tempnum1 */
 	+2 /* hang_wins */
 	+2 /* hang_losses */
 	+2 /* hang_stage */
@@ -17994,7 +18081,8 @@ tot_mem=
 	+2 /* tempsuper */
 	+strlen(t_ustr.home_room)
 	+strlen(t_ustr.webpic)
-	+strlen(t_ustr.afkmsg);
+	+strlen(t_ustr.afkmsg)
+	+t_ustr.alloced_size;
 
        if (t_ustr.pro_enter)
          tot_mem += (82*PRO_LINES);
@@ -18068,7 +18156,6 @@ for (u=0;u<MAX_USERS;++u) {
 	+2 /* suspended */
 	+2 /* area */
 	+2 /* shout */
-	+2 /* igtell */
 	+2 /* color */
 	+2 /* clrmail */ 
 	+2 /* sock */
@@ -18139,6 +18226,7 @@ for (u=0;u<MAX_USERS;++u) {
 	+2 /* miscnum3 */
 	+2 /* miscnum4 */
 	+2 /* miscnum5 */
+	+2 /* tempnum1 */
 	+2 /* hang_wins */
 	+2 /* hang_losses */
 	+2 /* hang_stage */
@@ -18160,7 +18248,8 @@ for (u=0;u<MAX_USERS;++u) {
 	+2 /* tempsuper */
 	+strlen(ustr[u].home_room)
 	+strlen(ustr[u].webpic)
-	+strlen(ustr[u].afkmsg);
+	+strlen(ustr[u].afkmsg)
+	+ustr[u].alloced_size;
 
        if (ustr[u].pro_enter)
          userm += (82*PRO_LINES);
@@ -18329,6 +18418,7 @@ write_str(user,"+---------------------------------------------------------------
  tot2=0;
  per=0;
  mfree=0;
+
 }
 
 
@@ -18341,7 +18431,6 @@ char filename[FILE_NAME_LEN], filename2[FILE_NAME_LEN];
 char temp[ATMOS_LEN+11];
 char temp2[ARR_SIZE];
 FILE *fp, *fp2;
-time_t tm;
 
 sprintf(filename, "%s/%s.atmos",datadir, astr[ustr[user].area].name);
 
@@ -18383,8 +18472,8 @@ if ((fp=fopen(filename, "r"))) {
 if ((fp=fopen(filename, "r"))) {
   strcpy(filename2, get_temp_file());
   if (!(fp2=fopen(filename2, "w"))) {
-	write_str(user, "Couldn't open temp file for atmos writing");
-	print_to_syslog("ERROR: Couldn't open temp file in add_atmos() for writing\n");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in add_atmos! %s\n",get_error());
 	return;
 	}
   
@@ -18448,17 +18537,16 @@ THEEND:
        fclose(fp);
        fclose(fp2);
        if (rename(filename2, filename)==-1) {
-	write_str(user, "Couldn't rename new atmosphere file");
-	print_to_syslog("ERROR: Couldn't rename temp file to atmosphere file in add_atmos()\n");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't rename file \"%s\" to \"%s\" in add_atmos! %s\n",filename2,filename,get_error());
 	return;
 	}
       } /* end of file open if */
 else {
   /* No atmosphere file exists..create one with new atmosphere */
   if (!(fp=fopen(filename, "a"))) {
-	write_str(user, "Couldn't add new atmosphere to the file");
-	sprintf(mess, "ERROR: Couldn't open %s's atmosphere file in add_atmos()\n", ustr[user].name);
-	print_to_syslog(mess);
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in add_atmos! %s\n",filename,get_error());
 	return;
 	}
 
@@ -18473,11 +18561,7 @@ write_str(user, mess);
 if (warn)
  write_str(user,"WARNING: Two distinct atmospheres have the same probability number. Doing this disregards the latter since a random number will match them equally.");
 
-time(&tm);
-strcpy(temp2, ctime(&tm));
-sprintf(mess,"%s:ATMOS added to %s by %s\n",temp2,astr[ustr[user].area].name,ustr[user].say_name);
-print_to_syslog(mess);
-
+write_log(SYSTEMLOG,YESTIME,"ATMOS: added to area %s by %s\n",astr[ustr[user].area].name,ustr[user].say_name);
 }
 
 
@@ -18517,8 +18601,8 @@ if (!(fp=fopen(filename,"r"))) {
 	}
 
 if (!(dp=fopen(tempfile, "w"))) {
-	write_str(user, "Couldn't open a temporary file");
-	print_to_syslog("ERROR: Couldn't open tempfile to write in del_atmos()\n");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in del_atmos! %s\n",get_error());
 	fclose(dp);  return;
 	}
 
@@ -18540,8 +18624,8 @@ fclose(dp);
 if (wrote) {
   /* Make the temp file the new atmospheres file for the user */
   if (rename(tempfile, filename)==-1) {
-	write_str(user, "Couldn't make new atmosphere file");
-	print_to_syslog("ERROR: Couldn't rename temp file to atmosphere file in del_atmos()\n");
+        write_str(user,BAD_FILEIO);
+	write_log(ERRLOG,YESTIME,"Couldn't rename file \"%s\" to \"%s\" in del_atmos! %s\n",tempfile,filename,get_error());
 	return;
 	}
   }
@@ -18550,9 +18634,15 @@ else {
   remove(tempfile);
   }
 
-if (atm_num>=i) sprintf(mess, "There is no atmosphere %d", atm_num);
-else sprintf(mess, "Atmosphere %d deleted", atm_num);
+if (atm_num>=i) {
+sprintf(mess, "There is no atmosphere %d", atm_num);
 write_str(user, mess);
+}
+else {
+sprintf(mess, "Atmosphere %d deleted", atm_num);
+write_str(user, mess);
+write_log(SYSTEMLOG,YESTIME,"ATMOS: deleted #%d from area %s by %s\n",atm_num,astr[ustr[user].area].name,ustr[user].say_name);
+}
 }
 
 
@@ -18643,8 +18733,6 @@ write_str(user,mess);
 void suicide_user(int user, char *inpstr)
 {
 char nuke_name[NAME_LEN+1];
-char buf1[30];
-time_t tm;
 
 /* Demotion check. If user was demoted to a 0 and they were */
 /* promoted at the beginning, dont let them suicide         */
@@ -18681,14 +18769,9 @@ writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
 strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
 bt_count = ( ++bt_count ) % NUM_LINES;
 
-        time(&tm);                                            
-	sprintf(buf1,"%s",ctime(&tm));
-        buf1[strlen(buf1)-6]=0; /* get rid of nl and year */
+write_log(SYSTEMLOG,YESTIME,"SUICIDE: By user %s\n",ustr[user].say_name);
 
-sprintf(mess,"%s: SUICIDE: By user %s\n",buf1,ustr[user].say_name);
-print_to_syslog(mess);
-
-user_quit(user);
+user_quit(user,1);
  
 remove_exem_data(nuke_name);
 remove_user(nuke_name);
@@ -18833,7 +18916,6 @@ says++;
 /** for all private communication commands      **/
 void gag_comm(int user, char *inpstr, int type)
 {
-char buf1[256];
 char other_user[ARR_SIZE];
 int u,inlen;
 unsigned int i;
@@ -18912,22 +18994,17 @@ if (strlen(inpstr) && strcmp(inpstr,"0")) {
   ustr[u].gag_time=atoi(inpstr);
   ustr[u].gagcomm = 1;
     write_str(u,GCOMMON_MESS);
-    sprintf(mess,"GCOM ON : %s by %s for %s\n",ustr[u].say_name,
+    sprintf(mess,"GCOM: ON for %s by %s for %s\n",ustr[u].say_name,
 ustr[user].say_name, converttime((long)ustr[u].gag_time));
 }
  else {
    ustr[u].gagcomm = 1;
    ustr[u].gag_time= 0;
    write_str(u,GCOMMON_MESS);
-   sprintf(mess,"GCOM ON : %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+   sprintf(mess,"GCOM: ON for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
   }
-
  btell(user, mess);
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
- print_to_syslog(mess);
- write_str(user,"Ok");
+ write_log(SYSTEMLOG,YESTIME,mess);
  return;
 } /* end of if gagcommed */
 
@@ -18935,14 +19012,9 @@ else {
     ustr[u].gagcomm = 0;
     ustr[u].gag_time = 0;
     write_str(u,GCOMMOFF_MESS);
-    sprintf(mess,"GCOM OFF: %s by %s",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"GCOM: OFF for %s by %s",ustr[u].say_name, ustr[user].say_name);
     btell(user, mess);
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
-    strcat(mess,"\n");
-    print_to_syslog(mess);
-    write_str(user,"Ok");
+    write_log(SYSTEMLOG,YESTIME,mess);
     return;
   } 
 
@@ -18956,21 +19028,15 @@ ustr[u].gag_time=0;
 
 if (type==1) {
 write_str(u,GCOMMON_MESS);
-sprintf(mess,"GCOM ON : %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+sprintf(mess,"GCOM: ON for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
 }
 else {
 write_str(u,GCOMMOFF_MESS);
-sprintf(mess,"GCOM OFF: %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+sprintf(mess,"GCOM: OFF for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
 }
 btell(user, mess);
+write_log(SYSTEMLOG,YESTIME,mess);
 
-
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
-print_to_syslog(buf1);
-
-write_str(user,"Ok");
 }
 
 /*-----------------------------------------------*/
@@ -18978,7 +19044,6 @@ write_str(user,"Ok");
 /*-----------------------------------------------*/
 void frog_user(int user, char *inpstr)
 {
-char buf1[256];
 char other_user[ARR_SIZE];
 int u,inlen;
 unsigned int i;
@@ -19056,14 +19121,14 @@ if (strlen(inpstr) && strcmp(inpstr,"0")) {
   ustr[u].frog_time=atoi(inpstr);
   ustr[u].frog = 1;
     write_str(u,FROGON_MESS);
-    sprintf(mess,"FROG ON : %s by %s for %s\n",ustr[u].say_name,
+    sprintf(mess,"FROG: ON for %s by %s for %s\n",ustr[u].say_name,
 ustr[user].say_name, converttime((long)ustr[u].frog_time));
 }
 else {
     ustr[u].frog = 1;
     ustr[u].frog_time=0;
     write_str(u,FROGON_MESS);
-    sprintf(mess,"FROG ON : %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"FROG: ON for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
   }
 }     /* end of if frogged */
 
@@ -19071,15 +19136,11 @@ else {
     ustr[u].frog = 0;
     ustr[u].frog_time=0;
     write_str(u,FROGOFF_MESS);
-    sprintf(mess,"FROG OFF: %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"FROG: OFF for %s by %s\n",ustr[u].say_name, ustr[user].say_name);
   } 
 
 btell(user, mess);
-
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
-print_to_syslog(buf1);
+write_log(SYSTEMLOG,YESTIME,mess);
 
 write_str(user,"Ok");
 }
@@ -19088,7 +19149,6 @@ write_str(user,"Ok");
 void auto_nuke(int user)
 {
 char line[132];
-char buf1[30];
 
   if (autonuke)
     {
@@ -19104,13 +19164,7 @@ char buf1[30];
     }
     
  btell(user,line);
-
- strcpy(mess,line);
- strcpy(buf1,get_time(0,0));    
- strcpy(line,buf1);
- strcat(line,mess);
- print_to_syslog(line);
-
+ write_log(SYSTEMLOG,YESTIME,line);
 }
 
 /* Jazzin - makes .autopromote .autonuke and .autoexpire into one command */
@@ -19183,7 +19237,6 @@ strcpy(onoff[1],"ON");
 /* Set talkers auto-promote flag on or off */
 void auto_prom(int user)
 {
-char buf1[30];
 char line[132];
 
   if (autopromote==1)
@@ -19200,19 +19253,13 @@ char line[132];
     }
 
  btell(user,line);
-
- strcpy(mess,line);
- strcpy(buf1,get_time(0,0));    
- strcpy(line,buf1);
- strcat(line,mess);
- print_to_syslog(line);
+ write_log(SYSTEMLOG,YESTIME,line);
 }
 
 /* Set talkers auto-promote flag on or off */
 void auto_expr(int user)
 {
 char line[132];
-char buf1[30];
 
   if (autoexpire==0)
     {
@@ -19240,13 +19287,7 @@ char buf1[30];
     }
     
  btell(user,line);
-
- strcpy(mess,line);
- strcpy(buf1,get_time(0,0));    
- strcpy(line,buf1);
- strcat(line,mess);
- print_to_syslog(line);
-
+ write_log(SYSTEMLOG,YESTIME,line);
 }
 
 
@@ -19293,7 +19334,7 @@ writeall_str(mess,1,user,0,user,NORM,SAY_TYPE,0);
 }
 
 /* Add warning log for a user */
-void warning(int user, char *inpstr)
+void warning(int user, char *inpstr, int mode)
 {
 char timestr[30];
 char other_user2[ARR_SIZE];
@@ -19347,9 +19388,8 @@ else {
    sprintf(filename,"%s/%s",WLOGDIR,other_user2);
 
    if (!(fp=fopen(filename,"a"))) {
-     strcpy(mess,"ERROR: Cannot append warning to user's warning log.\n");
-     write_str(user,mess);
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in warning! %s\n",filename,get_error());
      return;
     }
 
@@ -19366,8 +19406,11 @@ else {
    sprintf(z_mess,"(%s) From %s: %s\n",timestr,ustr[user].say_name,inpstr);
    fputs(z_mess,fp);
    fclose(fp);
+   if (mode==1) {
    sprintf(mess,"logged a warning about %s",other_user2);
    btell(user,mess);
+   write_log(SYSTEMLOG,YESTIME,"UWARNING: %s %s\n",ustr[user].say_name,mess);
+   }
  }
 }
 
@@ -19470,6 +19513,12 @@ writeall_str(mess, 1, user, 0, user, NORM, SAY_TYPE, 0);
 area = ustr[user].area;
 strncpy(conv[area][astr[area].conv_line],mess,MAX_LINE_LEN);
 astr[area].conv_line = ( ++astr[area].conv_line ) % NUM_LINES;
+
+  /* write to bot */
+  if (ustr[user].area == ustr[bot].area) {
+  sprintf(mess,"+++++ comm_emote:%s %s",ustr[user].say_name,inpstr);
+  write_bot(mess);
+  }
 	
 }
 
@@ -19658,7 +19707,7 @@ if (ustr[u].afk)
     write_str(user,t_mess);
   }
 
-if (ustr[u].igtell && ustr[user].super<WIZ_LEVEL) 
+if (!user_wants_message(u,TELLS) && ustr[user].super<WIZ_LEVEL) 
   {
    sprintf(mess,"%s is ignoring tells and secret emotes",ustr[u].say_name);
    write_str(user,mess);
@@ -19803,6 +19852,12 @@ else {
  write_hilite(u,mess);
  }
 
+  /* write to bot */
+  if (u==bot) {
+  sprintf(mess,"+++++ comm_semote:%s %s",ustr[user].say_name,other_input);
+  write_bot(mess);
+  }
+
 } /* end of message compisition for loop */
 
 if (multi) {
@@ -19890,7 +19945,6 @@ char cbe[3];
 char atm[3];
 char filename[FILE_NAME_LEN];
 FILE *fp;
-time_t tm;
 
 if (!strlen(inpstr)) showhide=0;
 else if (!strcmp(inpstr,"-h")) {
@@ -19913,13 +19967,10 @@ strcpy(atm," ");
 
 totl_hide = 0;
 
- time(&tm);
  strcpy(filename,get_temp_file());
  if (!(fp=fopen(filename,"w"))) {
-     sprintf(mess,"%s Cant create file for paged rooms listing!",ctime(&tm));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in rooms! %s\n",get_error());
      return;
      }
 
@@ -20036,11 +20087,8 @@ fputs(mess,fp);
 fclose(fp);
 
  if (!cat(filename,user,0)) {
-     time(&tm);
-     sprintf(mess,"%s Cant cat room listing file!",ctime(&tm));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't cat file \"%s\" in rooms! %s\n",filename,get_error());
      }
 
 return;
@@ -20129,11 +20177,8 @@ strncpy(filename,t_mess,FILE_NAME_LEN);
 
 if (!(fp=fopen(filename,"a"))) 
   {
-   sprintf(mess,"%s : message cannot be written",syserror);
-   write_str(user,mess);
-   sprintf(mess,"Cant open %s message board file to write in write_board()",
-                astr[ustr[user].area].name);
-   logerror(mess);
+   write_str(user,BAD_FILEIO);
+   write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in write_board! %s\n",filename,get_error());
    return;
   }
 
@@ -20224,7 +20269,8 @@ else if (mode==3)
 else
  {
   if (!strlen(inpstr)) {
-  if (astr[area].hidden && ustr[user].tempsuper < GRIPE_LEVEL)
+   if (astr[area].hidden && ((ustr[user].tempsuper < GRIPE_LEVEL)
+	|| (ustr[user].security[area]!='Y')))
     {
      write_str(user,"^Secured message board, read not allowed.^");
      return;
@@ -20265,7 +20311,8 @@ if ((strlen(inpstr) < 3) && (strlen(inpstr) > 0)) {
           { 
             found = TRUE;
             area = new_area;
-           if (astr[new_area].hidden && ustr[user].tempsuper < GRIPE_LEVEL)
+	   if (astr[new_area].hidden && ((ustr[user].tempsuper < GRIPE_LEVEL)
+		|| (ustr[user].security[new_area]!='Y')))
              {
               write_str(user,"^Secured message board, read not allowed.^");
               return;
@@ -20509,10 +20556,7 @@ if (!ustr[user].vis)
 
 writeall_str(mess, 1, user, 0, user, NORM, TOPIC, 0);
 
-sprintf(mess,"%s: TOPIC in %s changed by %s to %s\n",get_time(0,0),
-        astr[ustr[user].area].name,ustr[user].say_name,inpstr);
-print_to_syslog(mess);
-
+write_log(SYSTEMLOG,YESTIME,"TOPIC in %s changed by %s to \"%s\"\n",astr[ustr[user].area].name,ustr[user].say_name,inpstr);
 }
 
 
@@ -20559,8 +20603,7 @@ if (ustr[user].tempsuper<=ustr[victim].super)
 
 sprintf(line,"KILL %s performed by %s",ustr[victim].say_name,ustr[user].say_name);
 btell(user,line);
-strcat(line,"\n");
-print_to_syslog(line);
+write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 
 if (!strlen(inpstr)) {
   a = rand() % NUM_KILL_MESSAGES;
@@ -20576,7 +20619,7 @@ write_str(victim,"");
 write_str(victim,DEF_KILL_MESS);
 
 /* kill user */
-user_quit(victim);
+user_quit(victim,1);
 }
 
 /*** shutdown talk server ***/
@@ -20587,10 +20630,8 @@ int j=0;
 int fd;
 unsigned int i;
 char option[ARR_SIZE];
-char timestr[30];
-time_t tm;
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 PROCESS_INFORMATION p_info;
 STARTUPINFO s_info;
 char *args=strdup(thisprog); strcat(args," "); strcat(args,datadir);
@@ -20608,8 +20649,12 @@ else if (strlen(inpstr) > 0) {
                   }
            else {
                    down_time=0;
-		if (treboot) {
-                   write_str(user,"Auto reboot cancelled!");
+		if (treboot==1) {
+                   write_str(user,"Auto soft-reboot cancelled!");
+		   treboot=0;
+		   }
+		else if (treboot==2) {
+                   write_str(user,"Auto hard-reboot cancelled!");
 		   treboot=0;
 		   }
 		else {
@@ -20629,7 +20674,19 @@ else if (strlen(inpstr) > 0) {
                treboot=1;
                goto NORMAL;
                }
-            }
+         } /* if soft reboot */
+         else if (!strcmp(option,"-h")) {            
+            remove_first(inpstr);
+              if (strlen(inpstr) > 0) {
+               option[0]=0;
+               sscanf(inpstr,"%s",option);
+               said_reboot=2;
+               }
+              else { 
+               treboot=2;
+               goto NORMAL;
+               }
+         } /* if hard reboot */
          if ((!strcmp(option,"0")) || (strlen(option) > 5)) {
             write_str(user,"Specify only numbers between 1 and 32766");
             return;
@@ -20661,8 +20718,8 @@ else if (strlen(inpstr) > 0) {
          i=0;
          down_time=atoi(option);
 	if (said_reboot) {
-         sprintf(t_mess,"System will automatically reboot in  %i minutes.",down_time);
-         treboot=1;   /* actually tell the talker that reboot is on */
+         sprintf(t_mess,"System will automatically %sreboot in  %i minutes.",said_reboot==1?"soft-":"hard-",down_time);
+         treboot=said_reboot;   /* actually tell the talker that reboot is on */
          }
 	else {
          sprintf(t_mess,"System will be automatically shutdown in  %i  minutes.",down_time);
@@ -20690,7 +20747,7 @@ signal(SIGFPE,SIG_IGN);
 signal(SIGSEGV,SIG_IGN);
 signal(SIGTERM,SIG_IGN);
 
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 signal(SIGTRAP,SIG_IGN);
 #if !defined(__CYGWIN32__)
 signal(SIGIOT,SIG_IGN);
@@ -20708,62 +20765,79 @@ signal(SIGTTIN,SIG_IGN);
 signal(SIGTTOU,SIG_IGN);
 #endif
 
-write_str(user,"Quitting users...");
+if (!treboot) do_tracking(0, NULL);
 
-if (!treboot) {
-sprintf(mess,"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN Normal shutdown\nEND:\n\" > .tinfo",
-SYSTEM_NAME,(unsigned int)getpid());
-system(mess);
-system("mail tinfo@ncohafmuta.com < .tinfo");
-}
 
 if (treboot) {
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
   GetStartupInfo(&s_info);
 #endif
 }
 
+if (treboot!=1) write_str(user,"Quitting users...");
+else {
+if (SHOW_SREBOOT==1) {
+sprintf(mess,"%s *** System soft-rebooting, Please stand by.. ***",STAFF_PREFIX);
+writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, WIZT, 0);
+}
+}
+
 for (u=0;u<MAX_USERS;++u) 
   {
-   if (ustr[u].area == -1 && !ustr[u].logging_in) continue;
+   if (ustr[u].sock==-1) continue;
    if (u == user) continue;
-   write_str(u, " ");
-  if (treboot) {
-   write_str(u,"^*** System rebooting ***^");
+  if (treboot==1) {
+   if (SHOW_SREBOOT==2) {
+	write_str(u, "");
+	write_str(u," ^*** System soft-rebooting, Please stand by.. ***^");
+   }
+   /* write_bot("+++++ REBOOT"); */
+   }
+  else if (treboot==2) {
+   write_str(u, "");
+   write_str(u," ^*** System hard-rebooting. It will be back momentarily ***^");
    write_bot("+++++ REBOOT");
    }
   else {
-   write_str(u,"^*** System shutting down ***^");
+   write_str(u, "");
+   write_str(u," ^*** System shutting down ***^");
    write_bot("+++++ SHUTDOWN");
    }
-   write_str(u, " ");
-   user_quit(u);
+
+/*   write_str(u, ""); */
+   if (treboot!=1) user_quit(u,1);
+   else user_hot_quit(u);
    }
    
-write_str(user,"Logging shutdown...");
 sprintf(mess,"%s.pid",thisprog);
 remove(mess);
 sysud(0,user);
 check_mess(2);
 
-write_str(user,"Now quitting you...");
-if (treboot)
- write_str(user,"^* System will be back momentarily. *^");
+if (treboot!=1) write_str(user,"Now quitting you...");
+if (treboot==1) {
+ if (SHOW_SREBOOT==2) write_str(user," ^*** System in soft-reboot. Please stand by. ***^");
+}
+else if (treboot==2)
+ write_str(user," ^*** System will be back momentarily. ***^");
 else
- write_str(user,"^* System is now off. *^");
+ write_str(user," ^*** System is now off. ***^");
 
 strtolower(ustr[user].name);
 
-user_quit(user);
+if (treboot!=1) user_quit(user,1);
+else user_hot_quit(user);
 
 /* close listening sockets */
+if (treboot!=1) {
 for (j=0;j<4;++j) {
  while (CLOSE(listen_sock[j]) == -1 && errno == EINTR)
 	; /* empty while */
  /* FD_CLR(listen_sock[j],&readmask); */
  }
+}
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 /* Shutdown winsock + timer thread before exit */
 WSACleanup();
 TerminateThread(hThread,0);
@@ -20789,7 +20863,7 @@ if (treboot) {
             CLOSE(fd);
         }
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
   CreateProcess(thisprog,args,NULL,NULL,0,
                 DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS,
                 NULL, NULL, &s_info, &p_info);
@@ -20798,14 +20872,10 @@ if (treboot) {
 #endif
 
 	/* If we get this far it hasn't worked */
+        write_log(BOOTLOG,YESTIME,"BOOT: %sREBOOT Failed! %s\n",treboot==1?"SOFT-":"HARD-",get_error());
 	CLOSE(0);
 	CLOSE(1);
 	CLOSE(2);
-        time(&tm);
-        strcpy(timestr,ctime(&tm));
-        timestr[strlen(timestr)-6]=0;  /* get rid of nl and year */
-        sprintf(mess,"%s: REBOOT Failed!",timestr);
-        print_to_syslog(mess);
         exit(12);
        }
 exit(0); 
@@ -20816,10 +20886,8 @@ void shutdown_auto()
 int u;
 int j=0;
 int fd;
-char timestr[30];
-time_t tm;
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 PROCESS_INFORMATION p_info;
 STARTUPINFO s_info;
 char *args=strdup(thisprog); strcat(args," "); strcat(args,datadir);
@@ -20834,7 +20902,7 @@ signal(SIGFPE,SIG_IGN);
 signal(SIGSEGV,SIG_IGN);
 signal(SIGTERM,SIG_IGN);
 
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 signal(SIGTRAP,SIG_IGN);
 #if !defined(__CYGWIN32__)
 signal(SIGIOT,SIG_IGN);
@@ -20852,64 +20920,87 @@ signal(SIGTTIN,SIG_IGN);
 signal(SIGTTOU,SIG_IGN);
 #endif
 
-if (!treboot) {
-sprintf(mess,"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN Normal shutdown\nEND:\n\" > .tinfo",
-SYSTEM_NAME,(unsigned int)getpid());
-system(mess);
-system("mail tinfo@ncohafmuta.com < .tinfo");
-}
+if (!treboot) do_tracking(0, NULL);
 
 if (treboot) {
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
   GetStartupInfo(&s_info);
 #endif
 }
 
 if (!num_of_users) goto CONT;
 
+if (treboot==1 && SHOW_SREBOOT==1) {
+sprintf(mess,"%s *** System soft-rebooting. Please stand by.. ***",STAFF_PREFIX);
+writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, WIZT, 0);
+}
+
 for (u=0;u<MAX_USERS;++u) 
   {
    if (ustr[u].area == -1 && !ustr[u].logging_in) continue;
-   write_str(u, " ");
  if (user_wants_message(u,BEEPS)) {
-  if (treboot)
-   write_str(u,"\07^*** System auto-rebooting ***^\07");
-  else
-   write_str(u,"\07^*** System auto-shutting down ***^\07");
+  if (treboot==1) {
+  if (SHOW_SREBOOT==2) {
+	write_str(u, "");
+	write_str(u," \07^*** System soft-rebooting. Please stand by.. ***^\07");
+  }
+  }
+  else if (treboot==2) {
+   write_str(u, "");
+   write_str(u," \07^*** System hard-rebooting. It will be back momentarily ***^\07");
+  }
+  else {
+   write_str(u, "");
+   write_str(u," \07^*** System shutting down ***^\07");
+   }
   }
  else {
-  if (treboot)
-   write_str(u,"^*** System auto-rebooting ***^");
-  else
-   write_str(u,"^*** System auto-shutting down ***^");
+  if (treboot==1) {
+   if (SHOW_SREBOOT==2) {
+	write_str(u, "");
+	write_str(u," ^*** System soft-rebooting ***^");
+   }
+   }
+  else if (treboot==1) {
+   write_str(u, "");
+   write_str(u," ^*** System hard-rebooting. It will be back momentarily ***^");
+   }
+  else {
+   write_str(u, "");
+   write_str(u," ^*** System shutting down ***^");
+   }
   }
-   write_str(u, " ");
-   user_quit(u);
+/*   write_str(u, ""); */
+   if (treboot!=1) user_quit(u,1);
+   else user_hot_quit(u);
    }
 
 CONT:
 check_mess(2);
+
 if (treboot) {
- print_to_syslog("AUTO-REBOOT in progress..\n");
- write_bot("+++++ REBOOT");
+ write_log(BOOTLOG,YESTIME,"AUTO-%sREBOOT in progress\n",treboot==1?"SOFT-":"HARD-");
+ if (treboot!=1) write_bot("+++++ REBOOT");
  }
 else {
- print_to_syslog("AUTO-SHUTDOWN executed\n");
+ write_log(BOOTLOG,YESTIME,"AUTO-SHUTDOWN executed\n");
  write_bot("+++++ SHUTDOWN");
  }
 
 /* close listening sockets */
+if (treboot!=1) {
 for (j=0;j<4;++j) {
  while (CLOSE(listen_sock[j]) == -1 && errno == EINTR)
 	; /* empty while */
  /* FD_CLR(listen_sock[j],&readmask); */
  }
+}
 
 sprintf(mess,"%s.pid",thisprog);
 remove(mess);
 sysud(0,-1);
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 /* Shutdown winsock + timer thread before exit */
 WSACleanup();
 TerminateThread(hThread,0);
@@ -20936,7 +21027,7 @@ if (treboot) {
             CLOSE(fd);
         }
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
   CreateProcess(thisprog,args,NULL,NULL,0,
                 DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS,
                 NULL, NULL, &s_info, &p_info);
@@ -20945,31 +21036,56 @@ if (treboot) {
 #endif
 
 	/* If we get this far it hasn't worked */
+	write_log(BOOTLOG,YESTIME,"BOOT: AUTO-%sREBOOT Failed! %s\n",treboot==1?"SOFT-":"HARD-",get_error());
 	CLOSE(0);
 	CLOSE(1);
 	CLOSE(2);
-        time(&tm);
-        strcpy(timestr,ctime(&tm));
-        timestr[strlen(timestr)-6]=0;  /* get rid of nl and year */
-        sprintf(mess,"%s: REBOOT Failed!",timestr);
-        print_to_syslog(mess);
         exit(12);
        }
 
 exit(0); 
 }
 
+char *log_error(int error) {
+static char message2[256];
 
-void shutdown_error(int error)
+switch(error) {
+   case 1: strcpy(message2,"a failure to accept a new who socket"); break;
+   case 2: strcpy(message2,"a failure to set the who socket non-blocking"); break;
+   case 3: strcpy(message2,"a failure to accept a new www socket"); break;
+   case 4: strcpy(message2,"a failure to set the www socket non-blocking"); break;
+   case 5: strcpy(message2,"a failure to accept a new user socket"); break;
+   case 6: strcpy(message2,"a failure to accept a new wiz socket"); break;
+   case 7: strcpy(message2,"a failure to set the user or wiz socket non-blocking"); break;
+   case 8: strcpy(message2,"a loop panic. Talker broke out of main loop!"); break;
+   case 9: strcpy(message2,"an error during select()"); break;
+   case 10: strcpy(message2,"job kill"); break;
+   case 11: strcpy(message2,"a segmentation fault! - SIGSEGV"); break;
+#if !defined(_WIN32) || defined(__CYGWIN32__)
+   case 12: strcpy(message2,"a bus error! - SIGBUS"); break;
+#endif
+   case 13: strcpy(message2,"the command line shutdown script"); break;
+   case 14: strcpy(message2,"a failure to write to the system logs"); break;
+   case 15: strcpy(message2,"execution of an illegal instruction"); break;
+   default: strcpy(message2,"an unknown failure"); break;
+  }
+
+write_log(ERRLOG,YESTIME,"CAUGHT sig or err, case %d (%s)\n",error,message2);
+
+return message2;
+}
+
+void shutdown_error(char *message)
 {
 int u;
 int j=0;
 int fd;
-char timestr[30];
-char message[256];
-time_t tm;
+char filename1[FILE_NAME_LEN];
+char filename2[FILE_NAME_LEN];
+char filebuf[ARR_SIZE];
+FILE *fp;
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 PROCESS_INFORMATION p_info;
 STARTUPINFO s_info;
 char *args=strdup(thisprog); strcat(args," "); strcat(args,datadir);
@@ -20984,7 +21100,7 @@ signal(SIGFPE,SIG_IGN);
 signal(SIGSEGV,SIG_IGN);
 signal(SIGTERM,SIG_IGN);
 
-#if !defined(WIN32) || defined(__CYGWIN32__)
+#if !defined(_WIN32) || defined(__CYGWIN32__)
 signal(SIGTRAP,SIG_IGN);
 #if !defined(__CYGWIN32__)
 signal(SIGIOT,SIG_IGN);
@@ -21002,81 +21118,90 @@ signal(SIGTTIN,SIG_IGN);
 signal(SIGTTOU,SIG_IGN);
 #endif
 
-switch(error) {
-   case 1: strcpy(message,"a failure to accept a new who socket"); break;
-   case 2: strcpy(message,"a failure to set the who socket non-blocking"); break;
-   case 3: strcpy(message,"a failure to accept a new www socket"); break;
-   case 4: strcpy(message,"a failure to set the www socket non-blocking"); break;
-   case 5: strcpy(message,"a failure to accept a new user socket"); break;
-   case 6: strcpy(message,"a failure to accept a new wiz socket"); break;
-   case 7: strcpy(message,"a failure to set the user or wiz socket non-blocking"); break;
-   case 8: strcpy(message,"a loop panic. Talker broke out of main loop!"); break;
-   case 9: strcpy(message,"an error during select()"); break;
-   case 10: strcpy(message,"job kill"); break;
-   case 11: strcpy(message,"a segmentation fault! - SIGSEGV"); break;
-#if !defined(WIN32) || defined(__CYGWIN32__)
-   case 12: strcpy(message,"a bus error! - SIGBUS"); break;
-#endif
-   case 13: strcpy(message,"the command line shutdown script"); break;
-   case 14: strcpy(message,"a failure to write to the system logs"); break;
-   default: strcpy(message,"an unknown failure"); break;
-  }
-
-if (!treboot) {
-sprintf(mess,"echo \"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN %s\nEND:\n\" > .tinfo",
-SYSTEM_NAME,(unsigned int)getpid(),message);
-system(mess);
-system("mail tinfo@ncohafmuta.com < .tinfo");
+/* If we're going down, move the lastcommand to lastcommand.CRASH so we dont lose it */
+if (strcmp(message,"the command line shutdown script") && strcmp(message,"job kill")) {
+	sprintf(filename1,"%s/%s",LOGDIR,LASTFILE);
+	sprintf(filename2,"%s.CRASH",filename1);
+if (!check_for_file(filename2))
+        rename(filename1,filename2);
+else {
+fp=fopen(filename1,"r");
+fgets(filebuf,9000,fp);
+fclose(fp);
+remove(filename1);
+fp=fopen(filename2,"a");
+fputs(filebuf,fp);
+fclose(fp);
+}
 }
 
+if (!treboot) do_tracking(0, message);
+
 if (treboot) {
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
   GetStartupInfo(&s_info);
 #endif
+}
+
+if (!num_of_users) goto CONT2;
+
+if (treboot==1 && SHOW_SREBOOT==1) {
+sprintf(mess,"%s *** System soft-rebooting due to %s. Please stand by.. ***",STAFF_PREFIX,message);
+writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, WIZT, 0);
 }
 
 for (u=0;u<MAX_USERS;++u) 
   {
    if (ustr[u].area == -1 && !ustr[u].logging_in) continue;
-   write_str(u, " ");
-   if (treboot)
-    sprintf(mess,"^*** System rebooting due to %s ***^",message);
-   else
-    sprintf(mess,"^*** System shutting down due to %s ***^",message);
-   write_str(u,mess);
-   write_str(u, " ");
-   user_quit(u);
+   if (treboot==1) {
+    if (SHOW_SREBOOT==2) {
+	write_str(u, "");
+	sprintf(mess," ^*** System soft-rebooting due to %s. Please stand by.. ***^",message);
+	write_str(u,mess);
+    }
+   }
+   else if (treboot==2) {
+	write_str(u, "");
+    sprintf(mess," ^*** System hard-rebooting due to %s ***^",message);
+    write_str(u,mess);
+   }
+   else {
+	write_str(u, "");
+    sprintf(mess," ^*** System shutting down due to %s ***^",message);
+    write_str(u,mess);
+   }
+
+   if (treboot!=1) user_quit(u,1);
+   else user_hot_quit(u);
   }
 
+CONT2:
 check_mess(2);
 
-time(&tm);
-strcpy(timestr,ctime(&tm));
-timestr[strlen(timestr)-6]=0;  /* get rid of nl and year */
-
 if (treboot) {
- write_bot("+++++ REBOOT");
- sprintf(mess,"%s: REBOOTING due to %s\n",timestr,message);
+ if (treboot!=1) write_bot("+++++ REBOOT");
+ write_log(BOOTLOG,YESTIME,"%sREBOOTING due to %s\n",treboot==1?"SOFT-":"HARD-",message);
  }
 else {
  write_bot("+++++ SHUTDOWN");
- sprintf(mess,"%s: SHUTDOWN due to %s\n",timestr,message);
+ write_log(BOOTLOG,YESTIME,"SHUTDOWN due to %s\n",message);
  }
-print_to_syslog(mess);
 
 
 /* close listening sockets */
+if (treboot!=1) {
 for (j=0;j<4;++j) {
  while (CLOSE(listen_sock[j]) == -1 && errno == EINTR)
 	; /* empty while */
  FD_CLR(listen_sock[j],&readmask);
  }
+}
 
 sprintf(mess,"%s.pid",thisprog);
 remove(mess);
 sysud(0,-1);
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 /* Shutdown winsock + timer thread before exit */
 WSACleanup();
 TerminateThread(hThread,0);
@@ -21103,7 +21228,7 @@ if (treboot) {
             CLOSE(fd);
         }
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
   CreateProcess(thisprog,args,NULL,NULL,0,
                 DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS,
                 NULL, NULL, &s_info, &p_info);
@@ -21112,14 +21237,10 @@ if (treboot) {
 #endif
 
 	/* If we get this far it hasn't worked */
+        write_log(BOOTLOG,YESTIME,"BOOT: %sREBOOT Failed! %s\n",treboot==1?"SOFT-":"HARD-",get_error());
 	CLOSE(0);
 	CLOSE(1);
 	CLOSE(2);
-        time(&tm);
-        strcpy(timestr,ctime(&tm));
-        timestr[strlen(timestr)-6]=0;  /* get rid of nl and year */
-        sprintf(mess,"%s: REBOOT Failed!\n",timestr);
-        print_to_syslog(mess);
         exit(12);
        }
 
@@ -21154,9 +21275,8 @@ if (!strcmp(word,"email")) {
   sprintf(t_mess,"%s/%s",MAILDIR,ustr[user].name);
   strncpy(filename,t_mess,FILE_NAME_LEN);
   if (!(fp=fopen(filename,"r"))) {
-    strcpy(mess,"ERROR: Cant open user mailfile for searching!\n");
-    write_str(user,mess);
-    print_to_syslog(mess);
+    write_str(user,BAD_FILEIO);
+    write_log(ERRLOG,YESTIME,"Couldn't open file(r) \"%s\" in search_boards! %s\n",filename,get_error());
     return;
     }
 
@@ -21243,7 +21363,6 @@ char command[20];
 char z_mess[20];
 char result[FILE_NAME_LEN];
 char filename[FILE_NAME_LEN];
-char *super=RANKS;
 FILE *fp;
 
 /* help for one command */
@@ -21256,8 +21375,7 @@ if (strlen(inpstr)) {
 
 	if (strstr(inpstr,"/")) {
            write_str(user,"String has illegal character in it.");
-	   sprintf(mess,"User %s attempted to .help %s",ustr[user].say_name,inpstr);
-	   logerror(mess);
+	   write_log(WARNLOG,YESTIME,"User %s attempted to .help %s",ustr[user].say_name,inpstr);
 	   return;
 	   }
 
@@ -21616,7 +21734,7 @@ for (d=0;d<ustr[user].tempsuper+1;d++)
        fputs(" \n",fp);
       }
 
-    sprintf(mess,"%c)",super[d]);
+    sprintf(mess,"%c)",ranks[d].abbrev);
     fputs(mess,fp);
     nl=0;
    
@@ -21648,7 +21766,7 @@ cat(filename,user,0);
 
 /***** Nuts 3 format help *****/
 else if (ustr[user].help==2) {
- sprintf(mess,"*** Commands available for user level ^%s^ ***\n",ranks[ustr[user].tempsuper]);
+ sprintf(mess,"*** Commands available for user level ^%s^ ***\n",ranks[ustr[user].tempsuper].sname);
 fputs(mess,fp);
 
 nl = -1;
@@ -21661,7 +21779,7 @@ for (d=0;d<ustr[user].tempsuper+1;d++)
        fputs(" \n",fp);
       }
 
-    sprintf(mess,"^HC(%s)^",ranks[d]);
+    sprintf(mess,"^HC(%s)^",ranks[d].sname);
     fputs(mess,fp);
     fputs("\n",fp);
     nl=0;
@@ -21695,7 +21813,7 @@ cat(filename,user,0);
 
 /***** Nuts 2 format help *****/
 else if (ustr[user].help==3) {
- sprintf(mess,"*** Commands available for user level ^%s^ ***\n",ranks[ustr[user].tempsuper]);
+ sprintf(mess,"*** Commands available for user level ^%s^ ***\n",ranks[ustr[user].tempsuper].sname);
 fputs(mess,fp);
 
     for (c=0; sys[c].jump_vector != -1 ;++c)
@@ -21811,8 +21929,7 @@ if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
 
 sprintf(mess,"*** [ %s ] ***",inpstr);
 writeall_str(mess, 0, user, 1, user, BOLD, BCAST, 0);
-sprintf(mess,"%s: BROADCAST MESSAGE from %s\n",get_time(0,0),ustr[user].say_name);
-print_to_syslog(mess);
+write_log(SYSTEMLOG,YESTIME,"BCAST: by %s\n",ustr[user].say_name);
 }
 
 
@@ -21832,7 +21949,6 @@ char stm[30];
 char onoff[2][4];
 char yesno[2][4];
 char new[3][4];
-time_t tm;
 
 strcpy(onoff[0],"OFF");
 strcpy(onoff[1],"ON ");
@@ -21844,11 +21960,10 @@ strcpy(new[2],"YES");
 write_str(user,"+------------------------SYSTEM STATUS----------------------+");
 write_str(user,"| Overall:                                                  |");
 
-time(&tm);
 strcpy(stm,ctime(&start_time));
 stm[strlen(stm)-1]=0;  /* get rid of nl */
 
-minutes=(tm-start_time)/60;
+minutes=(time(0)-start_time)/60;
 days=(int)minutes/1440;
 ms=(int)minutes%1440;
 hours=ms/60;
@@ -21866,7 +21981,7 @@ dec_hours= (float)hours/24;
 
 sprintf(mess,  "|        System started: %24.24s           |",stm);
 write_str(user,mess);
-sprintf(mess,  "|                        %29.29s ago  |",converttime((long)((tm-start_time)/60)));
+sprintf(mess,  "|                        %29.29s ago  |",converttime((long)((time(0)-start_time)/60)));
 write_str(user,mess);
 write_str(user,"|                                                           |");
 write_str(user,"|        Atmos    Sys Open    New users     Max Users       |");
@@ -22032,7 +22147,7 @@ else
 sprintf(mess,MOVE_TOREST,tempstr);
 writeall_str(mess, 1, user2, 0, user, NORM, MOVE, 0);
 
-   if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
+   if (ustr[user2].area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user2].say_name);
     write_bot(mess);
     }
@@ -22051,7 +22166,7 @@ look(user2,"");
 sprintf(mess,MOVE_TONEW,tempstr,"s");
 writeall_str(mess, 1, user2, 0, user, NORM, MOVE, 0);
 
-   if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
+   if (ustr[user2].area == ustr[bot].area) {
     sprintf(mess,"+++++ came in:%s", ustr[user2].say_name);
     write_bot(mess);
     }
@@ -22102,8 +22217,7 @@ t_ustr.area=area;
 sprintf(mess,"%s moved to %s",t_ustr.say_name, astr[t_ustr.area].name);
 write_str(user,mess);  
 write_user(other_user);
-sprintf(mess,"%s moved %s (offline) to %s\n",ustr[user].name,t_ustr.name, astr[t_ustr.area].name);
-print_to_syslog(mess);
+write_log(SYSTEMLOG,YESTIME,"%s moved %s (offline) to %s\n",ustr[user].name,t_ustr.name, astr[t_ustr.area].name);
 }
 
 write_str(user,"Ok");
@@ -22134,8 +22248,7 @@ if (!co) {
   if(!strcmp(inpstr,"all")) {
         sprintf(line,"ALL PORTS CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: ALL PORTS CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	strcpy(line,"*** System is now closed to all further logins ***");
 	writeall_str(line, 0, user, 1, user, BOLD, NONE, 0);
 	sys_access=0;
@@ -22154,8 +22267,7 @@ if (!co) {
   if(!strcmp(inpstr,"main")) {
         sprintf(line,"MAIN PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: MAIN PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	sys_access=0;
 	return;
        }
@@ -22166,8 +22278,7 @@ if (!co) {
 	}
         sprintf(line,"WIZ PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: WIZ PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	wiz_access=0;
 	return;
        }
@@ -22178,8 +22289,7 @@ if (!co) {
 	}
         sprintf(line,"WHO PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: WHO PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	who_access=0;
 	return;
        }
@@ -22190,8 +22300,7 @@ if (!co) {
 	}
         sprintf(line,"WWW PORT CLOSED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: WWW PORT CLOSED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	www_access=0;
 	return;
        }
@@ -22204,8 +22313,7 @@ else {
   if(!strcmp(inpstr,"all")) {
         sprintf(line,"ALL PORTS OPENED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: ALL PORTS OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	strcpy(line,"*** System is now open to all further logins ***");
 	writeall_str(line, 0, user, 1, user, BOLD, NONE, 0);
 	sys_access=1;
@@ -22224,8 +22332,7 @@ else {
   if(!strcmp(inpstr,"main")) {
         sprintf(line,"MAIN PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: MAIN PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	sys_access=1;
 	return;
        }
@@ -22236,8 +22343,7 @@ else {
 	}
         sprintf(line,"WIZ PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: WIZ PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	wiz_access=1;
 	return;
        }
@@ -22248,8 +22354,7 @@ else {
 	}
         sprintf(line,"WHO PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: WHO PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	who_access=1;
 	return;
        }
@@ -22260,8 +22365,7 @@ else {
 	}
         sprintf(line,"WWW PORT OPENED BY %s",ustr[user].say_name);
         btell(user,line);
-        sprintf(line,"%s: WWW PORT OPENED BY %s\n",get_time(0,0),ustr[user].say_name);
-        print_to_syslog(line);
+        write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 	www_access=1;
 	return;
        }
@@ -22408,14 +22512,14 @@ if (!slen)
   
 if (slen>10) slen=10;
 
-/* check for special characters in string */ 
+/* check for special characters in string */
 for (i=0;i<slen;++i) {
-        if (!isalpha((int)inpstr[i])) { found=1; break; }
+	if (!isalpha((int)inpstr[i])) { found=1; break; }
 }
 if (found==1) {
 write_str(user,"Message cannot have special characters in it.");
 return;
-}       
+}
 i=0;
 
 strcpy(mess,"");
@@ -22525,7 +22629,7 @@ write_str(user2,ARREST_TOUSER);
 sprintf(mess,ARREST_TOREST,ustr[user2].say_name);
 writeall_str(mess, 1, user2, 0, user, NORM, NONE, 0);
 
-   if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
+   if (ustr[user2].area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user2].say_name);
     write_bot(mess);
     }
@@ -22548,9 +22652,9 @@ sprintf(mess,ARREST_TOJAIL,ustr[user2].say_name);
 writeall_str(mess, 1, user2, 0, user, NORM, NONE, 0);
 sprintf(mess, "ARREST: %s by %s",ustr[user2].say_name,ustr[user].say_name);
 btell(user,mess);
-strcat(mess,"\n");
-print_to_syslog(mess);
-write_str(user,"Ok");
+write_log(SYSTEMLOG,YESTIME,"%s\n",mess);
+sprintf(mess,"%s Arrested by %s",ustr[user2].name,ustr[user].say_name);
+warning(user,mess,0);
 }
 else if (mode==1) {
   unmuzzle(user,ustr[user2].name);
@@ -22559,8 +22663,9 @@ else if (mode==1) {
   look(user2,"");
   sprintf(mess, "UNARREST: %s by %s",ustr[user2].say_name,ustr[user].say_name);
   btell(user,mess);
-  strcat(mess,"\n");
-  print_to_syslog(mess);
+  write_log(SYSTEMLOG,YESTIME,"%s\n",mess);
+  sprintf(mess,"%s UNArrested by %s",ustr[user2].name,ustr[user].say_name);
+  warning(user,mess,0);
  }
 
 }
@@ -22820,8 +22925,7 @@ if (strlen(inpstr)) {
       /* Get filename size */
       if (stat(filename, &fileinfo) == -1) {
        if (check_for_file(filename)) {
-       sprintf(mess,"SYSTEM: Could not read mailfile size for user %s\n",ustr[user].say_name);
-       print_to_syslog(mess);
+       write_log(WARNLOG,YESTIME,"Couldn't read inbox size for \"%s\" in read_mail! %s\n",filename,get_error());
         }
        }
       else filesize = fileinfo.st_size;
@@ -22837,8 +22941,7 @@ if (strlen(inpstr)) {
       /* Get filename size */
       if (stat(filename, &fileinfo) == -1) {
        if (check_for_file(filename)) {
-       sprintf(mess,"SYSTEM: Could not read mailfile size for user %s\n",ustr[user].say_name);
-       print_to_syslog(mess);
+       write_log(WARNLOG,YESTIME,"Couldn't read sent-box size for \"%s\" in read_mail! %s\n",filename,get_error());
        }
       }
       else filesize = fileinfo.st_size;
@@ -23022,18 +23125,14 @@ if (!check_for_user(other_user))
 ret=gag_check2(user,other_user);
 if (!ret) return;
 else if (ret==2) {
- sprintf(mess,"SYSTEM: An error has occured reading %s's user file",other_user);
- write_str(user,mess);
- print_to_syslog(mess);
- print_to_syslog("\n");
+ write_str(user,BAD_FILEIO);
+ write_log(ERRLOG,YESTIME,"Couldn't open file(r) for \"%s\" in gag_check2! %s\n",other_user); 
  return;
  }
 
 if (!read_user(other_user)) {
- sprintf(mess,"SYSTEM: An error has occured reading %s's user file",other_user);
- write_str(user,mess);
- print_to_syslog(mess);
- print_to_syslog("\n");
+ write_str(user,BAD_FILEIO);
+ write_log(ERRLOG,YESTIME,"Couldn't open user file for \"%s\" in gag_check2! %s\n",other_user); 
  return;
  }
 
@@ -23055,8 +23154,7 @@ strncpy(filename,t_mess,FILE_NAME_LEN);
 /* Get filename size */
 if (stat(filename, &fileinfo) == -1) {
     if (check_for_file(filename)) {
-    sprintf(mess2,"SYSTEM: Could not read mailfile size for user %s\n",other_user);
-    print_to_syslog(mess2);
+    write_log(WARNLOG,YESTIME,"Couldn't read inbox size for \"%s\" in read_mail! %s\n",filename,get_error());
     }
    }
 else filesize = fileinfo.st_size;
@@ -23289,8 +23387,7 @@ strncpy(filename,t_mess,FILE_NAME_LEN);
 /* Get filename size */
 if (stat(filename, &fileinfo) == -1) {
     if (check_for_file(filename)) {
-    sprintf(t_mess,"SYSTEM: Could not read mailfile size for user %s\n",ustr[user].say_name);
-    print_to_syslog(t_mess);
+    write_log(WARNLOG,YESTIME,"Couldn't read sent-box size for \"%s\" in read_mail! %s\n",filename,get_error());
     }
    }
 else filesize = fileinfo.st_size;
@@ -23734,7 +23831,7 @@ if ( ((new_level == MAX_LEVEL-1) && (t_ustr.super == MAX_LEVEL-1)) ||
   
 if (new_level == t_ustr.super) new_level++;
   
-if (new_level == ustr[user].tempsuper && PROMOTE_TO_SAME == FALSE)
+if (new_level == ustr[user].tempsuper && PROMOTE_TO_SAME == FALSE && strcmp(ustr[user].name,ROOT_ID))
     {
       sprintf(mess,"Cant promote %s: That is beyond your authority",t_ustr.say_name);
       write_str(user,mess);
@@ -23774,28 +23871,26 @@ a=0;
 
 write_user(other_user); 
 
-sprintf(mess,"%s: PROMOTION to level %d by %s for %s\n",
-            get_time(0,0), t_ustr.super,
-            ustr[user].say_name, t_ustr.say_name);
-print_to_syslog(mess);
+write_log(SYSTEMLOG,YESTIME,"PROMOTION to level %d by %s for %s\n",
+            t_ustr.super, ustr[user].say_name, t_ustr.say_name);
 
 if((u=get_user_num_exact(other_user,user))>-1) 
   {
    ustr[u].super=new_level;
-   sprintf(mess,PROMOTE_MESS,ustr[user].say_name,ranks[ustr[u].super]);
+   sprintf(mess,PROMOTE_MESS,ustr[user].say_name,ranks[ustr[u].super].lname);
    write_str(u,mess);
   }
 else
   {
-   sprintf(mess,PROMOTE_MESS,ustr[user].say_name,ranks[t_ustr.super]);
+   sprintf(mess,PROMOTE_MESS,ustr[user].say_name,ranks[t_ustr.super].lname);
    sprintf(t_mess,"%s %s",other_user,mess);
    send_mail(user,t_mess,1);
   }
 
- sprintf(mess,UPROMOTE_MESS,t_ustr.say_name,ranks[t_ustr.super]);
+ sprintf(mess,UPROMOTE_MESS,t_ustr.say_name,ranks[t_ustr.super].lname);
  write_str(user,mess);
 
-sprintf(mess,"has PROMOTED %s to %s",other_user,ranks[t_ustr.super]);
+sprintf(mess,"has PROMOTED %s to %s",other_user,ranks[t_ustr.super].lname);
 btell(user,mess);
 }
 
@@ -23836,7 +23931,7 @@ void check_promote(int user, int mode)
     write_user(ustr[user].name);
 
     /* Inform user of their promotion */
-    sprintf(mess,APROMOTE_MESS,ranks[ustr[user].super]);
+    sprintf(mess,APROMOTE_MESS,ranks[ustr[user].super].lname);
     write_str(user,mess);
 
     /* Inform wizards of their promotion */
@@ -23844,8 +23939,7 @@ void check_promote(int user, int mode)
     writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
 
     /* Inform system log */
-    sprintf(mess,"%s: AUTO-PROMOTION by THE TALKER for %s\n",get_time(0,0),ustr[user].say_name);
-    print_to_syslog(mess);
+    write_log(SYSTEMLOG,YESTIME,"AUTO-PROMOTION by THE TALKER for %s\n",ustr[user].say_name);
     return;
     }
  } /* end of if super */
@@ -23922,7 +24016,7 @@ for (a=0;a<NUM_AREAS;++a)
        t_ustr.security[a]='N';
        if((u=get_user_num_exact(other_user,user))>-1) {
         ustr[u].security[a]='N';
-        sprintf(mess,"You have been locked from room %s",astr[a].name);
+        sprintf(mess,"You have been removed from special access for room %s",astr[a].name);
         write_str(u,mess);
         } /* end of if user on */
        } /* end of if level */
@@ -23931,29 +24025,27 @@ for (a=0;a<NUM_AREAS;++a)
 a=0;
 
 write_user(other_user);
-sprintf(z_mess,"%s: DEMOTION to level %d by %s for %s\n",
-              get_time(0,0), t_ustr.super,
-              ustr[user].say_name, t_ustr.say_name);
-print_to_syslog(z_mess);
+write_log(SYSTEMLOG,YESTIME,"DEMOTION to level %d by %s for %s\n",
+              t_ustr.super, ustr[user].say_name, t_ustr.say_name);
 
 if ((u=get_user_num_exact(other_user,user))>-1) 
   {
     ustr[u].super--;
     if (ustr[u].super == MONITOR_LEVEL-1) ustr[u].monitor=0;
-    sprintf(z_mess,DEMOTE_MESS,ustr[user].say_name,ranks[ustr[u].super]);
+    sprintf(z_mess,DEMOTE_MESS,ustr[user].say_name,ranks[ustr[u].super].lname);
     write_str(u,z_mess);
    }
 else
   {
-   sprintf(z_mess,DEMOTE_MESS,ustr[user].say_name,ranks[t_ustr.super]);
+   sprintf(z_mess,DEMOTE_MESS,ustr[user].say_name,ranks[t_ustr.super].lname);
    sprintf(t_mess,"%s %s",other_user,z_mess);
    send_mail(user,t_mess,1);
   }
 
-sprintf(z_mess,UDEMOTE_MESS,t_ustr.say_name,ranks[t_ustr.super]);
+sprintf(z_mess,UDEMOTE_MESS,t_ustr.say_name,ranks[t_ustr.super].lname);
 write_str(user,z_mess);
 
-sprintf(z_mess,"has DEMOTED %s to %s",other_user,ranks[t_ustr.super]);
+sprintf(z_mess,"has DEMOTED %s to %s",other_user,ranks[t_ustr.super].lname);
 btell(user,z_mess);
 } 
 
@@ -23961,7 +24053,6 @@ btell(user,z_mess);
 /** Muzzle a user, takes away his .shout capability **/
 void muzzle(int user, char *inpstr, int type)
 {
-char buf1[256];
 char other_user[ARR_SIZE];
 int u,inlen;
 unsigned int i;
@@ -24055,26 +24146,20 @@ writeall_str(mess, 1, u, 1, user, NORM, NONE, 0);
 write_str(u,MUZZLEON_MESS);
 
 if (ustr[u].muz_time > 0) {
- sprintf(mess,"MUZZLE: %s by %s for %s\n",ustr[u].say_name,
+ sprintf(mess,"MUZZLE: ON for %s by %s for %s",ustr[u].say_name,
          ustr[user].say_name, converttime((long)ustr[u].muz_time));
  }
 else {
- sprintf(mess,"MUZZLE: %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+ sprintf(mess,"MUZZLE: ON for %s by %s",ustr[u].say_name, ustr[user].say_name);
  }
 btell(user, mess);
-
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
-print_to_syslog(buf1);
-
+write_log(SYSTEMLOG,YESTIME,"%s\n",mess);
 }
 
 
 /** Unmuzzle a muzzled user, so they can shout again **/
 void unmuzzle(int user, char *inpstr)
 {
-char buf1[256];
 char other_user[ARR_SIZE];
 int u;
  
@@ -24127,14 +24212,9 @@ sprintf(mess,"%s can shout again",ustr[u].say_name);
 writeall_str(mess, 1, u, 1, user, NORM, NONE, 0);
 write_str(u,MUZZLEOFF_MESS);
 
-sprintf(mess,"UNMUZZLE: %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+sprintf(mess,"MUZZLE: OFF for %s by %s",ustr[u].say_name, ustr[user].say_name);
 btell(user, mess);
-
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
-print_to_syslog(buf1);
-
+write_log(SYSTEMLOG,YESTIME,"%s\n",mess);
 }
 
 
@@ -24340,7 +24420,7 @@ else
 sprintf(mess,MOVE_TOREST,tempstr);
 writeall_str(mess, 1, user2, 0, user, NORM, MOVE, 0);
 
-   if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
+   if (ustr[user2].area == ustr[bot].area) {
     sprintf(mess,"+++++ left:%s", ustr[user2].say_name);
     write_bot(mess);
     }
@@ -24354,7 +24434,7 @@ if ((find_num_in_area(ustr[user2].area)<=PRINUM) && astr[ustr[user2].area].priva
 ustr[user2].area=area;
 look(user2,"");
 
-   if (!strcmp(astr[ustr[user2].area].name,BOT_ROOM)) {
+   if (ustr[user2].area == ustr[bot].area) {
     sprintf(mess,"+++++ came in:%s", ustr[user2].say_name);
     write_bot(mess);
     }
@@ -24470,16 +24550,14 @@ if (!ustr[victim].vis)
 /* and number of commands associated with each.           */
 void display_ranks(int user)
 {
-  char fields[30];
   char z_mess[80];
   int i=0;
   int c=0;
   int count=0;
   int numcmds=0;
-  strcpy(fields,RANKS);
 
 write_str(user,"");
-sprintf(z_mess,"Your rank is ^%d^ (%s)",ustr[user].tempsuper,ranks[ustr[user].tempsuper]);
+sprintf(z_mess,"Your rank is ^%d^ (%s)",ustr[user].tempsuper,ranks[ustr[user].tempsuper].lname);
 write_str(user,z_mess);  
 write_str(user,"------------------------------------------------------------------");
 write_str(user,"lvl  rank                  odds     cmds this level    cmds total");
@@ -24492,9 +24570,9 @@ for(i=0;i<MAX_LEVEL+1;i++)
      }
     count += numcmds;
     if (ustr[user].tempsuper==i)
-	    sprintf(z_mess,"^HG%c    %-20.20s (%-5.5d)          %-3d              %-3d^",fields[i],ranks[i],odds[i],numcmds,count);
+	    sprintf(z_mess,"^HG%c    %-20.20s (%-5.5d)          %-3d              %-3d^",ranks[i].abbrev,ranks[i].lname,ranks[i].odds,numcmds,count);
     else
-	    sprintf(z_mess,"%c    %-20.20s (%-5.5d)          %-3d              %-3d",fields[i],ranks[i],odds[i],numcmds,count);
+	    sprintf(z_mess,"%c    %-20.20s (%-5.5d)          %-3d              %-3d",ranks[i].abbrev,ranks[i].lname,ranks[i].odds,numcmds,count);
     write_str(user,z_mess);
     c=0;
     numcmds=0;
@@ -24762,9 +24840,7 @@ char tempname[NAME_LEN+1];
        }
 
 if (found==1) {
- sprintf(mess,"User from site %s tried to login with banned name %s\n",
-               sitename,str);
- print_to_syslog(mess);
+ write_log(BANLOG,YESTIME,"BANNAME: User from site %s tried to login with banned name %s\n",sitename,str);
  return 1;
 }
 else return 0;
@@ -24815,7 +24891,6 @@ char site_name[65];
 char chunk[10];
 char reason[ARR_SIZE];
 char comment[ARR_SIZE];
-time_t tm;
 time_t tm_then;
 struct dirent *dp;
 FILE *fp;
@@ -24843,17 +24918,13 @@ if (!strcmp(inpstr,"list") || !strlen(inpstr))
     return;
    }
 
-   time(&tm);
-
    write_str(user,"Site/Cluster/Domain                 Ban Started"); 
    write_str(user,"-------------------------           -----------"); 
 
    strcpy(filename3,get_temp_file());
    if (!(fp2=fopen(filename3,"w"))) {
-     sprintf(mess,"%s Cant create file for paged restrict listing!",ctime(&tm));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+	write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in restrict! %s\n",get_error());
      (void) closedir(dirp);
      return;
      }
@@ -24881,7 +24952,7 @@ if (!strcmp(inpstr,"list") || !strlen(inpstr))
          FCLOSE(fp);
          timenum=atoi(timebuf);
          tm_then=((time_t) timenum);
-         sprintf(mess,"%-35s %s ago",small_buff,converttime((long)((tm-tm_then)/60)));
+         sprintf(mess,"%-35s %s ago",small_buff,converttime((long)((time(0)-tm_then)/60)));
          fputs(mess,fp2);
          fputs("\n",fp2);
          timebuf[0]=0;
@@ -24908,10 +24979,8 @@ if (!strcmp(inpstr,"list") || !strlen(inpstr))
  (void) closedir(dirp);
 
  if (!cat(filename3,user,0)) {
-     sprintf(mess,"%s Cant cat restrict listing file!",ctime(&tm));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);   
+     write_log(ERRLOG,YESTIME,"Couldn't cat file \"%s\" in restrict! %s\n",filename3,get_error());
      }
 
  return;
@@ -25058,20 +25127,16 @@ if ((fp2=fopen(filename,"r"))) {
     fclose(fp2);
     sprintf(mess,"Comment/Reason added to site %s by %s",site_name,ustr[user].say_name);
     btell(user,mess);
-    sprintf(mess,"%s: Comment/Reason added to site %s by %s\n",get_time(0,0),site_name,ustr[user].say_name);
-    print_to_syslog(mess);
+    write_log(BANLOG,YESTIME,"%s\n",mess);
    }  /* end of if */
 
 else {
  if (!(fp2=fopen(filename,"w"))) {
-         sprintf(mess,"%s : restriction could not be applied: ",syserror);
-         write_str(user,mess);
-         sprintf(mess,"Cant open %s to restrict access.",filename);
-         logerror(mess);
+         write_str(user,BAD_FILEIO);
+         write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in restrict! %s\n",filename,get_error()); 
          return;
          }
- time(&tm);
- sprintf(timestr,"%ld\n",(unsigned long)tm);
+ sprintf(timestr,"%ld\n",(unsigned long)time(0));
  fputs(timestr,fp2);
  fclose(fp2);
   /* Now since we're creating a new ban, check which - option we       */
@@ -25098,10 +25163,9 @@ else {
 
  sprintf(mess,"Site %s is now %s.",site_name, text_mess);
  write_str(user,mess);
- sprintf(mess,"%s: %s site %s by %s\n", get_time(0,0), text_mess, site_name, ustr[user].say_name);
- print_to_syslog(mess);
- sprintf(mess,"%s site %s by %s", text_mess, site_name, ustr[user].say_name);
+ sprintf(mess,"%s: site %s by %s", text_mess, site_name, ustr[user].say_name);
  btell(user,mess);
+ write_log(BANLOG,YESTIME,"%s\n",mess);
  }  /* end of else */
 }
 
@@ -25171,45 +25235,12 @@ sprintf(mess,"Site %s is ALLOWED ACCESS again.",inpstr);
 write_str(user,mess);
 
 if (type==ANY)
- sprintf(mess,"UNRESTRICT site %s by %s",inpstr,ustr[user].say_name);
+ sprintf(mess,"UNRESTRICT: site %s by %s",inpstr,ustr[user].say_name);
 else
- sprintf(mess,"UNBANNEW site %s by %s",inpstr,ustr[user].say_name);
+ sprintf(mess,"UNBANNEW: site %s by %s",inpstr,ustr[user].say_name);
 
 btell(user,mess);
-
-if (type==ANY)
- sprintf(mess,"%s: UNRESTRICT site %s by %s\n",get_time(0,0),inpstr,ustr[user].say_name);
-else
- sprintf(mess,"%s: UNBANNEW site %s by %s\n",get_time(0,0),inpstr,ustr[user].say_name);
-
-print_to_syslog(mess);
-}
-
-
-/* Ignore private tells */
-void igtells(int user)
-{
-if (ustr[user].igtell) {
-  write_str(user,"You are already ignoring .tells");
-  return;
-  }
- else {
-  write_str(user,"You ignore your .tells");
-  ustr[user].igtell=1;
-  }
-}
-
-/* Listen to private tells */
-void heartells(int user)
-{
-if (!ustr[user].igtell) {
-  write_str(user,"You are already listening to your .tells");
-  return;
-  }
- else {
-  write_str(user,"You listen to your .tells");
-  ustr[user].igtell=0;
-  }
+write_log(BANLOG,YESTIME,"%s\n",mess);
 }
 
 
@@ -25379,8 +25410,8 @@ else return;
 SKIP:
 if (!startup) {
         write_area(-1,"");
-	write_area(-1,"SYSTEM:: Midnight system check taking place, please wait...");
-        print_to_syslog("SYSTEM:: Midnight system check in progress..\n");
+	write_area(-1,"SYSTEM: Midnight system check taking place, please wait...");
+        write_log(SYSTEMLOG,YESTIME,"SYSTEM: Midnight system check in progress..\n");
    }
 
 /* cycle through files */
@@ -25396,15 +25427,15 @@ for(b=0;b<NUM_AREAS+1;++b) {
 	if (!(bfp=fopen(boardfile,"r"))) continue;
 	if (!(tfp=fopen(tempfile,"w"))) {
                if (startup==1) {
-		perror("\nSYSTEM: Cant open temp file to write in check_mess()");
+		perror("\nSYSTEM: Cant open tempfile(w) in check_mess");
 		FCLOSE(bfp);
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
                 exit(0);
                 }
                 else {
-		logerror("Cant open temp file to write in check_mess()");
+		write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in check_mess! %s\n",get_error());
 		FCLOSE(bfp);
                 checked = 0;
 		return;
@@ -25457,6 +25488,10 @@ WSACleanup();
   auto_expire();
   /* Expire email verifications from today */
   check_verify(-1,1);
+  /* We'll do daily backups here */
+  if (dobackups) backup_logs(-1);
+  /* We'll do cleaning of old backups here */
+  trim_backups(-1,TRIM_BACKUPS);
   }
 
 WLOG:
@@ -25477,18 +25512,14 @@ WLOG:
 
 if (!startup) {
         write_area(-1,"");
-	write_area(-1,"SYSTEM:: Check completed. Carry on!");
-        print_to_syslog("SYSTEM:: Check completed.\n");
-        sprintf(mess,"SYSTEM:: %d old messages deleted from boards\n",normcount);
-        print_to_syslog(mess);
-        sprintf(mess,"SYSTEM:: %d old messages deleted from wiz board\n",wizcount);
-        print_to_syslog(mess);
+	write_area(-1,"SYSTEM: Check completed. Carry on!");
+        write_log(SYSTEMLOG,YESTIME,"SYSTEM: Midnight check completed.\n");
+        write_log(SYSTEMLOG,YESTIME,"SYSTEM: %d old messages deleted from boards\n",normcount);
+        write_log(SYSTEMLOG,YESTIME,"SYSTEM: %d old messages deleted from wiz board\n",wizcount);
    }
 if (startup==1) {
-        sprintf(mess,"SYSTEM:: %d old messages deleted from boards\n",normcount);
-        print_to_syslog(mess);
-        sprintf(mess,"SYSTEM:: %d old messages deleted from wiz board\n",wizcount);
-        print_to_syslog(mess);
+        write_log(SYSTEMLOG,YESTIME,"SYSTEM: %d old messages deleted from boards\n",normcount);
+        write_log(SYSTEMLOG,YESTIME,"SYSTEM: %d old messages deleted from wiz board\n",wizcount);
    }
 
 return;
@@ -25519,8 +25550,7 @@ sprintf(mess,"User login activity for %s\n",daystr);
 /* Open the file to write to it */
 sprintf(filename,"%s",ACTVYFILE);
 if (!(fp=fopen(filename,"a"))) {
-      strcpy(mess,"Cant append login activity to file\n");
-      print_to_syslog(mess);
+      write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in write_meter! %s\n",filename,get_error());
       return;
   }
 
@@ -25767,18 +25797,11 @@ if (down_time > 1) offset=down_time-1;
 if ((down_time >= 61) && (down_time < 1441)) {
 for (c=1;c<24;++c) {
  if (down_time == (60*c+1)) {
-   if (c==1) {
    if (treboot)
-    sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  hour",c);
+    sprintf(mess,"SYSTEM:: Talker %sreboot in  %i  hou%s",treboot==1?"soft-":"hard-",c,c==1?"r":"rs");
    else
-    sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  hour",c);
-    }
-   else {
-   if (treboot)
-    sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  hours",c);
-   else
-    sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  hours",c);
-    }
+    sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  hou%s",c,c==1?"r":"rs");
+
    write_area(-1,"");
    write_area(-1,mess);
    break;
@@ -25790,18 +25813,11 @@ c=0;
 else if ((down_time >= 1441) && (down_time <= 32767)) {
 for (c=1;c<23;++c) {
  if (down_time == (1440*c+1)) {
-   if (c==1) {
    if (treboot)
-    sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  day",c);
+    sprintf(mess,"SYSTEM:: Talker %sreboot in  %i  da%s",treboot==1?"soft-":"hard-",c,c==1?"y":"ys");
    else
-    sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  day",c);
-    }
-   else {
-   if (treboot)
-    sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  days",c);
-   else
-    sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  days",c);
-    }
+    sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  da%s",c,c==1?"y":"ys");
+
    write_area(-1,"");
    write_area(-1,mess);
    break;
@@ -25810,65 +25826,19 @@ for (c=1;c<23;++c) {
 c=0;
 }  /* end of if */
 
-if (down_time==51) {
+if (down_time==51 || down_time==41 || down_time==31 || down_time==21 || down_time==11 || 
+    down_time==6 || down_time==2) {
 if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
+ sprintf(mess,"SYSTEM:: Talker %sreboot in  %i  minut%s",treboot==1?"soft-":"hard-",offset,offset==1?"e":"es");
 else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
+ sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  da%s",offset,offset==1?"e":"es");
+
 write_area(-1,"");
 write_area(-1,mess);
-   }
-if (down_time==41) {
-if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
-else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
-write_area(-1,"");
-write_area(-1,mess);
-   }
-if (down_time==31) {
-if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
-else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
-write_area(-1,"");
-write_area(-1,mess);
-   }
-if (down_time==21) {
-if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
-else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
-write_area(-1,"");
-write_area(-1,mess);
-   }
-if (down_time==11) {
-if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
-else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
-write_area(-1,"");
-write_area(-1,mess);
-   }
-if (down_time==6) {
-if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
-else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
-write_area(-1,"");
-write_area(-1,mess);
-   }
-if (down_time==2) {
-if (treboot)
- sprintf(mess,"SYSTEM:: Talker auto-reboot in  %i  minutes",offset);
-else
- sprintf(mess,"SYSTEM:: Talker auto-shutdown in  %i  minutes",offset);
-write_area(-1,"");
-write_area(-1,mess);
-   }
+}
+
 if (down_time==1) shutdown_auto();
 down_time = offset;
-
 }
 
 /*** see if any users are near or at idle limit or need flags reset***/
@@ -25886,7 +25856,7 @@ for (user=0; user<MAX_USERS; ++user)
           if (user_wants_message(user,BEEPS))
            write_str(user,"\07");
           write_str(user,"Connection closed due to exceeeded login time limit");
-          user_quit(user);
+          user_quit(user,1);
          }
       }
    }
@@ -25987,7 +25957,7 @@ for (user=0;user<MAX_USERS;++user)
    if (min >= IDLE_TIME ) 
     {
      write_str(user,IDLE_BYE_MESS);
-     user_quit(user);
+     user_quit(user,1);
     }
    }
    
@@ -26030,6 +26000,8 @@ ustr[user].say_name[0]=toupper((int)ustr[user].say_name[0]);
    ustr[user].init_date[24]=0;
    strcpy(ustr[user].last_date,  ctime(&tm));
    ustr[user].last_date[24]=0;
+   strcpy(ustr[user].creation,   ctime(&tm));
+   ustr[user].creation[24]=0;
    strcpy(ustr[user].init_site,    ustr[user].site);
    strcpy(ustr[user].last_site,    ustr[user].site);
    strcpy(ustr[user].last_name,    ustr[user].net_name);
@@ -26098,6 +26070,7 @@ ustr[user].miscnum2 =        0;
 ustr[user].miscnum3 =        0;
 ustr[user].miscnum4 =        0;
 ustr[user].miscnum5 =        0;
+ustr[user].tempnum1 =        0;
 
 for (i=0;i<NUM_MACROS;i++) {
  ustr[user].Macros[i].name[0]=0;
@@ -26127,7 +26100,7 @@ i=0;
 initabbrs(user);
 listen_all(user);
 
-if (strcmp(ustr[user].login_name,ROOT_ID)==0) 
+if (!strcmp(ustr[user].login_name,ROOT_ID)) 
   {
     ustr[user].super = MAX_LEVEL;
     ustr[user].promote = 1;
@@ -26263,6 +26236,7 @@ ustr[user].miscnum2       =t_ustr.miscnum2;
 ustr[user].miscnum3       =t_ustr.miscnum3;
 ustr[user].miscnum4       =t_ustr.miscnum4;
 ustr[user].miscnum5       =t_ustr.miscnum5;
+ustr[user].tempnum1       =t_ustr.tempnum1;
 strcpy(ustr[user].icq,t_ustr.icq);
 strcpy(ustr[user].miscstr1,t_ustr.miscstr1);
 strcpy(ustr[user].miscstr2,t_ustr.miscstr2);
@@ -26402,6 +26376,7 @@ t_ustr.miscnum2        =ustr[user].miscnum2;
 t_ustr.miscnum3        =ustr[user].miscnum3;
 t_ustr.miscnum4        =ustr[user].miscnum4;
 t_ustr.miscnum5        =ustr[user].miscnum5;
+t_ustr.tempnum1        =ustr[user].tempnum1;
 strcpy(t_ustr.icq,ustr[user].icq);
 strcpy(t_ustr.miscstr1,ustr[user].miscstr1);
 strcpy(t_ustr.miscstr2,ustr[user].miscstr2);
@@ -26452,12 +26427,10 @@ stat(filename, &fileinfo);
 if (fileinfo.st_size == 0) {
  fclose(f);
  remove(filename);
- sprintf(z_mess,"Found 0 length user file for %s..removing.\n",name);
- print_to_syslog(z_mess);
+ write_log(WARNLOG,YESTIME,"Found 0 length user file for %s in read_user..removing.\n",name);
  return -1;
  }
 
-  
 /*--------------------------------------------------------*/
 /* values added after initial release must be initialized */
 /*--------------------------------------------------------*/
@@ -26510,6 +26483,7 @@ t_ustr.miscnum2      = 0;
 t_ustr.miscnum3      = 0;
 t_ustr.miscnum4      = 0;
 t_ustr.miscnum5      = 0;
+t_ustr.tempnum1      = 0;
 listen_all(-1);
 
 /* first line is either version number or users name */
@@ -26806,6 +26780,7 @@ if (t_ustr.miscnum2 > 32767     || t_ustr.miscnum2 < 0)	t_ustr.miscnum2=0;
 if (t_ustr.miscnum3 > 32767     || t_ustr.miscnum3 < 0)	t_ustr.miscnum3=0;
 if (t_ustr.miscnum4 > 32767     || t_ustr.miscnum4 < 0)	t_ustr.miscnum4=0;
 if (t_ustr.miscnum5 > 32767     || t_ustr.miscnum5 < 0)	t_ustr.miscnum5=0;
+if (t_ustr.tempnum1 > 32767     || t_ustr.tempnum1 < 0)	t_ustr.tempnum1=0;
 
 FCLOSE(f);
 return 1;
@@ -26845,8 +26820,7 @@ stat(filename, &fileinfo);
 if (fileinfo.st_size == 0) {
  fclose(f);
  remove(filename);
- sprintf(t_mess,"Found 0 length user file for %s..removing.\n",name);
- print_to_syslog(t_mess);
+ write_log(WARNLOG,YESTIME,"Found 0 length user file for %s in read_to_user..removing.\n",name);
  return -1;
  }
 
@@ -26905,6 +26879,7 @@ ustr[user].miscnum2      = 0;
 ustr[user].miscnum3      = 0;
 ustr[user].miscnum4      = 0;
 ustr[user].miscnum5      = 0;
+ustr[user].tempnum1      = 0;
 listen_all(-1);
 
 /* first line is either version number or users name */
@@ -27204,6 +27179,7 @@ if (ustr[user].miscnum2  > 32767 || ustr[user].miscnum2 < 0) ustr[user].miscnum2
 if (ustr[user].miscnum3  > 32767 || ustr[user].miscnum3 < 0) ustr[user].miscnum3=0;
 if (ustr[user].miscnum4  > 32767 || ustr[user].miscnum4 < 0) ustr[user].miscnum4=0;
 if (ustr[user].miscnum5  > 32767 || ustr[user].miscnum5 < 0) ustr[user].miscnum5=0;
+if (ustr[user].tempnum1  > 32767 || ustr[user].tempnum1 < 0) ustr[user].tempnum1=0;
 
 FCLOSE(f);
 return 1;
@@ -27224,12 +27200,9 @@ buff1[0]=0;
 sprintf(t_mess,"%s/%s",USERDIR,name);
 strncpy(filename,t_mess,FILE_NAME_LEN);
 
-f = fopen (filename, "w"); /* open for output */
-
-if (f==NULL)
-  {
-   sprintf(mess,"Cant write to user data file %s! (%s)\n",filename,strerror(errno));
-   print_to_syslog(mess);
+/* open for output */
+if (!(f=fopen(filename, "w"))) {
+   write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in write_user! %s\n",filename,get_error());
    return;
   }
 
@@ -27252,10 +27225,8 @@ wbuf(t_ustr.init_netname);   /* users original hostname */
   while (strlen(t_ustr.custAbbrs[i].com) > 1) {  
     wbuf(t_ustr.custAbbrs[i].abbr);
     wbuf(t_ustr.custAbbrs[i].com);
-	sprintf(mess,"Abbr %d: %s\n",i,t_ustr.custAbbrs[i].abbr);
-	print_to_syslog(mess);
-	sprintf(mess,"Com  %d: %s\n",i,t_ustr.custAbbrs[i].com);
-	print_to_syslog(mess);
+	write_log(DEBUGLOG,YESTIME,"Abbr %d: %s\n",i,t_ustr.custAbbrs[i].abbr);
+	write_log(DEBUGLOG,YESTIME,"Com  %d: %s\n",i,t_ustr.custAbbrs[i].com);
     i++;
    }
 */
@@ -27361,7 +27332,6 @@ return;
 /*-------------------------------------------------------------------------*/
 /* check to see if the user exists                                         */
 /*-------------------------------------------------------------------------*/
-
 int check_for_user(char *name)
 {
 char filename[ARR_SIZE];
@@ -27377,6 +27347,27 @@ if (bfp)
   }
 return 0;
 }
+
+/*-------------------------------------------------------------------------*/
+/* check to see if the username is already in the process of creatio       */
+/*-------------------------------------------------------------------------*/
+int check_for_creation(char *name)
+{
+int u=0;
+
+for (u=0;u<MAX_USERS;++u) {
+        if (!strcmp(name,ustr[u].login_name) && 
+	    ustr[u].logging_in && ustr[u].logging_in!=3) {
+	/* We found a user logging in with the same name	 */
+	/* and not at the username prompt, so they get		 */
+	/* precedence for creation over the user we are checking */
+        return u;
+        }
+}
+
+return -1;
+}
+
 
 /*----------------------------------------*/
 /* check to see if the file exists        */
@@ -27437,10 +27428,10 @@ char filename[FILE_NAME_LEN];
 /*-----------------------------------------------------*/
 void getbuf(FILE *f, char *buf2, int buflen)
 {
-char temp[1000];
+char temp[ARR_SIZE];
 
 temp[0]=0;
-if (fgets((char *)temp,1000,f) == NULL) {
+if (fgets((char *)temp,ARR_SIZE,f) == NULL) {
 	return;
 	}
 
@@ -27470,6 +27461,23 @@ if (fgets((char *)temp,1000,f) == NULL) {
 temp[strlen(temp)-1]=0;
 sscanf(temp,"%d",&val1);
 return val1;
+}
+
+/*-----------------------------------------------------*/
+/* Read a char with return from a file                 */
+/*-----------------------------------------------------*/
+char getonechar(FILE *f) {
+char char1;
+char temp[1000];
+                
+temp[0]=0;
+if (fgets((char *)temp,1000,f) == NULL) {
+        return 0;
+        }
+                
+temp[strlen(temp)-1]=0;
+sscanf(temp,"%c",&char1);
+return char1;
 }
 
 /*-----------------------------------------------------*/
@@ -27771,8 +27779,7 @@ int check_fname(char *inpstr, int user)
 {
 if (strpbrk(inpstr,".$/+*[]\\") )
   { 
-   sprintf(mess,"User %s: illegal file: %s",ustr[user].say_name,inpstr);   
-   logerror(mess);
+   write_log(WARNLOG,YESTIME,"ILLEGAL: User %s tried to input file \"%s\"\n",ustr[user].say_name,inpstr);
    return(1);
   }
 return 0;
@@ -27813,50 +27820,32 @@ void permission_u(int user, char *inpstr)
 {
 int u,a,b,j=1;
 char permit;
-char permission[81];
+char permission[ARR_SIZE];
 char other_user[ARR_SIZE];
 char room[ARR_SIZE];
+char room_check[ARR_SIZE];
 char filename[FILE_NAME_LEN];
 FILE *fp;
 
 if (!strlen(inpstr)) {
-   write_str(user,"Usage: .permission [add|sub] <user> <room>"); 
-   write_str(user,"Leave <room> blank for permission list"); 
+   write_str(user,"Usage: .permission <user> <add|sub> <room>"); 
+   write_str(user,"Leave everything after <user> blank for permission list"); 
    return;
    }
-sscanf(inpstr,"%s ",permission);
-strtolower(permission);
-
-if (!strcmp("add",permission))
-  {
-   permit = 'Y';
-  }
-else if (!strcmp("sub",permission))
-  {
-   permit = 'N';
-  }
-else
-  {
-   write_str(user,"Option does not exist.");
-   return;
-  }
-
-remove_first(inpstr);
- 
-if (!strlen(inpstr)) {
-   write_str(user,"Security clear who?"); 
-   return;
-   }
- 
 sscanf(inpstr,"%s ",other_user);
+
+if (!strlen(other_user)) {
+   write_str(user,"Whose security clearance are we talking about?"); 
+   return;
+   }
+
 strtolower(other_user);
 CHECK_NAME(other_user);
 
 remove_first(inpstr);
 
-/* List room permissions */   
-if (!strlen(inpstr))
-  {
+/* List room permissions */
+if (!strlen(inpstr)) {
 
     if (!read_user(other_user))
      {
@@ -27866,18 +27855,15 @@ if (!strlen(inpstr))
 
  strcpy(filename,get_temp_file());
  if (!(fp=fopen(filename,"w"))) {
-     sprintf(mess,"%s Cant create file for paged permission listing!",get_time(0,0));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);
+     write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in permission_u! %s\n",get_error());
      return;
      }
 
     fputs("---------------------------------------------------------\n",fp);
-    sprintf(mess," Room permissions for ^%s^\n\n",t_ustr.say_name);
-    fputs(mess,fp);
+    fprintf(fp," Room permissions for ^%s^\n",t_ustr.say_name);
     fputs("---------------------------------------------------------\n",fp);
-    fputs("ALLOWED ROOMS:\n",fp);
+    fputs("^HGSPECIAL ACCESS ROOMS:^\n",fp);
 
     for (a=0;a<NUM_AREAS;++a) 
       {
@@ -27886,45 +27872,91 @@ if (!strlen(inpstr))
 	   sprintf(mess,"%*s ",ROOM_LEN,astr[a].name);
 	   fputs(mess,fp);
 	  }
+	else continue;
 	if (!(j++%3) )
            {
             j = 1;
             fputs("\n",fp);
 	   }
       } /* end of for */
-if (j<=3) fputs("\n",fp);
+if (j!=1 && j<=3) fputs("\n",fp);
 j=1;
 a=0;
 
-    fputs("DENIED ROOMS:\n",fp);
+    fputs("^HYALLOWED ROOMS:^\n",fp);
+
     for (a=0;a<NUM_AREAS;++a) 
       {
-	if (t_ustr.security[a]=='N' && strlen(astr[a].name))
+	if (t_ustr.security[a]=='N' && !astr[a].hidden && strlen(astr[a].name))
 	  {
 	   sprintf(mess,"%*s ",ROOM_LEN,astr[a].name);
 	   fputs(mess,fp);
 	  }
+	else continue;
 	if (!(j++%3) )
            {
             j = 1;
             fputs("\n",fp);
 	   }
       } /* end of for */
-if (j<=3) fputs("\n",fp);
+if (j!=1 && j<=3) fputs("\n",fp);
+j=1;
+a=0;
+
+    fputs("^HRDENIED ROOMS:^\n",fp);
+    for (a=0;a<NUM_AREAS;++a) 
+      {
+	if (t_ustr.security[a]=='X' && strlen(astr[a].name))
+	  {
+	   sprintf(mess,"%*s ",ROOM_LEN,astr[a].name);
+	   fputs(mess,fp);
+	  }
+	else continue;
+	if (!(j++%3) )
+           {
+            j = 1;
+            fputs("\n",fp);
+	   }
+      } /* end of for */
+if (j!=1 && j<=3) fputs("\n",fp);
    fputs("\n",fp);
-   fclose(fp);
+
+fclose(fp);
 
  if (!cat(filename,user,0)) {
-     sprintf(mess,"%s Cant cat permission listing file!",get_time(0,0));
-     write_str(user,mess);
-     strcat(mess,"\n");
-     print_to_syslog(mess);
+     write_str(user,BAD_FILEIO);   
+     write_log(ERRLOG,YESTIME,"Couldn't cat file \"%s\" in permission_u! %s\n",filename,get_error());
      }
 
    a=0; j=1;
    return;
-  }     /* end of if room list */
+} /* end of permission list */
+else {
+sscanf(inpstr,"%s ",permission);
+strtolower(permission);
 
+if (!strcmp(permission,"add"))
+  {
+   permit = 'Y';
+  }
+else if (!strcmp(permission,"sub"))
+  {
+   permit = 'N';
+  }
+else
+  {
+   write_str(user,"Permission option does not exist.");
+   return;
+  }
+} /* end of strlen else */
+
+remove_first(inpstr);
+
+if (!strlen(inpstr)) {
+   write_str(user,"What room's security clearance do you want to change for that user?"); 
+   return;
+   }
+ 
 sscanf(inpstr,"%s ",room);
 strtolower(room);
 
@@ -27939,12 +27971,32 @@ b= -1;
 /* read in descriptions and joinings */
 for (a=0;a<NUM_AREAS;++a) 
   {
-    if (!strcmp(room,astr[a].name))
+    strncpy(room_check,astr[a].name,ROOM_LEN);
+    strtolower(room_check);
+    if (!strcmp(room,room_check))
       {
-       t_ustr.security[a]=permit;
+	if (permit=='Y') {
+		if (t_ustr.security[a]=='X') {
+			t_ustr.security[a]='N';
+			write_str(user,"Security clearance changed from ^HRno^ access to ^HYnormal^ access");
+		}
+		else if (t_ustr.security[a]=='N') {
+			t_ustr.security[a]='Y';
+			write_str(user,"Security clearance changed from ^HYnormal^ access to ^HGspecial^ access");
+		}
+	} /* end of if permit */
+	else if (permit=='N') {
+		if (t_ustr.security[a]=='N') {
+			t_ustr.security[a]='X';
+			write_str(user,"Security clearance changed from ^HYnormal^ access to ^HRno^ access");
+		}
+		else if (t_ustr.security[a]=='Y') {
+			t_ustr.security[a]='N';
+			write_str(user,"Security clearance changed from ^HGspecial^ access to ^HYnormal^ access");
+		}
+	} /* end of else if permit */
        b=a;
        a=NUM_AREAS;
-       write_str(user,"Security clearance set");
       }
   }
   
@@ -27958,20 +28010,31 @@ write_user(other_user);
 
 if ((u=get_user_num(other_user,user))>-1) 
   {
-    if (b > -1) 
-      ustr[u].security[b]=permit;
-      
-    if (permit == 'Y')
-      {
-       sprintf(mess,"%s has cleared you to enter room %s",ustr[user].say_name,room);
-       write_str(u,mess);
-      }
-     else
-      {
-       sprintf(mess,"%s has locked you from entering room %s",ustr[user].say_name,room);
-       write_str(u,mess);
-      }
-   }
+	if (permit=='Y') {
+		if (ustr[u].security[b]=='X') {
+			ustr[u].security[b]='N';
+			sprintf(mess,"%s has changed your security clearance from ^HRno^ access to ^HYnormal^ access for room %s",ustr[user].say_name,astr[b].name);
+			write_str(u,mess);
+		}
+		else if (ustr[u].security[b]=='N') {
+			ustr[u].security[b]='Y';
+			sprintf(mess,"%s has changed your security clearance from ^HYnormal^ access to ^HGspecial^ access for room %s",ustr[user].say_name,astr[b].name);
+			write_str(u,mess);
+		}
+	} /* end of if permit */
+	else if (permit=='N') {
+		if (ustr[u].security[b]=='N') {
+			ustr[u].security[b]='X';
+			sprintf(mess,"%s has changed your security clearance from ^HYnormal^ access to ^HRno^ access for room %s",ustr[user].say_name,astr[b].name);
+			write_str(u,mess);
+		}
+		else if (ustr[u].security[b]=='Y') {
+			ustr[u].security[b]='N';
+			sprintf(mess,"%s has changed your security clearance from ^HGspecial^ access to ^HYnormal^ access for room %s",ustr[user].say_name,astr[b].name);
+			write_str(u,mess);
+		}
+	} /* end of else if permit */
+  } /* end of if user online */
 
 }
 
@@ -28113,70 +28176,6 @@ go(user,inpstr,2);
 }
 
 
-/*-------------------------------------------------*/
-/* log to syslog a string                          */
-/*-------------------------------------------------*/
-void print_to_syslog(char *str)
-{
-FILE *fp;
-
-if (!syslog_on) return;
-
- if ((fp=fopen(LOGFILE,"a"))) 
-   {
-    fputs(str,fp);
-    FCLOSE(fp);
-   } 
- else {
-   shutdown_error(14);
-   return;
-   }
-
-}
-
-void write_log(char *str, int type, int nl)
-{
-char logfile[256];
-FILE *fp;
-
-if (!syslog_on) return;
-
-if (type==0)
- strcpy(logfile,EMAILLOG);
-else if (type==1)
- strcpy(logfile,LOGINLOG);
-else if (type==2)
- strcpy(logfile,ERRORLOG);
-else if (type==3)
- strcpy(logfile,WARNINGLOG);
-
- if ((fp=fopen(logfile,"a"))) 
-   {
-    fputs(str,fp);
-    if (nl) fputs("\n",fp);
-    FCLOSE(fp);
-   } 
- else {
-   shutdown_error(14);
-   return;
-   }
-
-if (SYSLOG_ALSO) {
- if ((fp=fopen(LOGFILE,"a"))) 
-   {
-    fputs(str,fp);
-    if (nl) fputs("\n",fp);
-    FCLOSE(fp);
-   } 
- else {
-   shutdown_error(14);
-   return;
-   }
- } /* end of SYSLOG_ALSO if */
-
-
-}
-
 /*--------------------------------------------------------------------*/
 /* this command basically lists out a specified directory to the user */
 /* the directory is specified in the inpstr                           */
@@ -28187,7 +28186,6 @@ int num,timenum;
 char buffer[132];
 char small_buff[64];
 char timebuf[23];
-time_t tn;
 time_t tm_then;
 struct dirent *dp;
 FILE *fp2;
@@ -28218,10 +28216,9 @@ DIR  *dirp;
             }
          fgets(timebuf,13,fp2);
          FCLOSE(fp2);
-         time(&tn);
 	 timenum=atoi(timebuf);
          tm_then=((time_t) timenum);
-         sprintf(mess,"%-35s %s ago",small_buff,converttime((long)((tn-tm_then)/60)));
+         sprintf(mess,"%-35s %s ago",small_buff,converttime((long)((time(0)-tm_then)/60)));
          write_str(user,mess);
          timebuf[0]=0;
          num++;
@@ -28311,7 +28308,6 @@ char noyes[2][4];
 char filename[FILE_NAME_LEN];
 int i,min=0,ret=0;
 int signed_on = FALSE;
-time_t tm;
 time_t tm_then;
 
 strcpy(sw[0],"off");
@@ -28354,8 +28350,7 @@ else if (ret==2) {
  }
 
 
-time(&tm);  
-if (signed_on) min=(tm-ustr[i].time)/60;
+if (signed_on) min=(int)((time(0)-ustr[i].time)/60);
 
 if (!read_user(other_user))
   {
@@ -28436,7 +28431,7 @@ sprintf(mess,"| Made from:  %-15.15s %s",
 if (ustr[user].tempsuper >= WIZ_LEVEL)      write_str(user,mess);
 
 sprintf(mess,"| Rank:       %d  (^%s^)",
-              ustr[i].super,ranks[ustr[i].super]);
+              ustr[i].super,ranks[ustr[i].super].lname);
 if ((ustr[user].tempsuper >= WIZ_LEVEL) || (i==user)) write_str(user,mess); 
 
 write_str(user,"|");
@@ -28447,7 +28442,7 @@ write_str(user,mess);
 
 sprintf(mess,"|      Space  %s  Visible %s  PrivBeeps %s  Igtells   %s  Passhid %s",
              sw[ustr[i].white_space],yesno[ustr[i].vis],sw[ustr[i].beeps],
-sw[ustr[i].igtell],sw[ustr[i].passhid]);
+noyes[user_wants_message(i,TELLS)],sw[ustr[i].passhid]);
 write_str(user,mess);
 sprintf(mess,"|      Color  %s  AutoFwd %s  AutoRead  %s",
              sw[ustr[i].color],sw[ustr[i].autof],sw[ustr[i].autor]); 
@@ -28536,7 +28531,7 @@ if (mode) {
 tm_then=((time_t) t_ustr.rawtime);
 sprintf(mess,"| Last login: %-16.16s that was %s ago",
                            t_ustr.last_date, 
-                           converttime((long)((tm-tm_then)/60)));
+                           converttime((long)((time(0)-tm_then)/60)));
 write_str(user,mess);
 } /* end of mode */
 
@@ -28552,7 +28547,7 @@ sprintf(mess,"| Made from:  %-15.15s %s",
 if (ustr[user].tempsuper >= WIZ_LEVEL)      write_str(user,mess);
 
 sprintf(mess,"| Rank:       %d  (^%s^)",
-              t_ustr.super,ranks[t_ustr.super]);
+              t_ustr.super,ranks[t_ustr.super].lname);
 if (ustr[user].tempsuper >= WIZ_LEVEL)      write_str(user,mess); 
 
 write_str(user,"|");
@@ -28563,7 +28558,7 @@ write_str(user,mess);
 
 sprintf(mess,"|      Space  %s  Visible %s  PrivBeeps %s  Igtells   %s  Passhid %s",
              sw[t_ustr.white_space],yesno[t_ustr.vis],sw[t_ustr.beeps],
-sw[t_ustr.igtell],sw[t_ustr.passhid]);
+noyes[user_wants_message(-1,TELLS)],sw[t_ustr.passhid]);
 write_str(user,mess);
 sprintf(mess,"|      Color  %s  AutoFwd %s  AutoRead  %s",
              sw[t_ustr.color],sw[t_ustr.autof],sw[t_ustr.autor]); 
@@ -29137,9 +29132,9 @@ int new_area;
 /* check for secure room                        */
 /*----------------------------------------------*/
 
-if (astr[new_area].hidden && ustr[user].security[new_area] == 'N')
+if (ustr[user].security[new_area] == 'X')
   {
-   write_str(user,NO_ROOM);
+   write_str(user,"Your security clearance does not let you enter there");
    return;
   }
 
@@ -29556,25 +29551,28 @@ if (u!=-1) {
   writeall_str(mess, 1, u, 1, user, NORM, KILL, 0);
 
   write_str(u,DEF_KILL_MESS);
-  user_quit(u);
+  user_quit(u,1);
  }
 
 remove_exem_data(other_user);
 remove_user(other_user);
 
 if (u==-1) {
+ /* normal manual nuke */
  if (!mode) {
-  sprintf(z_mess,"NUKE %s by %s",t_ustr.say_name,ustr[user].say_name);   
+  sprintf(z_mess,"NUKE: %s by %s",t_ustr.say_name,ustr[user].say_name);   
   btell(user,z_mess);
-  sprintf(z_mess,"%s: NUKE %s by %s\n",get_time(0,0),t_ustr.say_name,ustr[user].say_name);   
-  print_to_syslog(z_mess);
+  write_log(SYSTEMLOG,YESTIME,"%s\n",z_mess);
   }
+ else {
+ /* manual user expire nuke */
+  write_log(SYSTEMLOG,YESTIME,"MANUAL-EXPIRE-NUKE: %s by %s\n",t_ustr.say_name,ustr[user].say_name);   
+ }
  }
 else {
- sprintf(z_mess,"KILL-NUKE %s by %s",other_name,ustr[user].say_name);   
+ sprintf(z_mess,"KILL-NUKE: %s by %s",other_name,ustr[user].say_name);   
  btell(user,z_mess);
- sprintf(z_mess,"%s: KILL-NUKE %s by %s\n",get_time(0,0),other_name,ustr[user].say_name);   
- print_to_syslog(z_mess);
+ write_log(SYSTEMLOG,YESTIME,"%s\n",z_mess);
  }
 
 }
@@ -29685,7 +29683,7 @@ write_str(user,mess);
 /*-----------------------------------*/
 int get_odds_value(int user)
 {
-return( (rand() % odds[ustr[user].super]) + 1 );
+return( (rand() % ranks[ustr[user].super].odds) + 1 );
 }
 
 /*----------------------------------------------------------*/
@@ -29782,8 +29780,8 @@ if (x == BOTH_LOSE)
               
    writeall_str(mess,1,user,0,user,NORM,FIGHT,0);
    write_str(user,mess);
-   user_quit(a);
-   user_quit(b);
+   user_quit(a,1);
+   user_quit(b,1);
    return;
   }
   
@@ -29795,7 +29793,7 @@ if (x == 1)
               
    writeall_str(mess,1,user,0,user,NORM,FIGHT,0);
    write_str(user,mess);
-   user_quit(b);
+   user_quit(b,1);
    return;
   }
  
@@ -29807,7 +29805,7 @@ if (x == 2)
               
    writeall_str(mess,1,user,0,user,NORM,FIGHT,0);
    write_str(user,mess);
-   user_quit(a);
+   user_quit(a,1);
    return;
   }
 }
@@ -30047,18 +30045,18 @@ if (!strcmp(inpstr,"all")) {
 
   if (astr[a].atmos) {
    astr[a].atmos=0;
-   sprintf(line,"ATMOS disabled by %s for %s\n",ustr[user].say_name,astr[a].name);
+   sprintf(line,"ATMOS: disabled by %s for %s",ustr[user].say_name,astr[a].name);
    }
   else {
    astr[a].atmos=1;
    atmos_on=1;
-   sprintf(line,"ATMOS enabled by %s for %s\n",ustr[user].say_name,astr[a].name);
+   sprintf(line,"ATMOS: enabled by %s for %s",ustr[user].say_name,astr[a].name);
    }
 
  }  /* end of else */
 
- print_to_syslog(line);
  btell(user,line);
+ write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 }	
 
 /* New user creation control */		 
@@ -30070,23 +30068,25 @@ char line[132];
     {
       write_str(user,"New users DISALLOWED totally");
       allow_new=0;
-      sprintf(line,"NEW users disallowed totally by %s\n",ustr[user].say_name);
+      sprintf(line,"ALLOW: NEW users disallowed totally by %s",ustr[user].say_name);
     }
    else if (allow_new==1)
     {
+      if (check_for_file(VERIFILE)) remove(VERIFILE);
+
       write_str(user,"New users ALLOWED freely");
       allow_new=2;
-      sprintf(line,"NEW users allowed freely by %s\n",ustr[user].say_name);
+      sprintf(line,"ALLOW: NEW users allowed freely by %s",ustr[user].say_name);
     }
    else
     {
       write_str(user,"New users ALLOWED w/email verify");
       allow_new=1;
-      sprintf(line,"NEW users allowed v/email verify by %s\n",ustr[user].say_name);
+      sprintf(line,"ALLOW: NEW users allowed v/email verify by %s",ustr[user].say_name);
     }
     
- print_to_syslog(line);
  btell(user,line);
+ write_log(SYSTEMLOG,YESTIME,"%s\n",line);
 }
 
 /*--------------------------------------------------------------*/
@@ -30137,8 +30137,8 @@ strcpy(temp,get_temp_file());
 
 if (!(tfp=fopen(temp,"w"))) 
   {
-   write_str(user,"Sorry - Cannot open temporary file");
-   logerror("Can't open temporary file");
+   write_str(user,BAD_FILEIO);
+   write_log(ERRLOG,YESTIME,"Couldn't open tempfile(w) in remove_lines_from_file! %s\n",get_error());
    FCLOSE(tfp);
    return;
   }
@@ -30550,144 +30550,87 @@ ustr[user].afk = 2;
 void systime(int user, char *inpstr)
 {
 char buf1[100];
-char tzmess[500];
-char wcd[FILE_NAME_LEN+10];
 struct tm *clocker;
 time_t tm_now;
-
-/* Get the current working directory so we can reference */
-/* to the absolute path of the TZ info                   */
-getcwd(wcd,FILE_NAME_LEN);
-strcat(wcd,"/tzinfo");
 
 if (!strlen(inpstr)) {
 write_str(user,"+-----------------------------------------------------------------------------+");
 
-/*
-#if defined(__bsdi__) || defined(__linux__)
-unsetenv("TZ");
-goto START;
-#endif
-*/
+do_timeset(TZONE);
 
-if (!strcmp(TZONE,"localtime")) {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-putenv("TZ=:/etc/localtime");
-#else
-putenv("TZ=localtime");      
-#endif  
-}
-else {
-sprintf(tzmess,"TZ=:%s/%s",wcd,TZONE);
-putenv(tzmess);
-}
-/* to make sure we get no warnings about not using a defined label */
-goto START;
-
-START:
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
-sprintf(mess,"System time is (%s)%-*s : %s",TZONE,23-strlen(TZONE),"",buf1);
+sprintf(mess,"System time is (%s)%-*s : %s",TZONE,(int)(23-strlen(TZONE)),"",buf1);
 write_str(user,mess);
 write_str(user," ");
 
-sprintf(tzmess,"TZ=:%s/US/Eastern",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("US/Eastern");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"US Eastern Time                          : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/US/Central",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("US/Central");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"US Central Time                          : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/US/Mountain",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("US/Mountain");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"US Mountain Time                         : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/US/Pacific",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("US/Pacific");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"US Pacific Time                          : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/Brazil/East",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("Brazil/East");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"East Brasilia Time                       : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/Greenwich",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("Greenwich");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"Greenwich Mean Time                      : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/CET",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("CET");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"Central European Time                    : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/Australia/NSW",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("Australia/NSW");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
 sprintf(mess,"Australian NSW Time                      : %s",buf1);
 write_str(user,mess);
 
-sprintf(tzmess,"TZ=:%s/NZ",wcd);
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset("NZ");
+
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
@@ -30704,83 +30647,54 @@ else if (!strcmp(inpstr,"-l")) {
 else {
  strtolower(inpstr);
  if (!strcmp(inpstr,"japan"))
-  sprintf(tzmess,"TZ=:%s/Japan",wcd);
+  do_timeset("Japan");
  else if (!strcmp(inpstr,"ausnorth"))
-  sprintf(tzmess,"TZ=:%s/Australia/North",wcd);
+  do_timeset("Australia/North");
  else if (!strcmp(inpstr,"aussouth"))
-  sprintf(tzmess,"TZ=:%s/Australia/South",wcd);
+  do_timeset("Australia/South");
  else if (!strcmp(inpstr,"auswest"))
-  sprintf(tzmess,"TZ=:%s/Australia/West",wcd);
+  do_timeset("Australia/West");
  else if (!strcmp(inpstr,"hawaii"))
-  sprintf(tzmess,"TZ=:%s/US/Hawaii",wcd);
+  do_timeset("US/Hawaii");
  else if (!strcmp(inpstr,"hongkong"))
-  sprintf(tzmess,"TZ=:%s/Hongkong",wcd);
+  do_timeset("Hongkong");
  else if (!strcmp(inpstr,"singapore"))
-  sprintf(tzmess,"TZ=:%s/Singapore",wcd);
+  do_timeset("Singapore");
  else if (!strcmp(inpstr,"israel"))
-  sprintf(tzmess,"TZ=:%s/Israel",wcd);
+  do_timeset("Israel");
  else if (!strcmp(inpstr,"cuba"))
-  sprintf(tzmess,"TZ=:%s/Cuba",wcd);
+  do_timeset("Cuba");
  else if (!strcmp(inpstr,"mexico"))
-  sprintf(tzmess,"TZ=:%s/Mexico/General",wcd);
+  do_timeset("Mexico/General");
  else if (!strcmp(inpstr,"egypt"))
-  sprintf(tzmess,"TZ=:%s/Egypt",wcd);
+  do_timeset("Egypt");
  else if (!strcmp(inpstr,"chile"))
-  sprintf(tzmess,"TZ=:%s/Chile/Continental",wcd);
+  do_timeset("Chile/Continental");
  else if (!strcmp(inpstr,"eeurope"))
-  sprintf(tzmess,"TZ=:%s/EET",wcd);
+  do_timeset("EET");
  else if (!strcmp(inpstr,"weurope"))
-  sprintf(tzmess,"TZ=:%s/WET",wcd);
+  do_timeset("WET");
  else if (!strcmp(inpstr,"meurope"))
-  sprintf(tzmess,"TZ=:%s/MET",wcd);
+  do_timeset("MET");
  else if (!strcmp(inpstr,"zulu"))
-  sprintf(tzmess,"TZ=:%s/Zulu",wcd);
+  do_timeset("Zulu");
  else {
    write_str(user,"Zone doesn't exist. \".time -l\" for list");
    return;
   }
 
-putenv(tzmess);
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
 time(&tm_now);
 clocker=localtime(&tm_now);
 strftime(buf1,sizeof(buf1),"%a, %b %d %I:%M:%S %p %Y ",clocker);
-sprintf(mess,"%s Time%-*s: %s",inpstr,36-strlen(inpstr),"",buf1);
+sprintf(mess,"%s Time%-*s: %s",inpstr,(int)(36-strlen(inpstr)),"",buf1);
 mess[0]=toupper((int)mess[0]);
 write_str(user,"+-----------------------------------------------------------------------------+");
 write_str(user,mess);
 write_str(user,"+-----------------------------------------------------------------------------+");
-}
+} /* end of strlen else */
 
 /* Reset time back to local time */
-
-/*
-#if defined(__bsdi__) || defined(__linux__)
-unsetenv("TZ");
-goto SSTART;
-#endif
-*/
-
-if (!strcmp(TZONE,"localtime")) {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-putenv("TZ=:/etc/localtime");
-#else
-putenv("TZ=localtime");      
-#endif  
-}
-else {
-sprintf(tzmess,"TZ=:%s/%s",wcd,TZONE);
-putenv(tzmess);
-}
-/* to make sure we get no warnings about not using a defined label */
-goto SSTART;
- 
-SSTART:
-#if !defined(__CYGWIN32__)
-tzset();
-#endif
+do_timeset(TZONE);
 
 }
 
@@ -31070,6 +30984,10 @@ write_str(user,"      12a  1  2  3  4  5  6  7  8  9 10 11 12p 1  2  3  4  5  6 
 
 } /* end of else if */
 
+else if (!strcmp(inpstr,"-b")) {
+backup_logs(user);
+write_str(user,"Backup done!");
+}
 else {
  write_str(user,"Invalid option.");
  write_str(user,"Usage: .meter [-l]");
@@ -31113,9 +31031,15 @@ void set_quota(int user, char *inpstr)
     {
       value = 0;
     }
+  else if (value > 999)
+    {
+      write_str(user,"WARNING: Valid quota range is 0 to 999");
+      value = 999;
+    }
     
   sprintf(mess,"The new quota is: %d",value);
   write_str(user,mess);
+  write_log(SYSTEMLOG,YESTIME,"QUOTA: %s changed the new user quota from %ld to %d\n",ustr[user].say_name,system_stats.quota,value);
 
   system_stats.logins_today++;    
   system_stats.logins_since_start++;
@@ -31145,7 +31069,6 @@ strcat(str,buff);
 /*-----------------------------------------------*/
 void xcomm(int user, char *inpstr)
 {
-char buf1[256];
 char other_user[ARR_SIZE];
 int u,inlen;
 unsigned int i;
@@ -31223,14 +31146,14 @@ if (strlen(inpstr) && strcmp(inpstr,"0")) {
   ustr[u].xco_time=atoi(inpstr);
   ustr[u].suspended = 1;
     write_str(u,XCOMMON_MESS);
-    sprintf(mess,"XCOM ON : %s by %s for %s\n",ustr[u].say_name,
+    sprintf(mess,"XCOM: ON for %s by %s for %s",ustr[u].say_name,
 ustr[user].say_name, converttime((long)ustr[u].xco_time));
 }
 else {
     ustr[u].suspended = 1;
     ustr[u].xco_time=0;
     write_str(u,XCOMMON_MESS);
-    sprintf(mess,"XCOM ON : %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"XCOM: ON for %s by %s",ustr[u].say_name, ustr[user].say_name);
   }
 }     /* end of if suspended */
 
@@ -31238,15 +31161,10 @@ else {
     ustr[u].suspended = 0;
     ustr[u].xco_time=0;
     write_str(u,XCOMMOFF_MESS);
-    sprintf(mess,"XCOM OFF: %s by %s\n",ustr[u].say_name, ustr[user].say_name);
+    sprintf(mess,"XCOM: OFF for %s by %s",ustr[u].say_name, ustr[user].say_name);
   } 
 btell(user, mess);
-
- strcpy(buf1,get_time(0,0));    
- strcat(buf1," ");
- strcat(buf1,mess);
-print_to_syslog(buf1);
-
+write_log(SYSTEMLOG,YESTIME,"%s\n",mess);
 write_str(user,"Ok");
 }
 
@@ -31259,15 +31177,8 @@ struct sockaddr_in bind_addr;       /* AF_INET sockaddr structure */
 int i,open_port=0;
 int on=1;
 int size=sizeof(struct sockaddr_in);
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 unsigned long arg = 1;
-#endif
-
-/* Zero out memory for address */
-#if defined(HAVE_BZERO)
- bzero((char *)&bind_addr, size);
-#else
- memset((char *)&bind_addr, 0, size);
 #endif
 
 for (i=0;i<4;++i) {
@@ -31277,40 +31188,99 @@ for (i=0;i<4;++i) {
 /*---------------------------------------*/
 if (i==0) {
  open_port = PORT;
+ if (!restarting) {
  printf("Main talker port:\n\n");
  printf("   use port: %d\n",open_port);
+ }
+ else continue;
  }
 else if (i==1) {   
  if (WIZ_OFFSET != 0) {
  open_port = PORT + WIZ_OFFSET;
+ if (!restarting) {
  printf("Wizard port:\n\n");
  printf("   use port: %d\n",open_port);
  }
- else { wiz_access=0; continue; }
+ else {
+ /* we are soft-booting and want to start this port		*/
+ /* was it open? If so, move on to next port, If not, start it	*/
+  if (listen_sock[i]!=-1) continue;
  }
+ } /* END OF IF OFFSET */
+ else {
+ /* we are soft-booting and DONT want to start this port	   */
+ /* was it open? If so, close it, If not, move on to the next port */
+	wiz_access=0;
+	if (restarting) {
+	if (listen_sock[i]!=-1) {
+	while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
+	; /* empty while */
+	write_log(BOOTLOG,YESTIME,"Closed WIZ port on soft-reboot\n");
+	}
+	}
+	continue;
+ } /* END OF ELSE OFFSET */
+} /* END OF ELSE IF */
 else if (i==2) {
  if (WHO_OFFSET != 0) {
  open_port = PORT + WHO_OFFSET;
+ if (!restarting) {
  printf("External WHO list port:\n\n");
  printf("   use port: %d\n",open_port);
  }
- else { who_access=0; continue; }
+ else {
+  if (listen_sock[i]!=-1) continue;
  }
+ } /* END OF IF OFFSET */
+ else {
+	who_access=0;
+	if (restarting) {
+        if (listen_sock[i]!=-1) {
+        while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
+        ; /* empty while */
+        write_log(BOOTLOG,YESTIME,"Closed WHO port on soft-reboot\n");
+        }
+	}
+	continue;
+ } /* END OF ELSE OFFSET */
+} /* END OF ELSE IF */
 else if (i==3) {   
  if (WWW_OFFSET != 0) {
  open_port = PORT + WWW_OFFSET;
+ if (!restarting) {
  printf("Mini WWW port:\n\n");
  printf("   use port: %d\n",open_port);
  }
- else { www_access=0; continue; }
+ else {
+  if (listen_sock[i]!=-1) continue;
  }
+ } /* END OF IF OFFSET */
+ else {
+	www_access=0;
+	if (restarting) {
+        if (listen_sock[i]!=-1) {
+        while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
+        ; /* empty while */
+        write_log(BOOTLOG,YESTIME,"Closed WWW port on soft-reboot\n");
+        }
+	}
+	continue;
+ } /* END OF ELSE OFFSET */
+} /* END OF ELSE IF */
+
+/* Zero out memory for address */
+#if defined(HAVE_BZERO)
+ bzero((char *)&bind_addr, size);
+#else
+ memset((char *)&bind_addr, 0, size);
+#endif
 
 #if defined(__FreeBSD__)        
 bind_addr.sin_len = sizeof(bind_addr);
 #endif /* __FreeBSD__ */       
 bind_addr.sin_family      = AF_INET;   /* setup address struct */
 bind_addr.sin_addr.s_addr = INADDR_ANY; 
-bind_addr.sin_port        = htons(open_port); /* with local host info */
+bind_addr.sin_port        = htons((unsigned short)open_port); /* with local host info */
 
  
 /*-------------------------------------------------*/
@@ -31319,9 +31289,14 @@ bind_addr.sin_port        = htons(open_port); /* with local host info */
 
 if ((listen_sock[i] = socket(AF_INET,SOCK_STREAM,0)) == INVALID_SOCKET)
  {
+  if (!restarting) {
   printf("   ***CANNOT CREATE SOCKET***\n");
   printf("\n   Cannot create socket, aborting startup!\n");
-#if defined(WIN32) && !defined(__CYGWIN32__)
+  }
+  else {
+  write_log(ERRLOG,YESTIME,"Cant create listening socket %d:%d on soft-reboot! %s\n",i,open_port,get_error());
+  }
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
   exit(0);
@@ -31330,10 +31305,14 @@ WSACleanup();
 /* Set address reusable */
 if (setsockopt(listen_sock[i], SOL_SOCKET, SO_REUSEADDR, (char *) &on,
     sizeof(on))== -1) {
-   printf("\n   Cannot setsockopt(), aborting startup!\n");
+   if (!restarting)
+    printf("\n   Cannot setsockopt(), aborting startup!\n");
+   else
+    write_log(ERRLOG,YESTIME,"Cant setsockopt on listening socket %d:%d on soft-reboot! %s\n",i,open_port,get_error());
+
    while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
 	; /* empty while */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
    exit(0);
@@ -31343,15 +31322,19 @@ WSACleanup();
 /* Set socket to non_blocking */
 /*----------------------------*/
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
  if (ioctlsocket(listen_sock[i], FIONBIO, &arg) == -1) {
 #else
  if (fcntl(listen_sock[i], F_SETFL, NBLOCK_CMD)== -1) {
 #endif
-   printf("\n   Cannot set binding socket to non-blocking, aborting startup!\n");
+   if (!restarting)
+    printf("\n   Cannot set binding socket to non-blocking, aborting startup!\n");
+   else
+    write_log(ERRLOG,YESTIME,"Cant set listening socket %d:%d non-blocking on soft-reboot! %s\n",i,open_port,get_error());
+
    while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
 	; /* empty while */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
    exit(0);
@@ -31366,17 +31349,22 @@ WSACleanup();
 /* giving the socket the local address ADDR        */
 /*-------------------------------------------------*/
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 if (bind(listen_sock[i], (struct sockaddr *)&bind_addr, size)!= 0)
 #else
 if (bind(listen_sock[i], (struct sockaddr *)&bind_addr, size)== -1)
 #endif
   {
+   if (!restarting) {
    printf("   ***CANNOT BIND TO PORT***\n");
    printf("\n   Cannot bind to port, server may be already running, aborting startup!\n");
+   }
+   else {
+   write_log(ERRLOG,YESTIME,"Cant bind listening socket %d:%d on soft-reboot! %s\n",i,open_port,get_error());
+   }
    while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
 	; /* empty while */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
    exit(0);
@@ -31389,24 +31377,27 @@ WSACleanup();
 /* silently limits to 128, SunOS to 5. Go figure        */
 /*------------------------------------------------------*/
 
-#if defined(WIN32) && !defined(__CYGWIN32__)
 if (listen(listen_sock[i], 5)==SOCKET_ERROR)
-#else
-if (listen(listen_sock[i], 5)== -1)
-#endif
   {
+   if (!restarting) {
    printf("   ***LISTEN FAILED ON PORT***\n");
    printf("\n   Cannot listen on port, aborting startup!\n");
+   }
+   else {
+   write_log(ERRLOG,YESTIME,"Cant listen on socket %d:%d on soft-reboot! %s\n",i,open_port,get_error());
+   }
    while (CLOSE(listen_sock[i]) == -1 && errno == EINTR)
 	; /* empty while */
-#if defined(WIN32) && !defined(__CYGWIN32__)
+#if defined(_WIN32) && !defined(__CYGWIN32__)
 WSACleanup();
 #endif
    exit(0);
   }
 
-
+if (!restarting)
 printf("   port created, bound, and listening\n\n");
+else
+write_log(BOOTLOG,YESTIME,"Started socket %d on port %d on soft-reboot\n",i,open_port);
 
  } /* end of for */
 }
@@ -31417,10 +31408,18 @@ printf("   port created, bound, and listening\n\n");
 /*--------------------------------------------------------*/
 int user_wants_message(int user, int type)
 {
+ if (user==-1) {
+ if (t_ustr.flags[type] == '1')
+  return 0;
+ else
+  return 1;
+ }
+ else {
  if (ustr[user].flags[type] == '1')
   return 0;
  else
   return 1;
+ }
 }
 
 /*---------------------------------------------------------*/
@@ -31578,353 +31577,6 @@ if (u > -1)
   }
 }
 
-/* Parse web server port input */
-void parse_input(int user, char *inpstr)
-{
-int i=0,found=0;
-char chunk[257];
-char type1[80];
-char command[257];
-char request[257];
-char servtype[257];
-char filename[FILE_NAME_LEN+50];
-time_t tm;
-
-time(&tm);
-inpstr[256]=0;
-
-if (wwwport[user].method==1)
- strcpy(command,"POST");
-else
- sscanf(inpstr,"%s ",command);
-
-if (!strcmp(command,"GET")) {
-   wwwport[user].method=0;
-   remove_first(inpstr);
-   sscanf(inpstr,"%s ",request);
-   if ((request[0]!='/') || strstr(request,"..")) {
-	web_error(user,NO_HEADER,NOT_FOUND);
-	goto FREE;
-	}
-   if (!strlen(request)) {
-	web_error(user,HEADER,BAD_REQUEST);
-	goto FREE;
-	}
-   remove_first(inpstr);
-   sscanf(inpstr,"%s ",servtype);
-   if (!strlen(servtype) || !strstr(servtype,"HTTP")) {
-	web_error(user,NO_HEADER,BAD_REQUEST);
-	goto FREE;
-	}
-  } /* end of GET */
-else if (!strcmp(command,"POST")) {
- if (wwwport[user].method==1) {
-        if (strlen(inpstr)) {
-        print_to_syslog("POST line: ");
-        print_to_syslog(inpstr);
-        print_to_syslog("\n");
-        sscanf(inpstr,"%s ",request);
-        }
-        else return;
-
-        if (wwwport[user].req_length) {
-          if (strstr(inpstr,"=")) {
-                print_to_syslog("Shortening length..\n");
-                wwwport[user].req_length-=strlen(inpstr);
-                print_to_syslog("Shortened\n");
-                if (!strlen(wwwport[user].keypair))
-		  strcpy(wwwport[user].keypair,inpstr);
-		else {
-		  strcat(wwwport[user].keypair," ");
-		  strcat(wwwport[user].keypair,inpstr);
-		  }
-                print_to_syslog("Keypair: ");
-                print_to_syslog(wwwport[user].keypair);
-                print_to_syslog("\n");
-                if (!wwwport[user].req_length) goto POST;
-           }
-         }
-        else if (!strcmp(request,"Content-length:")) {
-          print_to_syslog("Saving content length\n");
-          remove_first(inpstr);
-          wwwport[user].req_length=atoi(inpstr);
-          print_to_syslog("Saved content length\n");
-        }
-        return;
-   }
- else {
-   wwwport[user].method=1;
-   remove_first(inpstr);
-   sscanf(inpstr,"%s ",request);
-   remove_first(inpstr);
-   sscanf(inpstr,"%s ",servtype);
-   if (!strlen(servtype) || !strstr(servtype,"HTTP")) {
-        web_error(user,NO_HEADER,NOT_FOUND);
-        goto FREE;
-        }
-   }
-
-  } /* end of POST */
-else if (!strcmp(command,"HEAD")) {
-   wwwport[user].method=2;
-   remove_first(inpstr);
-   sscanf(inpstr,"%s ",request);
-   remove_first(inpstr);
-   sscanf(inpstr,"%s ",servtype);
-   if (!strlen(servtype) || !strstr(servtype,"HTTP")) {
-	web_error(user,NO_HEADER,NOT_FOUND);
-	goto FREE;
-	}
-  } /* end of HEAD */
-else {
-	web_error(user,HEADER,BAD_REQUEST);
-	goto FREE;
-  }
-
-/* Strip leading slash off filename request and truncate */
-midcpy(request,request,1,256);
-
-if (!strlen(request))
- sprintf(filename,"%s/%s",WEBFILES,web_opts[0]);
-else
- sprintf(filename,"%s/%s",WEBFILES,request);
-
-if (request[0]=='_') {
-	for (i=0;i<strlen(request);++i) {
-	   if (request[i]=='\?') { found=1; break; }
-	   }
-	if (found) midcpy(request,chunk,0,i-1);
-	else midcpy(request,chunk,0,257);
-   }
-
-POST:
-/* If POST method, save requested url to memory so we can read later */
-if (wwwport[user].method==1) {
-  if (strlen(wwwport[user].keypair)) {
-   strcpy(chunk,wwwport[user].file);
-   strcpy(request,wwwport[user].keypair);
-   found=1;
-   }
-  else {
-   strcpy(wwwport[user].file,chunk);
-   return;
-   }
-  }
-
-if (strcmp(chunk,"_who") && strcmp(chunk,"_users")) {
- if (!check_for_file(filename)) {
-   web_error(user,HEADER,NOT_FOUND);
-   goto FREE;
-   }
- }
-
-	write_it(wwwport[user].sock,"HTTP/1.0 200 OK\n");
-	sprintf(mess, "Server: %s/1.0\n",SYSTEM_NAME);
-	write_it(wwwport[user].sock, mess);
-	sprintf(mess,"Date: %s",ctime(&tm));
-	write_it(wwwport[user].sock, mess);
-
-if (!strcmp(chunk,"_who")) {
-  external_www(wwwport[user].sock);
-  goto FREE;
-  }
-
-if (!strcmp(chunk,"_users")) {
-	/* If question mark not found, its a request for all users list */
-	/* else for a specific user if query is greater than 1 or group */
-	/* if equal to 1						*/
-   if (!found)
-   	external_users(user,3,NULL);
-   else {
-	if (wwwport[user].method != 1) {
-	  midcpy(request,request,i+1,257);
-	  found=0; i=0;
-	  for (i=0;i<strlen(request);++i) {
-	     if (request[i]=='=') { found=1; break; }
-	     }
-	  if (found) midcpy(request,request,i+1,257);
-	  else { web_error(user,HEADER,BAD_REQUEST); goto FREE; }
-	}
-
-	if (!strlen(request))
-   	 external_users(user,0,NULL);
-	else if ((strlen(request)==1) && isalpha((int)request[0]))
-   	 external_users(user,1,request);
-	else
-   	 external_users(user,2,request);
-	} /* end of else */
-   goto FREE;
-  } /* end of _users if */
-
-	 sprintf(mess,"Content-length: %d\n",get_length(filename));
-	 write_it(wwwport[user].sock, mess);
-
-	strcpy(type1,get_mime_type(filename));
-	if (!strcmp(type1,"bad")) {
-	  web_error(user,HEADER,BAD_REQUEST);
-	  goto FREE;
-	  }
-	sprintf(mess,"Content-type: %s\n\n",type1);
-        write_it(wwwport[user].sock, mess);
-
-cat_to_sock(filename,wwwport[user].sock);
-
-FREE:
-free_sock(user,'4');
-
-}
-
-void web_error(int user, int header, int mode)
-{
-int size=0;
-char message[350];
-char output[ARR_SIZE];
-time_t tm;
-
-time(&tm);
-
-switch(mode) {
-	case 0: strcpy(message,""); break;
-	case BAD_REQUEST: strcpy(message,"HTTP/1.0 400 Bad request\n"); break;
-	case NOT_FOUND: strcpy(message,"HTTP/1.0 404 Not found\n"); break;
-	default: strcpy(message,"HTTP/1.0 500 Unknown\n"); break;
-  } /* end of switch */
-
-if (header==HEADER) {
-	write_it(wwwport[user].sock,message);
-	sprintf(mess, "Server: %s/1.0\n",SYSTEM_NAME);
-	write_it(wwwport[user].sock, mess);
-	sprintf(mess,"Date: %s",ctime(&tm));
-	write_it(wwwport[user].sock, mess);
-	}
-
-if (mode==0) { }
-else if (mode==BAD_REQUEST) {
-	strcpy(output,"\n\rYour browser sent a message this server could not understand.");
-	size=strlen(output);
-  }
-else if (mode==NOT_FOUND) {
-	strcpy(output,"<TITLE>Not Found</TITLE><H1>Not Found</H1> The requested object does not exist on this server.");
-	size=strlen(output);
-  }
-
-if ((header==HEADER) && mode) {
-	sprintf(mess,"Content-length: %d\n",size);
-        write_it(wwwport[user].sock, mess);
-        write_it(wwwport[user].sock, "Content-type: text/html\n\n");
-	}
-
-write_it(wwwport[user].sock, output);
-
-}
-
-
-/* Get length of output */
-int get_length(char *filen)
-{
-int size=0;
-char line[257];
-FILE *fp;
-
-line[0]=0;
-
-fp=fopen(filen,"rb");
-
-
-size+=fread(line, 1, sizeof line, fp);
-
-while(!feof(fp)) {
-	size+=fread(line, 1, sizeof line, fp);
-} /* end of feof */
-
-fclose(fp);
-
-return size;
-}
-
-/* Get type of file requested by extension */
-char *get_mime_type(char *filen)
-{
-int i=0,found=0,count=1;
-char ext[10];
-char fileext[10];
-char buf1[81];
-char mime[80];
-char filename[256];
-static char type[40];
-FILE *tfp;
-
-mime[0]=0;
-buf1[0]=0;
-ext[0]=0;
-fileext[0]=0;
-
-/* Find where extension ends to the left */
-for (i=strlen(filen)-1;i!=0;--i) {
-	if (filen[i]=='.') break;
-   }
-
-/* Were not gonna take extra long extensions */
-if ((strlen(filen)-i) > 9) {
-	strcpy(type,"bad");
-	return type;
-	}
-
-/* Copy the extension to memory */
-midcpy(filen,ext,i+1,ARR_SIZE);
-i=0;
-
-strtolower(ext);
-
-sprintf(t_mess,"%s/%s",WEBFILES,web_opts[1]);
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-/* Open up the mime types file and read in each line, searching */
-/* for a matching extension, and returning the associated type  */
-if (!(tfp=fopen(filename,"r"))) {
-	sprintf(mess,"%s: Cant open mime type file %s!",get_time(0,0),filename);
-	print_to_syslog(mess);
-	strcpy(type,"text/plain");
-	return type;
-	}
-
-while (fgets(buf1,80,tfp) != NULL) {
-	buf1[strlen(buf1)-1]=0;
-	if (!strlen(buf1)) continue;
-	if (buf1[0]=='#') continue;
-	sscanf(buf1,"%s",mime);
-	remove_first(buf1);
-	/* Count up spaces in extension part ot see how many we get */
-	/* to check for a match */
-	for (i=0;i<strlen(buf1);++i) {
-	if (buf1[i]==' ') count++;
-	} /* end of for */
-	i=0;
-	/* Now scan them in one by one and try to match */
-	for (i=0;i<count;++i) {
-	sscanf(buf1,"%s",fileext);
-	remove_first(buf1);
-	if (!strcmp(ext,fileext)) { strcpy(type,mime); found=1; break; }
-	} /* end of for */
-	i=0; count=1; mime[0]=0; fileext[0]=0;
-	if (!found) {
-	  /* No match, bummer! well return a default */
-	  strcpy(type,"text/plain");
-	  }
-	else {
-	  /* Ah ha! Jackpot! */
-	  break;
-	  }
-	buf1[0]=0;
-  } /* end of while */
-fclose(tfp);
-i=0;
-found=0;
-count=1;
-
-return type;
-}
-
 char *itoa(int num) {
 static char num_ascii[6];
 
@@ -31973,421 +31625,429 @@ char linetemp[302];
 	return line;
 }
 
-/*** prints who is on the system to requesting user ***/
-void external_www(int as)
-{
-	int u,min,idl,invis=0;
-	time_t tm;
-	char an[NAME_LEN],ud[DESC_LEN+1];
-	char i_buff[5];
-	char filename[256];
-	FILE *fp;
 
-	time(&tm);
+void write_rebootdb(int user) {
+int i=0;
+FILE *f;
 
-        write_it(as, "Content-type: text/html\n\n");
-	write_it(as, "<HTML>\n");
-	write_it(as, "<HEAD>\n");
-	sprintf(mess, "<TITLE>%s WWW port</title>\n",SYSTEM_NAME);
-	write_it(as, mess);
-	write_it(as, "</HEAD>\n\r");
+if (!check_for_file(REBOOTFILE)) {
+f=fopen(REBOOTFILE,"w");
+wval(listen_sock[0]);
+if (WIZ_OFFSET != 0)
+ wval(listen_sock[1]);
+else
+ wval(-1);
+if (WHO_OFFSET != 0)
+ wval(listen_sock[2]);
+else
+ wval(-1);
+if (WWW_OFFSET != 0)
+ wval(listen_sock[3]);
+else
+ wval(-1);
 
-	if ((web_opts[4][0]=='#') || (!strstr(web_opts[4],".")))
-	 sprintf(mess,"<BODY BGCOLOR=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
-	else
-	 sprintf(mess,"<BODY BACKGROUND=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
-
-	write_it(as, mess);
-
-	/* Write our header file */
-	sprintf(mess,"%s/%s",WEBFILES,web_opts[2]);
-	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
-	else {
-		while (fgets(mess,256,fp) != NULL) {
-		write_it(as, mess);
-		}
-		fclose(fp);
-	     }
-
-	write_it(as, "<center>\n");
-	sprintf(mess,"<font color=\"%s\"><h1>Users currently logged into %s</h1>\n",
-					web_opts[9],SYSTEM_NAME);
-	write_it(as, mess);
-        strcpy(filename,ctime(&tm));
-        filename[24]=0;
-	sprintf(mess,"<h3>on (%s)</h3>\n",filename);
-	write_it(as, mess);
-        filename[0]=0;
-	write_it(as, "<br><center></font>\n");
-        sprintf(mess,"<A HREF=\"telnet://%s:%d\">Connect to %s</a><br>",thishost,PORT,SYSTEM_NAME);
-	write_it(as, mess);
-        write_it(as,"</center>\n");
-        write_it(as,"<table border>\n\r");
-	write_it(as, "<tr><th><b>Room</b></th><th><b>Name/Description</b></th><th><b>Time on</b></th><th><b>Status</b></th><th><b>Idle</b></th></tr>\n\r");
-	
-	for (u=0;u<MAX_USERS;++u) {
-		if ((ustr[u].area!=-1) && (!ustr[u].logging_in))  {
-			if (!ustr[u].vis) { 
-	            invis++;  
-	            continue; 
-			}
-			min=(tm-ustr[u].time)/60;
-			idl=(tm-ustr[u].last_input)/60;
-
-                if (ustr[u].afk==0)
-		 strcpy(ud,ustr[u].desc);
-		else if ((strlen(ustr[u].afkmsg) > 1) && (ustr[u].afk>=1))
-		 strcpy(ud,ustr[u].afkmsg);
-                else if (!strlen(ustr[u].afkmsg) && (ustr[u].afk>=1))
-                 strcpy(ud,ustr[u].desc);
-
-			if (!astr[ustr[u].area].hidden) {
-				strcpy(an,astr[ustr[u].area].name);
-			}
-			else { 
-				strcpy(an, "        ");
-			}
-			if (ustr[u].afk == 1) {
-				strcpy(i_buff,"AFK ");
-			}
-			else if (ustr[u].afk == 2) {
-				strcpy(i_buff,"BAFK");
-			}
-			else {
-				strcpy(i_buff,"Idle"); 
-			}
-				sprintf(mess,"<tr> <td>%s</td> <td><a href=\"http://%s:%d/_users?search=%s\">%s</a> %s</td> <td align=\"center\">%i</td> <td align=\"center\">%s</td> <td align=\"center\">%i</td></tr>\n\r",
-			an,thishost,PORT+WWW_OFFSET,ustr[u].say_name,ustr[u].say_name,ud,min,i_buff,idl);
-                        strcpy(mess, convert_color(mess));
-			write_it(as,mess);
-		}
-	}
-	if(invis) {
-		sprintf(mess,SHADOW_WWW,invis == 1 ? "is" : "are",invis,invis == 1 ? " " : "s");
-		write_it(as,mess);
-	}
-	sprintf(mess,USERCNT_WWW,num_of_users == 1 ? "is" : "are",num_of_users,num_of_users == 1 ? "" : "s");
-	write_it(as,mess);
-
-	write_it(as, "</table><br>\n</center>\n");
-
-	/* Write our footer file */
-	sprintf(mess,"%s/%s",WEBFILES,web_opts[3]);
-	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
-	else {
-		while (fgets(mess,256,fp) != NULL) {
-		write_it(as, mess);
-		}
-		fclose(fp);
-	     }
-
-	sprintf(mess,"<br><b><center>This web page dynamically generated on %s</b></center><br>",ctime(&tm));
-	write_it(as, mess);
-
-	write_it(as, "</body>\n\r");
-	write_it(as, "</html>\n\n");
+wval(num_of_users);
+write_log(BOOTLOG,YESTIME,"REBOOT: Writing %d users to reboot log\n",num_of_users);
 }
+else f=fopen(REBOOTFILE,"a");
 
+write_log(BOOTLOG,YESTIME,"REBOOT: Writing %s to reboot log\n",ustr[user].name);
 
-/*** prints list of all users, lettered group users, or specific user data ***/
-void external_users(int user, int mode, char *query)
-{
-	int as=wwwport[user].sock;
-	int u,on_now=0,num=0;
-	char letter;
-	char small_buffer[64];
-	char filename[256];
-	struct dirent *dp;
-	time_t tm;
-	time_t tm_then;
-	FILE *fp;
-	DIR *dirp;
+wval(user);
+wbuf(ustr[user].name);
+wval(ustr[user].sock);
+wval(ustr[user].time);
+wbuf(ustr[user].real_id);
+wval(ustr[user].nerf_shots);
+wval(ustr[user].nerf_energy);
+wval(ustr[user].warning_given);
+wval(ustr[user].ttt_board);
+wval(ustr[user].ttt_playing);
+wval(ustr[user].ttt_opponent);
+wval(ustr[user].hang_stage);
+wbuf(ustr[user].hang_word);
+wbuf(ustr[user].hang_word_show);
+wbuf(ustr[user].hang_guess);
+wbuf(ustr[user].site);
+wbuf(ustr[user].net_name);
+wbuf(ustr[user].afkmsg);
+wval(ustr[user].promptseq);
+wval(ustr[user].t_ent);
+wval(ustr[user].t_num);
+wbuf(ustr[user].t_name);
+wbuf(ustr[user].t_host);
+wbuf(ustr[user].t_ip);
+wbuf(ustr[user].t_port);
+wbuf(ustr[user].phone_user);
+wval(ustr[user].tempsuper);
+wval(ustr[user].rwho);
+wchar(ustr[user].attach_port);
+wval(ustr[user].last_input);
+wval(ustr[user].invite);
+wbuf(ustr[user].page_file);
 
-	time(&tm);
+wval(NUM_LINES);
+for (i=0;i<NUM_LINES;++i) wbuf(ustr[user].conv[i]);
 
 /*
-	if (wwwport[user].method==1) {
-	  strcpy(username,strip_user(query));
-	  strcpy(password,strip_user(query));
-	  }
+wval(ustr[user].alloced_size);
+wval(ustr[user].write_offset);
+wbuf(ustr[user].output_data);
 */
 
-        write_it(as, "Content-type: text/html\n\n");
-	write_it(as, "<HTML>\n\r");
-	write_it(as, "<HEAD>\n\r");
-	if (mode==0)
-		sprintf(mess, "<TITLE>All users on %s</title>\n\r",SYSTEM_NAME);
-	else if (mode==1)
-		sprintf(mess, "<TITLE>\"%s\" users on %s</title>\n\r",query,SYSTEM_NAME);
-	else if (mode==2) {
-		sprintf(mess, "<TITLE>User info for %s on %s</title>\n\r",query,SYSTEM_NAME);
-		}
-	else if (mode==3) {
-		sprintf(mess, "<TITLE>%s\'s user page</title>\n\r",SYSTEM_NAME);
-		}
+fclose(f);
+}
 
-	write_it(as, mess);
-	write_it(as, "</HEAD>\n\r");
+void read_rebootdb(void) {
+int i=0,j=0,user2=0,num_lines=0;
+char buff1[ARR_SIZE];
+FILE *f;
 
-	if ((web_opts[4][0]=='#') || (!strstr(web_opts[4],".")))
-	 sprintf(mess,"<BODY BGCOLOR=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
-	else
-	 sprintf(mess,"<BODY BACKGROUND=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
+if (!(f=fopen(REBOOTFILE,"r"))) {
+write_log(ERRLOG,YESTIME,"Can't read REBOOT db!\n");
+return;
+}
 
-	write_it(as, mess);
+buff1[0]=0;
 
-	/* Write our header file */
-	sprintf(mess,"%s/%s",WEBFILES,web_opts[2]);
-	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+rval(listen_sock[0]);
+rval(listen_sock[1]);
+rval(listen_sock[2]);
+rval(listen_sock[3]);
+rval(num_of_users);
+write_log(BOOTLOG,YESTIME,"REBOOT: Reading %d users from reboot log\n",num_of_users);
+for (i=0;i<num_of_users;++i) {
+rval(user2);
+rbuf(ustr[user2].name,NAME_LEN);
+rval(ustr[user2].sock);
+rval(ustr[user2].time);
+rbuf(ustr[user2].real_id,50);
+rval(ustr[user2].nerf_shots);
+rval(ustr[user2].nerf_energy);
+rval(ustr[user2].warning_given);
+rval(ustr[user2].ttt_board);
+rval(ustr[user2].ttt_playing);
+rval(ustr[user2].ttt_opponent);
+rval(ustr[user2].hang_stage);
+rbuf(ustr[user2].hang_word,TOPIC_LEN);
+rbuf(ustr[user2].hang_word_show,TOPIC_LEN);
+rbuf(ustr[user2].hang_guess,TOPIC_LEN);
+rbuf(ustr[user2].site,21);
+rbuf(ustr[user2].net_name,64);
+rbuf(ustr[user2].afkmsg,46);
+rval(ustr[user2].promptseq);
+rval(ustr[user2].t_ent);
+rval(ustr[user2].t_num);
+rbuf(ustr[user2].t_name,24);
+rbuf(ustr[user2].t_host,31);
+rbuf(ustr[user2].t_ip,16);
+rbuf(ustr[user2].t_port,6);
+rbuf(ustr[user2].phone_user,NAME_LEN);
+rval(ustr[user2].tempsuper);
+rval(ustr[user2].rwho);
+rchar(ustr[user2].attach_port);
+rval(ustr[user2].last_input);
+rval(ustr[user2].invite);
+rbuf(ustr[user2].page_file,80);
+
+rval(num_lines);
+j=0;
+for (j=0;j<num_lines;++j) {
+rbuf(buff1,-1);
+if (j <= NUM_LINES) strcpy(ustr[user2].conv[j],buff1);
+buff1[0]=0;
+}
+
+/*
+rval(ustr[user2].alloced_size);
+rval(ustr[user2].write_offset);
+ustr[user2].output_data = (char *)malloc(ustr[user2].alloced_size+1);
+rbuf(buff1,-1);
+strcpy(ustr[user2].output_data,buff1);
+*/
+
+#if defined(_WIN32) && !defined(__CYGWIN32__)
+ioctlsocket(ustr[user2].sock, FIONBIO, &arg);
+#else
+fcntl(ustr[user2].sock, F_SETFL, NBLOCK_CMD); /* set socket to non-blocking */
+#endif
+add_user2(user2,0);
+
+read_to_user(ustr[user2].name,user2);
+strcpy(ustr[user2].login_name,ustr[user2].name);
+write_log(BOOTLOG,YESTIME,"REBOOT: Got user sock: %d name: %s slot: %d\n",ustr[user2].sock,ustr[user2].name,user2);
+} /* end of main for */
+
+fclose(f);
+remove(REBOOTFILE);
+write_log(BOOTLOG,YESTIME,"REBOOT: Read %d users\n",i);
+
+}
+
+void backup_stuff(int user, char *inpstr) {
+int timegiven=0;
+char option[81];
+
+if (!strlen(inpstr)) {
+ if (dobackups) {
+ dobackups=0;
+ write_str(user,"Log archiving at midnight turned OFF");
+ return;
+ }
+ else {
+ dobackups=1;
+ write_str(user,"Log archiving at midnight turned ON");
+ return;
+ }
+}
+else {
+inpstr[80]=0;
+sscanf(inpstr,"%s ",option);
+  if (!strcmp(option,"-t")) {
+	remove_first(inpstr);
+	if (!strlen(inpstr))
+	 trim_backups(user,TRIM_BACKUPS);
 	else {
-		while (fgets(mess,256,fp) != NULL) {
-		write_it(as, mess);
-		}
-		fclose(fp);
-	     }
+	 inpstr[3]=0;
+	 timegiven=atoi(inpstr);
+	 if (timegiven > 0) trim_backups(user,timegiven);
+	 else {
+	 /* bad number */
+	 write_str(user,"Invalid number of days");
+	 return;
+	 }
+	}
+  } /* end of if -t */
+  else if (!strcmp(option,"-b")) {
+  if (backup_logs(user) != -1) write_str(user,"All logs have been archived");
+  } /* end of if -b option */
+ else {
+ /* bad option */
+ write_str(user,"That option doesn't exist!");
+ return;
+ }
+} /* end of strlen else */
 
-	switch(mode) {
-	case 0:
-		  sprintf(mess,"<font color=\"%s\"><h3>These are all the users that exist on %s</h3></font>\n\r",web_opts[8],SYSTEM_NAME);
-		  write_it(as, mess);
-		  break;
-	case 1:
-		  sprintf(mess,"<font color=\"%s\"><h1>The \"%s\" users</h1></font>\n\r",web_opts[8],query);
-		  write_it(as, mess);
-		  break;
-	case 2:
-		  break;
-	case 3:
-		  break;
-	default:  break;
-	} /* end of switch */
+}
 
-/* Wont do switch() here because cases get to hairy, esp. with only 80 columns to see */
-if (mode==0) {
- sprintf(mess,"%s",USERDIR);
- strncpy(filename,mess,FILE_NAME_LEN);
- 
- dirp=opendir((char *)filename);
-  
+int backup_logs(int user) {
+int i=0;
+char filerid[FILE_NAME_LEN];
+char filename[FILE_NAME_LEN*2];
+char filename2[FILE_NAME_LEN*2];
+char timestr[30];
+FILE *fp;
+struct tm *clocker;
+time_t tm_now;
+
+time(&tm_now);
+clocker=localtime(&tm_now);
+strftime(timestr,sizeof(timestr),"%m%d%Y.%H:%M:%S",clocker);
+sprintf(filerid,"%s/%s",LOGDIR,timestr);
+if (mkdir(filerid,0700) == -1) {
+  if (user!=-1) write_str(user,BAD_FILEIO);
+  write_log(ERRLOG,YESTIME,"BACKUP: Couldn't create directory \"%s\" in backup_logs! %s\n",filerid,get_error());
+  return -1;
+}
+
+/* create a TIMESTAMP file containing the current unix time */
+/* for trimming backups later */
+sprintf(filename,"%s/TIMESTAMP",filerid);
+if (!(fp=fopen(filename,"w"))) {
+  if (user!=-1) write_str(user,BAD_FILEIO);
+  write_log(ERRLOG,YESTIME,"BACKUP: Couldn't open file(w) \"%s\" in backup_logs! %s\n",filename,get_error());
+  rmdir(filerid);
+  return -1;
+  }
+sprintf(timestr,"%ld\n",(unsigned long)tm_now);
+fputs(timestr,fp);
+fclose(fp);
+
+/* move all logs to new directory by renaming them */
+for (i=0;logfacil[i].file!=NULL;++i) {
+sprintf(filename,logfacil[i].file,LOGDIR);
+sprintf(filename2,logfacil[i].file,filerid);
+rename(filename,filename2);
+}
+/* now do lastcommand and lastlogs file */
+sprintf(filename,"%s/%s",LOGDIR,LASTFILE);
+sprintf(filename2,"%s/%s",filerid,LASTFILE);
+rename(filename,filename2);
+sprintf(filename,"%s/%s.CRASH",LOGDIR,LASTFILE);
+sprintf(filename2,"%s/%s.CRASH",filerid,LASTFILE);
+rename(filename,filename2);
+sprintf(filename,"%s/%s",LOGDIR,LASTLOGS);
+sprintf(filename2,"%s/%s",filerid,LASTLOGS);
+rename(filename,filename2);
+
+write_log(SYSTEMLOG,YESTIME,"BACKUP: All log files backed up by %s to directory \"%s\"\n",user==-1?"the TALKER":ustr[user].say_name,filerid);
+return 1;
+}
+
+void trim_backups(int user, int days) {
+int i=0,count=0;
+char filename[FILE_NAME_LEN];
+char filerid[FILE_NAME_LEN];
+char filerid2[FILE_NAME_LEN];
+unsigned long diff;
+unsigned long tm_then;
+char small_buffer[64];
+time_t tm_now;
+struct dirent *dp;
+DIR *dirp;
+FILE *fp;
+
+if (TRIM_BACKUPS <= 0) {
+if (user!=-1) write_str(user,"The system is set to not allow log trimming.");
+return;
+}
+
+ time(&tm_now);
+ sprintf(t_mess,"%s",LOGDIR);
+ strncpy(filerid,t_mess,FILE_NAME_LEN);
+ dirp=opendir((char *)filerid);
  if (dirp == NULL)
-   {  
-      strcpy(mess,"SYSTEM: Directory information not found for external_users\n");
-      print_to_syslog(mess);
-      write_it(as, mess);
-	write_it(as, "</body>\n\r");
-	write_it(as, "</html>\n\r\n\r");
-      return;
+   {
+	if (user!=-1) write_str(user,BAD_FILEIO);
+        write_log(ERRLOG,YESTIME,"TBACKUP: Can't open directory \"%s\" for trim_backups! %s\n",filerid,get_error());
+	return;
    }
 
-    write_it(as,"<ul>");
-
- while ((dp = readdir(dirp)) != NULL) 
-   { 
-
+ while ((dp = readdir(dirp)) != NULL)
+   {
     sprintf(small_buffer,"%s",dp->d_name);
-        if (small_buffer[0] == '.')
+        if ((small_buffer[0] == '.') || !strstr(small_buffer,":"))
          continue;
-
-	read_user(small_buffer);
-
-if (strstr(t_ustr.webpic,"://")) {
-    sprintf(mess,"<li><a href=\"http://%s:%d/_users?search=%s\">%s</a>&nbsp;&nbsp;<img align=\"absmiddle\" src=\"pic.gif\" border=0 alt=\"User has a picture\"></li>\n\r",thishost,
-		PORT+WWW_OFFSET,t_ustr.say_name,t_ustr.say_name);
-    }
-else {
-    sprintf(mess,"<li><a href=\"http://%s:%d/_users?search=%s\">%s</a></li>\n\r",thishost,
-		PORT+WWW_OFFSET,t_ustr.say_name,t_ustr.say_name);
-    }
-    write_it(as, mess);
-    small_buffer[0]=0;
-    num++;
-   } /* end of directory while */
- (void)closedir(dirp);
-
-    write_it(as,"</ul>\n");
-
-    sprintf(mess,"<ul><b>%d user%s exist on %s</ul><br>",num,num == 1 ? "" : "s",SYSTEM_NAME);
-    write_it(as,mess);
-    num=0;
-
-
-  } /* end of main if */
-else if (mode==1) {
- sprintf(mess,"%s",USERDIR);
- strncpy(filename,mess,FILE_NAME_LEN);
- 
- dirp=opendir((char *)filename);
-  
- if (dirp == NULL)
-   {  
-      strcpy(mess,"SYSTEM: Directory information not found for external_users\n");
-      print_to_syslog(mess);
-      write_it(as, mess);
-	write_it(as, "</body>\n\r");
-	write_it(as, "</html>\n\r\n\r");
-      return;
-   }
-
-    write_it(as,"<ul>");
-
- while ((dp = readdir(dirp)) != NULL) 
-   { 
-
-    sprintf(small_buffer,"%s",dp->d_name);
-        if (small_buffer[0] == '.')
-         continue;
-        if (small_buffer[0] != tolower((int)query[0]))
-         continue;	
-
-	read_user(small_buffer);
-
-if (strstr(t_ustr.webpic,"://")) {
-    sprintf(mess,"<li><a href=\"http://%s:%d/_users?search=%s\">%s</a>&nbsp;&nbsp;<img align=\"absmiddle\" src=\"pic.gif\" border=0 alt=\"User has a picture\"></li>\n\r",thishost,
-		PORT+WWW_OFFSET,t_ustr.say_name,t_ustr.say_name);
-    }
-else {
-    sprintf(mess,"<li><a href=\"http://%s:%d/_users?search=%s\">%s</a></li>\n\r",thishost,
-		PORT+WWW_OFFSET,t_ustr.say_name,t_ustr.say_name);
-    }
-    write_it(as, mess);
-    small_buffer[0]=0;
-   } /* end of directory while */
- (void)closedir(dirp);
-
-    write_it(as,"</ul><br>\n\r");
-  } /* end of else if */
-else if (mode==2) {
-	strtolower(query);
-	if (!check_for_user(query)) {
-	  sprintf(mess,"<h3>%s</h3><br>",NO_USER_STR);
-	  write_it(as, mess);
-	  }
-	else {
-	  read_user(query);
-	  sprintf(mess,"<font color=\"%s\"><h1>%s</h1></font>\n\r",web_opts[8],t_ustr.say_name);
-	  write_it(as, mess);
-
-	  write_it(as,"<table width=100% border=0><tr>\n");
-	  write_it(as,"<td valign=top width=50%>\n");
-
-	  write_it(as,"<table valign=top border=0 cellspacing=10><tr valign=top>\n");
-	  sprintf(mess,"<td align=left>With %s since</td><td align=left>%s</td>",SYSTEM_NAME,t_ustr.creation);
-	  write_it(as, mess);
-	  write_it(as,"</tr>\n");
-
-		/* Is user online? */
-		if ((u = get_user_num_exact(query,-1)) != -1) {
-		  on_now = 1;
-		  }
-
-	if (on_now) {
-	  sprintf(mess,"<tr><td align=left>Online Status</td><td align=left><font color=\"%s\"><b><blink>IS ONLINE RIGHT NOW</b></blink></font></td>",web_opts[10]);
-	  write_it(as,mess);
-	  }
-	else {
-	  tm_then=((time_t) t_ustr.rawtime);
-	  sprintf(mess,"<tr><td align=left>Online Status</td><td align=left>On %s ago</td>",converttime((long)((tm-tm_then)/60)));
-	  write_it(as, mess);
-	  }
-	  write_it(as,"</tr>\n");
-	  sprintf(mess,"<tr><td align=left>Gender</td><td align=left>%s</td>",strip_color(t_ustr.sex));
-	  write_it(as, mess);
-	  write_it(as,"</tr>\n");
-	  sprintf(mess,"<tr><td align=left>ICQ #</td><td align=left>%s</td>",strip_color(t_ustr.icq));
-	  write_it(as, mess);
-	  write_it(as,"</tr>\n");
-
-	  if ((!t_ustr.semail) &&
-		strstr(t_ustr.email_addr,"@") &&
-		strstr(t_ustr.email_addr,".")) {
-		sprintf(mess,"<tr><td align=left>Email</td><td align=left><a href=\"mailto:%s\">%s</a></td>",t_ustr.email_addr,t_ustr.email_addr);
-		write_it(as, mess);
-		write_it(as,"</tr>\n");
-                        }
-
-	  if ((!strstr(t_ustr.homepage,DEF_URL)) && (strstr(t_ustr.homepage,"/"))) {
-		if (strstr(t_ustr.homepage,"://")) {
-		sprintf(mess,"<tr><td align=left>Homepage</td><td align=left><a href=\"%s\">%s</a></td>",t_ustr.homepage,t_ustr.homepage);
-		write_it(as, mess);
-		write_it(as,"</tr>\n");
-                           }
-	    }
-
-	  sprintf(filename,"%s/%s",PRO_DIR,query);
-	  write_it(as,"<tr><td colspan=2>\n");
-
-        if (!(fp=fopen(filename,"r"))) {
-		write_it(as,"No profile. Sorry :)<br>");
-	  }
-        else {
-                while (fgets(mess,256,fp) != NULL) {
-                write_it(as, convert_color(mess));
-		write_it(as,"<br>");
-                }
-                fclose(fp);
-             }
-
-	  write_it(as,"</td></tr>\n");
-
-	  write_it(as,"</table>\n");
-	  
-	  write_it(as,"</td><td width=50%>\n");
-	  if (strstr(t_ustr.webpic,"://")) {
-	   sprintf(mess,"<img src=\"%s\" border=0 alt=\"%s\'s Picture\">",t_ustr.webpic,t_ustr.say_name);
-	   write_it(as, mess);
-	  }
-	  else write_it(as,"<font size=+1><b><center>No picture available</center></b></font>");
-
-	  write_it(as,"</td></tr></table>\n");
-	  write_it(as,"<br>\n");
-	  } /* end of check_for_user else */
-  } /* end of else if */
-else if (mode==3) {
-write_it(as, "<center>\n");
-write_it(as, "<font size=+1>Pick a letter of users</font><br><br>\n");
-write_it(as, "<font size=+3><b>\n");
-for (letter='A';isalpha((int)letter);letter++) {
-	sprintf(mess,"<a href=\"http://%s:%d/_users?search=%c\">%c</a></li>\n",thishost,
-                PORT+WWW_OFFSET,letter,letter);
-	write_it(as, mess);
-   } /* end of for */
-write_it(as, "</b></font>");
-write_it(as, "<br><br>");
-sprintf(mess,"<a href=\"http://%s:%d/_users?search=\">List of all users</a>",
-		thishost,PORT+WWW_OFFSET);
-write_it(as, mess);
-write_it(as, "<br><br>");
-
-sprintf(mess, "<FORM METHOD=\"GET\" ACTION=\"http://%s:%d/_users\">",thishost,PORT+WWW_OFFSET);
-write_it(as, mess);
-sprintf(mess,"<font size=+1><b>Find user</b></font><br><INPUT TYPE=\"TEXT\" NAME=\"search\" SIZE=%d>",NAME_LEN+1);
-write_it(as, mess);
-write_it(as, "&nbsp;&nbsp;<INPUT TYPE=\"SUBMIT\" VALUE=\"Search\">");
-write_it(as, "</FORM>");
-
-write_it(as, "</center>");
-
-  } /* end of else if */
-
-
-	/* Write our footer file */
-	sprintf(mess,"%s/%s",WEBFILES,web_opts[3]);
-	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
-	else {
-		while (fgets(mess,256,fp) != NULL) {
-		write_it(as, mess);
+	/* we have a log sub-directory */
+	/* check the timestamp against how long we want to keep */
+	sprintf(filerid2,"%s/%s",LOGDIR,small_buffer);
+	sprintf(filename,"%s/TIMESTAMP",filerid2);
+	if (!(fp=fopen(filename,"r"))) {
+	 if (user!=-1) write_str(user,BAD_FILEIO);
+         write_log(ERRLOG,YESTIME,"TBACKUP: Couldn't open file(r) \"%s\" in trim_backups! %s\n",filename,get_error());
+	 continue;
+	}
+	 fscanf(fp,"%ld\n",&tm_then);
+         FCLOSE(fp);
+	 diff = tm_now - tm_then; /* seconds since now */
+	 if (diff >= (days*86400)) {
+	 /* longer than the time we want to keep */
+		for (i=0;logfacil[i].file!=NULL;++i) {
+		sprintf(filename,logfacil[i].file,filerid2);
+		remove(filename);
 		}
-		fclose(fp);
-	     }
+		i=0;
+		sprintf(filename,"%s/%s",filerid2,LASTFILE);
+		remove(filename);
+		sprintf(filename,"%s/%s.CRASH",filerid2,LASTFILE);
+		remove(filename);
+		sprintf(filename,"%s/%s",filerid2,LASTLOGS);
+		remove(filename);
+		sprintf(filename,"%s/TIMESTAMP",filerid2);
+		remove(filename);
+		/* now that all files are removed	*/
+		/* remove the empty directory		*/
+		rmdir(filerid2);
+		count=1;
+		write_log(SYSTEMLOG,YESTIME,"TBACKUP: In trimming to %d days by %s, removed \"%s\"\n",days,user==-1?"the TALKER":ustr[user].say_name,filerid2);
+	 } /* end of if */
+	 diff=0;
+	 tm_then=0;
+   } /* end of directory while */
+   (void)closedir(dirp);
 
-	sprintf(mess,"<br><b><center>This web page dynamically generated on %s</b></center><br>",ctime(&tm));
-	write_it(as, mess);
-	write_it(as, "</body>\n\r");
-	write_it(as, "</html>\n\r\n\r");
+if (user != -1) {
+if (count) write_str(user,"Logs trimmed.");
+else write_str(user,"No logs needed to be trimmed.");
+}
+
+}
+
+void do_tracking(int mode, char *downmess) {
+int sendmail=0,nosubject=0;
+char filename[FILE_NAME_LEN];
+FILE *pp;
+
+if (strstr(MAILPROG,"sendmail")) {
+  sprintf(t_mess,"%s",MAILPROG);
+  sendmail=1;
+  }
+else {
+  sprintf(t_mess,"%s tinfo@ncohafmuta.com",MAILPROG);
+  if (strstr(MAILPROG,"-s"))
+	nosubject=0;
+  else
+	nosubject=1;
+  }  
+strncpy(filename,t_mess,FILE_NAME_LEN);
+
+/* Open pipe to sendmail program */
+if (!(pp=popen(filename,"w"))) 
+  {
+   write_log(ERRLOG,YESTIME,"TRACKING: Couldn't open popen(w) \"%s\" to send email in do_tracing! %s\n",filename,get_error());
+   return;
+  }
+
+if (sendmail) {
+fprintf(pp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
+fprintf(pp,"To: TRACKING <%s>\n","tinfo@ncohafmuta.com");
+fprintf(pp,"Subject: %s\n\n","TRACKING");
+}
+else if (nosubject) {
+fprintf(pp,"%s\n","TRACKING");
+}
+
+if (mode==1) {
+/* we are coming up */
+sprintf(mess,
+"SYSTEM_NAME: %s\nPID: %u\nSTATUS: UP\nROOT_ID: %s\nVERSION: %s\nHOSTNAME: %s\nMAIN_PORT: %d\nWIZ_PORT: %d\nWHO_PORT: %d\nWWW_PORT: %d\nSYSTEM_EMAIL: %s\nNUM_USERS: %ld\nNEWUSER_STATUS: %d\nTHEME: %s\nEIGHTTPLUS: %d\nEND:\n",
+SYSTEM_NAME,(unsigned int)getpid(),ROOT_ID,VERSION,thishost,PORT,
+PORT+WIZ_OFFSET,PORT+WHO_OFFSET,PORT+WWW_OFFSET,SYSTEM_EMAIL,
+system_stats.tot_users,allow_new,TTHEME,EIGHTTPLUS);
+} /* end of mode 0 */
+else if (mode==0) {
+/* we are going down */
+	if (downmess) {
+	sprintf(mess,"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN %s\nEND:\n",
+	SYSTEM_NAME,(unsigned int)getpid(),downmess);
+	}
+	else {
+	sprintf(mess,"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN Normal shutdown\nEND:\n",
+	SYSTEM_NAME,(unsigned int)getpid());
+	}
+} /* end of mode 1 */
+
+fputs(mess,pp);
+fputs("\n",pp);
+fputs(".\n",pp);
+pclose(pp);
+
+}
+
+void do_timeset(char *zonetime) {
+char wcd1[FILE_NAME_LEN+10];
+static char timemess[FILE_NAME_LEN+100];
+
+/* SET TALKER TIME TO THE TIMEZONE WE WANT */
+/* Get the current working directory so we can reference */
+/* to the absolute path of the TZ info                   */
+getcwd(wcd1,FILE_NAME_LEN);
+strcat(wcd1,"/tzinfo");
+
+if (!strcmp(zonetime,"localtime")) {
+#if defined(__FreeBSD__) || defined(__NetBSD__)
+putenv("TZ=:/etc/localtime");
+#else
+putenv("TZ=localtime");
+#endif
+}
+else {
+sprintf(timemess,"TZ=:%s/%s",wcd1,zonetime);
+putenv(timemess);
+}
+#if !defined(__CYGWIN32__)
+tzset();
+#endif
 
 }
 

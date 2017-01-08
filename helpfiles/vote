@@ -1,7 +1,7 @@
  Syntax:  .vote
           .vote <choice #>
-          .vote -c  (Level 7 only)
-          .vote -d  (Level 7 only)
+          .vote -c  (specific levels only)
+          .vote -d  (specific levels only)
 
 Results:  Typed by itself, this command will show what current issue
           is being voted on by all users in the talker.  There are 3

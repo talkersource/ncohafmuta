@@ -2,7 +2,7 @@ init_data file format
 ---------------------
 
 Example file:
-5000 3 1 1 4 1 1 ABC
+5000 3 1 1 4 1 1 0 ABC
 A square BC 0 1
 B pond AC 0 1
 C shop AB 0 1
@@ -30,6 +30,9 @@ RESOLVE IP ADDRESSES    1 for yes with only talked-specific caching
 			currently not-functional..code isn't done)
 			0 for no resolution of ips->hostnames
 			This is only the initial setting..can be toggled online.
+BACKUP/ARCHIVE LOGS	1 to have the talker backup/archive logs at
+			midnight (can be changed with .backup)
+			0 to not have it back/archive them up
 
 ROOMS LOCKED TO PUBLIC  room letters locked to public (can't be made private)
 

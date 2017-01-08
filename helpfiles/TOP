@@ -1,4 +1,4 @@
-#!/bin/csh -f
+#!/bin/sh
 #
 # This script updates the help topics list for the helpfiles directory
 # the 'cut' grep down below is for SunOS.  Other system's options are
@@ -16,7 +16,7 @@
 rm topics
 touch topics
 echo " " >> topics
-echo "------------ ---------- Type .help <topic> for more details \!" >> topics 
+echo "------------ ---------- Type .help <topic> for more details!" >> topics 
 echo "Last Changed HELP Topic" >> topics
 echo "------------ ----------" >> topics
 ls -lt [a-z]* | cut -c43-79 | grep -v topics >> topics

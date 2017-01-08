@@ -1,6 +1,6 @@
 #!/bin/csh -f
 # by Cygnus
-# cygnus@ncohafmuta.com
+# code@ncohafmuta.com
 
 setenv FOUND 0
 setenv BFILE backup.tar
@@ -8,7 +8,7 @@ setenv BACKUPDRIVE backupd
 setenv RESTOREDRIVE restored
 
 echo /---------------------------------------/
-echo / Ncohafmuta 1.2.0 Data Restore Utility /
+echo / Ncohafmuta 1.2.2 Data Restore Utility /
 echo /---------------------------------------/
 
 # Check if backup archive exists

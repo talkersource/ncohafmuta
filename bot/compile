@@ -1,4 +1,11 @@
+#!/bin/sh
+
+if test -f "storybot"
+then
+echo -n "Backing up old storybot program.."
 cp storybot storybot.old
+echo "Done"
+fi
 echo 'gcc -O3 -o storybot storybot.c'
 gcc -O3 -o storybot storybot.c
 

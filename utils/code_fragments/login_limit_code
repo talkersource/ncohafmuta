@@ -1,0 +1,73 @@
+struct {
+	char site[16];
+        int connections;
+} connlist[20];
+
+
+before gethostbyaddr()..
+
+int pos=0,free=0;
+
+pos=in_connlist(new_user);
+
+if (!pos) {
+	/* not in list */
+	free=find_free_connslot();
+	strcpy(connlist[free].site,ustr[user].site);
+	connlist[free].connections=1;
+	}
+else {
+	/* pos is where they are */
+	if (connlist[pos].connections > MAX_CONNS_PER_MIN) {
+	/* auto ban the site */
+	auto_restrict(new_user);
+	connlist[pos].site[0]=0;
+	connlist[pos].connections=0;
+	}
+	else connlist[pos].connections++;
+}
+
+
+in do_events() (in NUTS)
+
+clear_connlist();
+
+
+DECLARATIONS:
+
+int in_connlist(int user) {
+int z=0;
+
+for (z=0;z<20;++z) {
+	if (!strcmp(connlist[z].site,ustr[user].site)) return z;
+	}
+return 0;
+}
+
+int find_free_connslot(void) {
+int z=0;
+int found=0;
+int lowest=1,lowestpos=0;
+
+for (z=0;z<20;++z) {
+	if (connlist[z].connections == 0) return z;
+	}
+z=0;
+/* all slots used, bump lowest one */
+for (z=19;z>=0;--z) {
+	if (connlist[z].connections <= lowest) {
+	 lowest=connlist[z].connections;
+	 lowestpos=z;
+	}
+
+return lowestpos;
+}
+
+void clear_connlist(void) {
+int z=0;
+
+for (z=0;z<20;++z) {
+	connlist[z].connections=0;
+	connlist[z].site[0]=0;
+	}
+}

@@ -18,6 +18,8 @@ Results:  Gives a list of all visible users currently on the board.
            IDLE - User is idle between 1 hour and 3 hours.
            COMA - User has been idle for more than 3 hours.
            AFK  - User is away from the keyboard.
+           BAFK - User is AFK and not getting any output.
+           LAFK - User is AFK and their terminal is locked.
            PROF - User is entering a profile.
            DESC - User is writing a room description.
            VOTE - User is entering a vote topic.

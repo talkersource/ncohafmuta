@@ -42,6 +42,7 @@ rbuf(buff1,-1); /* ENDVER STRING */
                 
 END:
 
+
 	YOU WOULD CHANGE THIS TO:
 
 rbuf(buff1,-1); /* ENDVER STRING */
@@ -52,6 +53,7 @@ rbuf(t_ustr.age,MAX_AGE);
                 
 END:
 
+And so on for in write_user() and read_to_user()
 If this document is not clear or you have any confusion, Email me.
 
 -Cygnus

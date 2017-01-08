@@ -3,7 +3,7 @@ Documentation?  Are you CRAZY?  Oh... All right...
 This is a hodgepodge of stuff taken from a stagnant but 
 running, non-development agent, known as Thoth on DragonMud
 (telnet dragonmud.org 4201) and currently ported/developed for the
-talker "PinWHeeLs" by me, Cygnus (cygnus@ncohafmuta.com) to work on the
+talker "PinWHeeLs" by me, Cygnus (code@ncohafmuta.com) to work on the
 SunOS and Linux operating system. I make no guarantees that this bot will
 work on other OSs. You're lucky if it does. :-)
 
@@ -16,6 +16,7 @@ is where I began.
 What you will find:
 manual  ---  how to use the storybot (flatfile).
 restart  --- The startup script.
+compile  --- The simple script I use to compile the bot
 Stories   --- The directory that holds all learned stories.
 storybot.c --- the current source code. (has a lame paginator
         to break up long lists of stories, and some decorative
@@ -51,7 +52,7 @@ DO:
       2) as the BOTS_ROOTID (with the bot logged in) type ".force
          <bot_name> com .monitor" until it says that
 
-    Type "compile" to compile the code
+    Type "compile" to compile the bot
 
     Type "restart" to boot the bot.
 
@@ -60,17 +61,17 @@ as the BOTS_ROOTID you have control over the bot like noone else.
 You can force it, tell it to delete any story you wish, abort writing by
 anyone, etc..
 You can also tell it to reboot or shutdown itself.
-.tell it "reboot" to make him reboot itself
-.tell it "shutdown" to make him shutdown itself
+.tell it "reboot" to make it reboot itself
+.tell it "shutdown" to make it shutdown itself
 
-PLEASE REMEMBER, the bot is designed to work with a communication format
-of <user> says "<message>", <user> tells you: "<message>", etc.. as
-defaulted in the ncohafmuta talker code's constants.h
-It will NOT work if you change these. You will have to go in the bot code
-itself and make modifications for your specific communication formats.
-A good place to start is the XXXXX_OFFSET #define's.
+The bot formally was designed to work with the standard communications format
+set in the constants.h file in the ncohafmuta code. Now he works on a common
+format, generated internally by the ncohafmuta talker code. This means
+you can change the communications format any way you want in constants.h
+and the bot will still work. This is current as of version 1.3 of the bot 
+and 1.2.2b-2 of ncohafmuta.
 
-You may want to fire off mail to John Crane (jopsy@ucsd.edu)
+You may want to fire off mail to John Crane (jopsy@qualcomm.com)
 letting him know that you obtained this code from " Cray ", and are using
 it, and for what, just so he knows.
 
@@ -79,7 +80,7 @@ OR answer questions from overweening users having trouble getting
 it running.   ;-)
 
 However, If you patch it, fix it, or modify it, patches are very
-welcome at jopsy@ucsd.edu and cygnus@ncohafmuta.com.
+welcome at jopsy@qualcomm.com and code@ncohafmuta.com.
 
 This code is not for resale or value added arrangements.  
 Distribution is strictly on an "as-interested" basis, in

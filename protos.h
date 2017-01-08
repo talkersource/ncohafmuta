@@ -5,12 +5,20 @@
 /* Precious declaration says                    */
 /* I believe all hope is dead no longer         */
 
+#if defined(__sun__)
+ /* SunOS of some sort */
+  #if defined(__svr4__) || defined(__SVR4)
+  /* Solaris, i.e. SunOS 5.x */
+   #define SOL_SYS
+  #endif
+#endif
+
 /* Can't crash now I've been waiting for this   */
 void write_cygnus(int user);
 void sigcall(int sig);
 void init_signals(void);
 void zombie_killer(int sig);
-void shutdown_error(int error);
+void shutdown_error(char *message);
 void web_error(int user, int header, int mode);
 void handle_sig(int sig);
 void abbrcount(void);
@@ -34,8 +42,9 @@ void free_sock(int user, char port);
 void external_who(int as);
 void write_it(int sock, char *str);
 void write_str(int user, char *str);
+void write_str_www(int user, char *str, int size);
 void writeall_str(char *str, int area, int user, int send_to_user, int who_did, int mode, int type, int sw);
-void user_quit(int user);
+void user_quit(int user, int mode);
 void strtolower(char *str);
 void telnet_echo_on(int user);
 void telnet_echo_off(int user);
@@ -75,8 +84,6 @@ void look(int user, char *inpstr);
 void check_mail(int user);
 void syssign(int user, int onoff);
 void remove_first(char *inpstr);
-void logerror(char *s);
-void print_to_syslog(char *str);
 void st_crypt(char *str);
 void clear_sent(int user, char *inpstr);
 void write_user(char *name);
@@ -124,8 +131,6 @@ void hide(int user, char *inpstr);
 void display_ranks(int user);
 void restrict(int user, char *inpstr, int type);
 void unrestrict(int user, char *inpstr, int type);
-void igtells(int user);
-void heartells(int user);
 void picture(int user, char *inpstr);
 void preview(int user, char *inpstr);
 void password(int user, char *pword);
@@ -203,7 +208,7 @@ void gag_comm(int user, char *inpstr, int type);
 void frog_user(int user, char *inpstr);
 void auto_com(int user, char *inpstr);
 void eight_ball(int user, char *inpstr);
-void warning(int user, char *inpstr);
+void warning(int user, char *inpstr, int mode);
 void banname(int user, char *inpstr);
 void player_create(int user, char *inpstr);
 void revoke_com(int user, char *inpstr);
@@ -233,7 +238,7 @@ void copy_to_user(int user);
 void getbuf(FILE *f, char *buf2, int buflen);
 void putbuf(FILE *f, char *buf2);
 void catall(int user, char *filename);
-void write_log(char *str, int type, int nl);
+void write_log(int type, int wanttime, char *str, ...);
 void print_ban_dir(int user, char *inpstr, char *s_search);
 void set_email(int user, char *inpstr);
 void set_homepage(int user, char *inpstr);
@@ -267,8 +272,8 @@ void file_skip_lines(FILE *in_file, int lines);
 void file_copy(FILE *in_file, FILE *out_file);
 void fill_bar(int val1, int val2, char *str);
 void ignore_all(int user);
-void external_www(int as);
-void external_users(int user, int mode, char *query);
+void external_www(int user);
+void external_users(int user, int mode, char *query, int photofilter);
 void telnet_ask_tuid(int user);
 void proc_dont(int user);
 void proc_do(int user);
@@ -286,7 +291,7 @@ void write_bot(char *fmt);
 void write_bot_nr(char *fmt);
 void write_str(int user, char *str);
 void write_str_nr(int user, char *str);
-void reset_user_struct(int user);
+void reset_user_struct(int user, int mode);
 void telnet_ask_eor(int user);
 void telnet_write_eor(int user);
 void initabbrs(int user);
@@ -304,11 +309,24 @@ void play_hangman(int user, char *inpstr);
 void guess_hangman(int user, char *inpstr);
 void frtell(int user, char *inpstr);
 void femote(int user, char *inpstr);
+void queue_write(int user, char *queue_str, int length);
+void queue_write_www(int user, char *new_str, int length);
+void external_menu(int user, char *wusername, char *wpassword, char *woption);
+void unescape_url(char *url);
+void plustospace(char *str);
+void read_rebootdb(void);
+void write_rebootdb(int user);
+void user_hot_quit(int user);
+void backup_stuff(int user, char *inpstr);
+void trim_backups(int user, int days);
+void do_tracking(int mode, char *downmess);
+void do_timeset(char *zonetime);
 
 /* Won't crash now I found some encouragement   */
 int quit_multiples(int user);
 int find_free_slot(char port);
 int cat_to_sock(char *filename, int accept_sock);
+int cat_to_www(char *filename, int user);
 int cat(char *filename, int user, int line_num);
 int nospeech(char *str);
 int get_com_num(int user, char *inpstr);
@@ -360,6 +378,13 @@ int determ_rand(int u1, int u2);
 int get_flag_num(char *inpstr);
 int ttt_is_end(int user);
 int getint(FILE *f);
+int queue_flush(int user);
+int queue_flush_www(int user);
+int external_login(int user, char *wusername, char *wpassword, int wlogin);
+int get_input(int user, char port, int mode);
+int is_quit(int user, char *str);
+int check_for_creation(char *name);
+int backup_logs(int user);
 long getlong(FILE *f);
 long temp_mem_get(void);
 long user_mem_get(void);
@@ -370,7 +395,6 @@ long shout_mem_get(void);
 
 /* Can't break now I've been living for this    */
 char *get_time(time_t ref, int mode);
-char *get_input(int user, char port, int mode);
 char *get_help_file(char *i_name, int user);
 char *get_temp_file(void);
 char *get_mime_type(char *filen);
@@ -382,6 +406,11 @@ char *converttime(long mins);
 char *get_error(void);
 char *generate_password(void);
 char *get_hang_word(char *aword);
+char *get_value(char *keypair, char *ukey);
+char *log_error(int error);
+char *get_iac_string(unsigned char code);
+char x2c(char *what);
+char getonechar(FILE *f);
 
 #if defined(WIN32) && !defined(__CYGWIN32__)
 char *winerrstr(int type);
@@ -392,8 +421,12 @@ char *ctime();
 struct tm *localtime();
 #endif
 
+#if defined(__GLIBC__)
+char *strptime(const char *s, const char *fmt, struct tm *tp);
+#endif
+
 #if defined(SOL_SYS)
-void bcopy(const void, void, size_t);
+void bcopy(const void *, void *, size_t);
 int gethostname(char *, int);
 int getdomainname(char *, int);
 #endif

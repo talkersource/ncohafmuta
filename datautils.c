@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <sys/time.h>
-#if defined(SOL_SYS)
+#if defined(SOL_SYS) || defined(__linux__)
 #include <string.h>
 #else
 #include <strings.h>
@@ -20,6 +21,7 @@ extern int syslog_on;
 extern int MESS_LIFE;
 extern int allow_new;
 extern int resolve_names;
+extern int dobackups;
 extern char area_nochange[MAX_AREAS];
 extern int new_room;
 extern char web_opts[11][64];
@@ -50,13 +52,14 @@ WSACleanup();
 fgets(line,80,fp);
 
 /* read in important system data & do a check of some of it */
-sscanf(line,"%d %d %d %d %d %d %d %s",&PORT,
+sscanf(line,"%d %d %d %d %d %d %d %d %s",&PORT,
                                    &NUM_AREAS,
                                    &atmos_on,
                                    &syslog_on,
                                    &MESS_LIFE,
                                    &allow_new,
 				   &resolve_names,
+				   &dobackups,
                                    area_nochange);
                                    
 if (PORT<1024 || PORT>9999) 
@@ -69,6 +72,12 @@ WSACleanup();
 #endif
    exit(0);
   }
+
+/* If we're not booting with email verification set	*/
+/* remove the verification DB if it exists		*/
+if (allow_new!=1) {
+if (check_for_file(VERIFILE)) remove(VERIFILE);
+}
 	
 if (NUM_AREAS>MAX_AREAS) 
   {
@@ -307,8 +316,7 @@ FILE *fp;
 sprintf(filename,"%s",EXEMFILE);
 if (!(fp=fopen(filename,"w")))
   {
-   sprintf(mess,"Cannot write exempted users to %s\n",filename);
-   print_to_syslog(mess);
+   write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in write_exem_data! %s\n",filename,get_error());
    return 0;
   }
 
@@ -331,8 +339,7 @@ FILE *fp;
 sprintf(filename,"%s",NBANFILE);
 if (!(fp=fopen(filename,"w")))
   {
-   sprintf(mess,"Cannot write banned names to %s\n",filename);
-   print_to_syslog(mess);
+   write_log(ERRLOG,YESTIME,"Couldn't open file(w) \"%s\" in write_nban_data! %s\n",filename,get_error());
    return 0;
   }
 
@@ -360,6 +367,7 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].login_pass[0] = 0;
    ustr[u].password[0]   = 0;
    ustr[u].email_addr[0] = 0;
+   ustr[u].page_file[0]  = 0;
    ustr[u].desc[0]       = 0;
    ustr[u].sex[0]        = 0;
    ustr[u].fail[0]       = 0;
@@ -378,9 +386,12 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].sock          = -1;
    ustr[u].area          = -1; 
    ustr[u].invite        = -1;  
+   ustr[u].clrmail       = -1;  
    ustr[u].super         = 0;
    ustr[u].vis           = 1;  
    ustr[u].warning_given = 0;
+   ustr[u].time		 = time(0);
+   ustr[u].last_input	 = time(0);
    ustr[u].logging_in    = 0;
    ustr[u].conv_count    = 0;
    ustr[u].mutter[0]     = 0;
@@ -438,6 +449,8 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].init_date[0]  = 0;
    ustr[u].last_date[0]  = 0;
    ustr[u].pro_enter     = 0;
+   ustr[u].roomd_enter   = 0;
+   ustr[u].vote_enter    = 0;
    ustr[u].t_ent         = 0;
    ustr[u].t_num         = 0;
    ustr[u].t_name[0]     = 0;
@@ -472,6 +485,15 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].miscnum3	 = 0;
    ustr[u].miscnum4	 = 0;
    ustr[u].miscnum5	 = 0;
+   ustr[u].tempnum1	 = 0;
+   ustr[u].output_data   = NULL;
+   ustr[u].write_offset  = 0;
+   ustr[u].alloced_size  = 0;
+   ustr[u].log_stage	 = 0;
+   ustr[u].temp_buffer[0]= 0;
+   ustr[u].file_posn	 = 0;
+
+   initabbrs(u);
    listen_all(u);
 
    ustr[u].char_buffer[0]     = 0;
@@ -502,17 +524,12 @@ for (u=0; u<MAX_USERS; ++u)
       ustr[u].Macros[v].body[0]=0;
       ustr[u].Macros[v].name[0]=0;
      }
-   for (v=0; v<NUM_ABBRS; v++)
-     {
-      ustr[u].custAbbrs[v].com[0]=0;
-      ustr[u].custAbbrs[v].abbr[0]=0;
-     }
 
   } /* end of for */
 }
 
 /*** init user structure ***/
-void reset_user_struct(int user)
+void reset_user_struct(int user, int mode)
 {
 int u=user;
 int v;
@@ -523,6 +540,7 @@ int v;
    ustr[u].login_pass[0] = 0;
    ustr[u].password[0]   = 0;
    ustr[u].email_addr[0] = 0;
+   ustr[u].page_file[0]  = 0;
    ustr[u].desc[0]       = 0;
    ustr[u].sex[0]        = 0;
    ustr[u].fail[0]       = 0;
@@ -536,11 +554,14 @@ int v;
    ustr[u].last_site[0]  = 0;
    ustr[u].init_site[0]  = 0;
 
-   ustr[u].area          = -1; 
-   ustr[u].invite        = -1;  
+   ustr[u].area          = -1;
+   ustr[u].invite        = -1;
+   ustr[u].clrmail       = -1;
    ustr[u].super         = 0;
    ustr[u].vis           = 1;  
    ustr[u].warning_given = 0;
+   ustr[u].time		 = time(0);
+   ustr[u].last_input	 = time(0);
    ustr[u].conv_count    = 0;
    ustr[u].mutter[0]     = 0;
    ustr[u].phone_user[0] = 0;
@@ -597,6 +618,8 @@ int v;
    ustr[u].init_date[0]  = 0;
    ustr[u].last_date[0]  = 0;
    ustr[u].pro_enter     = 0;
+   ustr[u].roomd_enter   = 0;
+   ustr[u].vote_enter    = 0;
    ustr[u].t_ent         = 0;
    ustr[u].t_num         = 0;
    ustr[u].t_name[0]     = 0;
@@ -630,6 +653,12 @@ int v;
    ustr[u].miscnum3	 = 0;
    ustr[u].miscnum4	 = 0;
    ustr[u].miscnum5	 = 0;
+   ustr[u].tempnum1	 = 0;
+   ustr[u].log_stage	 = 0;
+   ustr[u].temp_buffer[0]= 0;
+   ustr[u].file_posn	 = 0;
+
+   initabbrs(u);
    listen_all(u);
 
    ustr[u].char_buffer[0]     = 0;
@@ -661,11 +690,18 @@ int v;
       ustr[u].Macros[v].name[0]=0;
      }
    v=0;
-   for (v=0; v<NUM_ABBRS; v++)
-     {
-      ustr[u].custAbbrs[v].com[0]=0;
-      ustr[u].custAbbrs[v].abbr[0]=0;
-     }
+
+if (mode==1) {
+ustr[u].site[0]		= 0;
+ustr[u].net_name[0]	= 0;
+ustr[u].sock		= -1;
+ustr[u].logging_in	= 0;
+ustr[u].promptseq	= 0;
+if (ustr[u].output_data) free(ustr[u].output_data);
+ustr[u].output_data	= NULL;
+ustr[u].write_offset	= 0;
+ustr[u].alloced_size	= 0;
+}
 
 }
 
@@ -707,6 +743,10 @@ for (a=0;a<MAX_WWW_CONNECTS;++a)
    wwwport[a].file[0]=0;
    wwwport[a].site[0]=0;
    wwwport[a].net_name[0]=0;
+   if (wwwport[a].output_data) free(wwwport[a].output_data);
+   wwwport[a].output_data=NULL;
+   wwwport[a].write_offset=0;
+   wwwport[a].alloced_size=0;
   }
 
 }

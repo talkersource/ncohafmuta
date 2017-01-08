@@ -8,7 +8,8 @@ the ustr[user]. buffer that it's set up for.
 
 To compile these programs, type "make" in the utils directory
 
-see README.backups for info on the backup and restore utilities
+see README.backups for info on the backup, restore, and trimbackups 
+utilities
 
 -Cygnus
 Anthony J. Biacco

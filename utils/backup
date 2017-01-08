@@ -1,12 +1,12 @@
 #!/bin/csh -f
 # by Cygnus
-# cygnus@ncohafmuta.com
+# code@ncohafmuta.com
 
 setenv BFILE backup.tar
 setenv BACKUPDRIVE backupd
 
 echo /--------------------------------------/
-echo / Ncohafmuta 1.2.0 Data Backup Utility  /
+echo / Ncohafmuta 1.2.2 Data Backup Utility  /
 echo /--------------------------------------/
 
 if (-e $BFILE) then
@@ -44,8 +44,11 @@ echo                              DONE!
 echo -n '             user warnings..'
 tar uf $BFILE ../warnings
 echo                              DONE!
+echo -n '             message boards..'
+tar uf $BFILE ../messboards
+echo                              DONE!
 echo -n '             configs..'
-tar uf $BFILE ../config
+tar uf $BFILE ../config ../webfiles
 echo                              DONE!
 echo -n '             documentation..'
 tar uf $BFILE ../docs

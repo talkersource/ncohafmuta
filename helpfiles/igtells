@@ -1,9 +1,0 @@
- Syntax:  .igtells
- 
-Results:  Allows you to turn off your .tells.  You will still be able to
-          see everything said, shouted, etc.
-
-   Note:  You cannot ignore anything .telled to you by a user >= 2 levels
-          of you.
-
-See also: heartells, ignore, listen
