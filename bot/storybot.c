@@ -78,7 +78,7 @@
 
 #endif
 
-#define VERSION	"1.61"
+#define VERSION	"1.62"
 #define YES		1
 #define NO		0
 #define YESTIME         1       /* timestamp log entries */
@@ -94,13 +94,17 @@ int   port = 1900;
 
 /* BOT_NAME must be all lowercase */
 /* REPLACE THIS with the bot's name */
+/* This also acts as the login username for the bot */
 #define BOT_NAME      "spokes"
 
+/* REPLACE THIS with the bot's login password */
+#define BOT_PASSWORD  "botpassword"
+
 /* REPLACE THIS with the bot's login sequence. The default here is */
-/* bot_name <carriage-return> bot_password                         */
+/* <carriage-return> bot_name <carriage-return> bot_password       */
 /* YOU DO NOT NEED TO *END* THIS STRING WITH \n's OR \r's	   */
 /* THE PROGRAM AUTOMATICALLY SENDS 2 OF THEM TO FINISH THE LOGIN   */
-#define CONNMSG       "\n %s \n botpassword"
+#define CONNMSG       "\n %s \n %s"
 
 /* ROOT_ID must be all lowercase */
 /* REPLACE THIS with the username of the bot's owner */
@@ -155,6 +159,14 @@ int   port = 1900;
 
 /* the directory the bot's stories will go in. dont change normally */
 #define STORYDIR      "Stories"
+
+/* Talker commands */
+#define SAY_COMMAND	".say"		/* public talk */
+#define TELL_COMMAND	".tell"		/* private talk */
+#define EMOTE_COMMAND	".emote"	/* public action */
+#define SEMOTE_COMMAND	".semote"	/* private action */
+#define SHOUT_COMMAND	".shout"	/* global talk */
+#define SHEMOTE_COMMAND	".shemote"	/* global action */
 
 /* dont change */
 #define DIRECTORY     "."
@@ -271,6 +283,7 @@ int g_FORMATTED=FORMATTED;		/* are paras formatted to 64 lines? */
 int g_CONVOLOG=CONVOLOG;		/* conversation logging flag */
 int g_KILLSWEAR=KILLSWEAR;		/* .kill people swearing at me? */
 int bs;					/* bot's connection socket */
+int bot_user = -1;			/* bot's user number */
 char *g_HOME_ROOM=HOME_ROOM;		/* the bot's home room */
 char thisprog[FILE_NAME_LEN];
 char directions[FILE_NAME_LEN];
@@ -375,7 +388,7 @@ signal(SIGQUIT,SIG_IGN);
     sysud(1);
 
     /* send login info to the talker */
-    sprintf(mess,CONNMSG,BOT_NAME);
+    sprintf(mess,CONNMSG,BOT_NAME,BOT_PASSWORD);
     sendchat("%s\n\n", mess);
 
 ourstory = NULL;
@@ -754,6 +767,7 @@ void process_input(char *inbuf)
 		/* get vis status */
 		remove_first(inbuf);
 		sscanf(inbuf,"%d",&ustr[u].vis);
+		if (!strcmp(ustr[u].name,BOT_NAME)) bot_user=u;
         write_log(YESTIME,"Read in user %s (cn: %s) (rm: %s) (vs: %d)\n", strip_color(ustr[u].say_name),ustr[u].say_name,ustr[u].room,ustr[u].vis);
 	    } /* end of _who command line read */
 	}
@@ -972,7 +986,7 @@ strtolower(command2);
 /* SAY part */
 if (volume==SAY) {
  if (!strcmp(command2,BOT_NAME)) {
-   sendchat("What do you want, %s? ;-)\n",ustr[user].say_name);
+   sendchat(".say What do you want, %s? ;-)\n",ustr[user].say_name);
    goto ENDING;
    }
  if (strstr(command2,BOT_NAME)) {
@@ -1641,12 +1655,29 @@ struct storystate *handle_command(int user, char *command, int volume, struct st
   char dirbuf[FILE_NAME_LEN];
   char titlebuf[FILE_NAME_LEN];
   char author[NAME_LEN+1];
+  char comm_pre[80];
+  char comm_pre_act[80];
   int i,found=0;
   struct dirent *dp;
   FILE *fp;
   FILE *tfp;
   DIR *dirp;
   time_t tm;
+
+
+ /* Set the communication prefixes based on location */
+ if (volume == SAY || volume == EMOTE) {
+	sprintf(comm_pre,"%s",SAY_COMMAND);
+	sprintf(comm_pre_act,"%s",EMOTE_COMMAND);
+ }
+ else if (volume == WHISPER || volume == SEMOTE) {
+	sprintf(comm_pre,"%s %s",TELL_COMMAND,ustr[user].name);
+	sprintf(comm_pre_act,"%s %s",SEMOTE_COMMAND,ustr[user].name);
+ }
+ else if (volume == SHOUT || volume == SHEMOTE) {
+	sprintf(comm_pre,"%s",SHOUT_COMMAND);
+	sprintf(comm_pre_act,"%s",SHEMOTE_COMMAND);
+ }
 
   if (!strcasecmp(command, "help")) 
     give_help(user, story);

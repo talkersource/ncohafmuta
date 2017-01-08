@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------*/
-/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.4.x    */
+/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.5.x    */
 /*----------------------------------------------------------------------*/
 /*  This code is a collection of software that originally started       */
 /*  as a system called:                                                 */
@@ -41,7 +41,7 @@
 #ifndef _CONSTANTS_H
 #define _CONSTANTS_H
 
-#define VERSION  "Ncohafmuta 1.4.1 by Cygnus"
+#define VERSION  "Ncohafmuta 1.5.1 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 

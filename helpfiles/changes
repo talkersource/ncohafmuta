@@ -5,6 +5,10 @@ cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
+ 03/15/04 1.5.1
+* Version 1.4.1 changes
+* Some storybot action/command development
+
  03/15/04 1.4.1
 * Fixed glitch with resetting autoforward limits at midnight, where if 
   a user was online when the reset was done, their limit wouldn't get reset 
