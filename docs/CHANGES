@@ -1,11 +1,162 @@
-                      /*** Ncohafmuta 1.2.* changes ***/
+                      /*** Ncohafmuta 1.4.* changes ***/
 Quick need-to-do?:
 * if user .hilite==2 multi-tells with a lot of colored names in it might
 cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
- 03/11/2002 1.2.3 *
+ 11/05/03 1.4.0
+* Updated README.windows with info for getting a small, free mail server 
+  for sending/forwarding mail out from the talker.
+
+ 07/01/03 1.3.9
+* Fixed race doing queue_flush_www(), where free_sock() could be called 
+  twice on a socket, causing a segfault.
+* Added bad socket check in free_sock()
+* Updated some of the rwho listings to current IPs
+* Removed hard-coded system name from EXT_WHO3 in hdrfiles/constants.h
+* Added some comments in hdrfiles/constants.h
+
+ 06/08/03
+* Updated Cygwin documentation in docs/README.windows a bit
+* Fixed very strict 'may be undefined' warnings for comm_cmds.c, server.c, 
+  write_funcs.c, check_funcs.c (so far only seen under Cygwin)
+
+ 01/29/03 1.3.8
+* Added do_stafflist() call to startup/reboots.
+* Moved do_stafflist() for ROOT_ID creation out of init_user(), and to 
+  do_login(), as while in init_user(), the ROOT_ID's userfile is not 
+  written to disk yet, and do_stafflist() reads user levels from disk.
+* Added do_stafflist() call to .reinit
+* Removed prototype declaration for getdomainname/gethostname under 
+  Cygwin.
+
+ 12/26/02
+* Fixed bug in send_mail where sending to all users (-a) put the -a 
+  in the mailed message.
+
+ 11/22/02
+* Added WEB_FORBIDDEN and WEB_SERVER_ERROR variables to constants.h.
+  Added more file read/write failure checking in whowww_funcs.c. 
+  Added log entry for web_opt[]s when a .reinit is done.
+
+ 08/03/02 1.3.7
+* Added DO_TRACKING option to constants.h to easily set whether
+  the talker should do tracking or not.
+
+ 06/29/2002 1.3.6
+* Added login limiting. This is, ip x.x.x.x will be auto-restricted 
+  when connecting more than y tiems in 1 minute. Default is 10.
+  You can enable/disable this with LOGIN_LIMITING in constants.h
+* Moved ip address getting, to before motd. This is to facilitate ip
+  restriction and login limiting checking
+* Added additional hostname restriction checking after we get a 
+  reply from the resolver clipon, because in the login we might not
+  know the resolved hostname right away.
+* Modified check_restriction() to take an argument to check just IP 
+  or just hostname.
+* Changed resolver_clipon DNS resolution a bit. Message sent from 
+  talker to clipon now doesn't contain the SYS_LOOK_FAILED message, 
+  just a *, this is for easier parsing by the clipon and by the
+  talker on getting a reply from the clipon (since this field wont ever
+  contain spaces. The clipon now tacks a space onto the reply to the
+  talker. The talker's read_resolver_reply function now will read the 
+  reply buffer until it's empty. This is in case the clipon sends a 
+  reply with more than 1 ip/host in it, which is possible under a lot
+  of resolutions being done. Previously, more than one ip/host combo
+  in a reply would corrupt a user's host info.
+* Made configure say what files were created, and also had it create
+  a config.status file with the last successful configure command run.
+* Created new source file, set_funcs.c which contains the functions
+  from server.c dealing with the .set command
+* Began moving informational setting commands to .set. Moved .desc
+  to .set desc, .entermsg to .set entermsg, .exitmsg to .set exitmsg,
+  .succ to .set succ, .fail to .set fail, .entpro to .set profile
+  Created old_func() which will redirect the old syntaxes to the new
+  functions, while telling the user that said old syntax will be de-
+  precated soon and to use the new syntax.
+* Renamed succm() to set_succ(), failm() to set_fail(), exitm() to 
+  set_exitmsg(), enterm() to set_entermsg(), enter_pro() to 
+  set_profile().  Changed and copied helpfiles for said functions.
+
+ 06/02/2002 1.3.5
+* Fixed small glitch in send_mail where (on some systems) talker would 
+  segfault when you tried to email a non-existant user. Cause was a 
+  badly formatted log line. Only native to 1.3.4
+
+ 05/21/2002 1.3.4
+* Added multi-mails and friend mails to .smail (user,user,user and -f)
+* Updated smail helpfile.
+* Cleaned up send_mail() a little more.
+* Fixed typos and grammar errors in the tutorials.
+* Put prelim. probed terminal type under ".set show" for now.
+
+ 05/04/2002 1.3.3
+* Fixed glitch in exec_com where if users were online and the permission to 
+  write to the lastcommand file was denied when a user did a command, the 
+  talker segfaulted.
+* Added send_ext_mail() function to consolidate code and send external email
+  out. (to smtp_funcs.c). Modified auto_expire(), fmail(), send_mail(), and
+  mail_verify() to use this.
+  Added level-based/mass-mail ability to send_mail(). See .smail helpfile 
+  on use.
+  Multi-user mail to follow at some point. Cleaned up send_mail() a bit.
+* Stopped writing bad file I/O error to user if couldn't write to the last
+  logins file, when they logged in.
+* Took epass argument out of mail_verify() and write_verifile(). In my_login()
+  copied password to ustr[user].login_pass
+* Copied ustr[user].login_name to ustr[user].say_name in my_login() mail veri.
+
+ 04/16/2002 1.3.2
+* wrote helpfile for .set atmos (.h set_atmos) because there is no docs on how
+  the atmosphere cycles, countdowns, factors work.
+* put check in .set atmos for WIZ_LEVEL or above.
+* really fixed the signal warnings this time on Mac OS X, and possible other
+  OSes, by adding a check in the configure.
+* added preliminary telopt negotiation for terminal type. added user struct 
+  variables term_type and prev_term_type. Moved terms struct from main.c to
+  constants.h
+
+ 04/06/2002 1.3.1
+* wizlist is now created on-the-fly. It will get updated whenever a promote or
+  demote or .pcreate is done. added STAFF_FILE_HEADER to hdrfiles/constants.h
+  Added function do_stafflist()
+* fixed --disable-optims in configure. Now it really does turn optims off! :)
+* added --enable-gcc-debug in configure. Will use -g when gcc is present.
+* added check for Darwin (Mac OS X) systems in configure
+* added override for Mac OS X systems for NET_SIZE_T to int. configure returns
+  that it can use size_t, but cc complains about incompatible pointer type and
+  the manpages and includes say to use int. *shrug*
+* prefixed SIG_IGN and SIG_ERR with (handler_t) as Max OS X spewed warnings 
+  about them not being functions.
+* fixed misc Mac OS X compile warnings
+* changed login function to my_login and echo function to my_echo to eliminate
+  confusion with any internal C lib functions of the same name.
+* added "clipon" argument to ./shutdown script to kill the resolver clip-on
+
+ 03/26/2002 1.3.0 (new development version)
+* Added fopen check to get_length(). Changed file read method from !feof loop
+  to while fread.
+* Return bad request in parse_input() in whowww_funcs.c if get_length failed.
+* Return text/plain mimetype in get_mime_type() if filename doesn't contain 
+  a .
+* Moved check_var() function to check_funcs.c
+* Added %webport% substitution variable to hdrfiles/constants.h
+* Modified cat_to_www() to do variable substituion, and to only do it on html
+  and text files.
+* Modified default index.html to use substitution variables for the system's
+  name, host, webport.
+* Added code so that if you try to browse to a directory on the webport, it
+  will cat the index.html file from that directory (if there is one), instead
+  of show nothing
+* Replaced old javaclient with Dave Jarvis's java terminal emulator. Going to
+  the webport at http://yourhost.com:webport/connect will automatically bring
+  up a java window conencting to your talker. (it's actually the index.html
+  file from the webfiles/connect/ directory, with host and webport substi-
+  tution variables in it)
+* Updated COPYING, CREDITS, and README
+
+ 03/11/2002 1.2.3
 * Added fopen checks in some resolve_funcs.c functions that didn't have them.
 * Changed list_last to use file_count_lines() and file_skip_lines() instead of
   popen()ing to the tail program. I should be shot for waiting so long to
@@ -61,7 +212,7 @@ in the URL to get it to work??
   demote to. This is not true. Fixed wrapping lines on "help" helpfile
 * Wrote out messages to user doing grant/revoke notifying them of such.
   Thanx to Calysto for noticing this.
-* Put in main.c and resolver_clipon.c a default umask set of 066 for -rw------- 
+* Put in main.c and resolver_clipon.c a default umask set of 066 for -rw-------
   permissions.
 * Made smtp conversation lines send \r\n because some cygwin implementations
   don't like to flush lines to the remote host with just \n *boggle*

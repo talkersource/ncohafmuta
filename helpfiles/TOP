@@ -5,11 +5,9 @@
 # listed right here, so change the -c<number>-<number> down below for
 # your specific system
 #
-#  SunOS		is  -c33-79
-#  BSDi			is  -c35-79
-#  FreeBSD		is  -c36-79
-#  Digital Unix (OSF1)	is  -c42-79
-#  Linux		is  -c43-79
+#  Linux		is  -c44-79
+#  FreeBSD		is  -c32-79
+#  SunOS/Solaris	is  -c43-79
 #
 # -Cygnus
 
@@ -19,6 +17,6 @@ echo " " >> topics
 echo "------------ ---------- Type .help <topic> for more details!" >> topics 
 echo "Last Changed HELP Topic" >> topics
 echo "------------ ----------" >> topics
-ls -lt [a-z]* | cut -c43-79 | grep -v topics >> topics
+ls -ltn [a-z]* | cut -c44-79 | grep -v topics >> topics
 echo "------------ ----------" >> topics
 echo Done.

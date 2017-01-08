@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------*/
-/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.2.3    */
+/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.4.x    */
 /*----------------------------------------------------------------------*/
 /*  This code is a collection of software that originally started       */
 /*  as a system called:                                                 */
@@ -492,7 +492,8 @@ write_log(LOGINLOG,YESTIME,"%s:%s:%s:%s:sck#%d:slt#%d\n",onoff == 1 ? "IN " : "O
 
   sprintf(filename,"%s/%s",LOGDIR,LASTLOGS);
   if (!(fp=fopen(filename,"a"))) {
-       write_str(user,BAD_FILEIO);
+       /* write_str(user,BAD_FILEIO); */
+       /* writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, NONE, 0); */
        write_log(ERRLOG,YESTIME,"Couldn't open file(a) \"%s\" in syssign! %s\n",filename,get_error()); 
        return;
        }
@@ -1454,6 +1455,13 @@ for (u=0; u<MAX_USERS; ++u)
              }
 	  } /* end of else if */
   } /* end of for */
+/*
+for (u=0;u<MAX_CONNLIST_ENTRIES;++u) {
+	sprintf(mess,"%14s %2d %ld\n",connlist[u].site,connlist[u].connections,
+	connlist[u].starttime);
+	write_str(user,mess);
+}
+*/
 
 if (!found) {
 /* plug security hole */
@@ -1802,258 +1810,6 @@ sprintf(mess,"%s knocks on the %s door",ustr[user].say_name,astr[new_area].name)
 writeall_str(mess, 1, user, 0, user, NORM, KNOCK, 0);
 }
 
-
-/** Enter profile ***/
-void enter_pro(int user, char *inpstr)
-{
-char *c;
-int ret_val;
-int redo=0;
-int quickdone=0;
-int i=0; /*******/
-int op_mode=0; /******/
-char option[ARR_SIZE]; /******/
-char filename[FILE_NAME_LEN];
-char filename2[FILE_NAME_LEN];
-FILE *fp;
-
-/* get memory */
-STARTPRO:
-
-if (!ustr[user].pro_enter) {
-       option[0]=0;
-       sscanf(inpstr,"%s ",option);
-       if (!strcmp(option,"-c") || !strcmp(option,"clear")) {
-       sprintf(filename,"%s/%s",PRO_DIR,ustr[user].name);
-       remove(filename);
-       write_str(user,"Profile deleted."); redo=0;
-       return;
-       }
-        if (!(ustr[user].pro_start=(char *)malloc(82*PRO_LINES))) {
-        write_str(user,BAD_MALLOC);
-	write_log(ERRLOG,YESTIME,"MALLOC: Can't malloc memory in enter_pro! %s\n",get_error());
-        redo=0;
-        return;
-        }
-
-       if (strlen(inpstr) && (!redo)) {
-         if (!strncmp(option,"-i",2)) {
-          if (strlen(option)==2) op_mode=3;
-          else {
-           for (i=2;i<strlen(option);++i) {
-              if (!isdigit((int)option[i])) {
-                write_str(user,"Line number given was not a number!");
-                return;
-                }
-             } /* end of for */
-           i=0;
-           midcpy(option,option,2,7);
-           i=atoi(option);
-           if (i == 0) {
-             write_str(user,"Profile lines start at 1. Not 0. Try again.");
-             return;
-             }
-           op_mode=5;
-          } /* end of else */
-
-          remove_first(inpstr);
-          if (op_mode==3) {
-            if (!strlen(inpstr)) {
-              write_str(user,"You must have text or a -b after this option");
-              return;
-              }
-            if (!strcmp(inpstr,"-b")) op_mode=4;
-            inedit_file(user,inpstr,1,op_mode);
-            return;
-           }
-          else if (op_mode==5) {
-            if (!strlen(inpstr)) {
-              write_str(user,"You must have text or a -b after this option");
-              return;
-              }
-            if (!strcmp(inpstr,"-b")) op_mode=6;
-            inedit_file(user,inpstr,i,op_mode);
-            return;
-           }
-         } /* end of IF INSERT OPTION */
-
-       for (i=0;i<strlen(option);++i) {
-          if (!isdigit((int)option[i])) {
-            write_str(user,"Line number given was not a number!");
-            return;
-            }
-         }
-       i=0;
-       i=atoi(option);
-       if (i == 0) {
-         write_str(user,"Profile lines start at 1. Not 0. Try again.");
-         return;
-         }
-       if (i > PRO_LINES) {
-         sprintf(mess,"The line number can't be higher than the max profile lines allowed, which is currently %d",PRO_LINES);
-         write_str(user,mess);
-         return;
-         }
-       remove_first(inpstr);
-       if (!strcmp(inpstr,"-c")) op_mode=1;
-       else if (!strcmp(inpstr,"-b")) op_mode=2;
-       else op_mode=0;
-       inedit_file(user,inpstr,i,op_mode);
-       return;
-      } /* end of inedit */         
-    ustr[user].pro_enter=1;
-    ustr[user].pro_end=ustr[user].pro_start;
-    if (!redo) {
-    sprintf(mess,"%s is entering a profile..",ustr[user].say_name);
-    writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
-    }
-    if (!redo) {
-	/* save all user listen-ignore flags so we can give */
-	/* them back when we're done */
-     strcpy(ustr[user].mutter,ustr[user].flags);
-     user_ignore(user,"all");
-     }
-    write_str(user,"");
-    write_str(user,"** Entering a profile, finish with a '.' on a line by itself **");
-    sprintf(mess,"** Max lines you can write is %d",PRO_LINES);
-    write_str(user,mess);
-    write_str(user,"");
-    write_str_nr(user,"1: ");
-	telnet_write_eor(user);
-    noprompt=1;
-    return;
-    }
-inpstr[80]=0;  c=inpstr;
-
-/* check for dot terminator */
-ret_val=0;
-
-if (ustr[user].pro_enter > PRO_LINES) {
-QUICKDONE:
-   if (*c=='s' && *(c+1)==0) {
-     ret_val=write_pro(user);
-        if (ret_val) {
-	write_str(user,"");
-	write_str(user,"Profile stored");
-	}
-        else {
-	write_str(user,"");
-	write_str(user,"Profile not stored");
-	}
-        free(ustr[user].pro_start);  ustr[user].pro_enter=0;
-        ustr[user].pro_end='\0';
-        noprompt=0;
-        sprintf(mess,"%s finishes entering a profile",ustr[user].say_name);
-        writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
-	/* give them back their saved flags */
-        strcpy(ustr[user].flags,ustr[user].mutter);
-        ustr[user].mutter[0]=0;
-
-        if (autopromote == 1)
-         check_promote(user,9);
-
-        redo=0;
-        return;
-     }
-   else if (*c=='v' && *(c+1)==0) {
-write_str(user,"+-----------------------------------------------------------------------------+");
-c='\0';
-strcpy(filename2,get_temp_file());
-fp=fopen(filename2,"w");
-for (c=ustr[user].pro_start;c<ustr[user].pro_end;++c) {
-    putc(*c,fp);
-    }
-    fclose(fp);
-    cat(filename2,user,0);
-    remove(filename2);
-c='\0';
-write_str(user,"+-----------------------------------------------------------------------------+");
-	if (quickdone==1) {
-		quickdone=0;
-		write_str(user,"");
-		sprintf(mess,"%d: ",ustr[user].pro_enter);
-		write_str_nr(user,mess);
-		telnet_write_eor(user);
-	}
-	else {
-            write_str_nr(user,PROFILE_PROMPT);
-		 telnet_write_eor(user);
-	}
-            noprompt=1;  return;
-        }
-   else if (*c=='r' && *(c+1)==0) {
-        free(ustr[user].pro_start); ustr[user].pro_enter=0;
-        ustr[user].pro_end='\0';
-        redo=1;
-        goto STARTPRO;
-        }             
-   else if (*c=='a' && *(c+1)==0) {
-        free(ustr[user].pro_start); ustr[user].pro_enter=0;
-        ustr[user].pro_end='\0';
-	write_str(user,"");
-        write_str(user,"Profile not stored");
-        noprompt=0;
-        sprintf(mess,"%s finishes entering a profile",ustr[user].say_name);
-        writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
-	/* give them back their saved flags */
-        strcpy(ustr[user].flags,ustr[user].mutter);
-        ustr[user].mutter[0]=0;
-        redo=0;
-        return;
-        }             
-   else {
-    write_str_nr(user,PROFILE_PROMPT);
-	 telnet_write_eor(user);
-    return;
-   } 
-  }
-
-if (*c=='.' && *(c+1)==0) {
-        if (ustr[user].pro_enter!=1)   {
-            ustr[user].pro_enter= PRO_LINES + 1;
-            write_str_nr(user,PROFILE_PROMPT);
-		 telnet_write_eor(user);
-            noprompt=1;  return;
-            }
-        else {
-	write_str(user,"");
-	write_str(user,"Profile not stored");
-	}
-        free(ustr[user].pro_start);  ustr[user].pro_enter=0;
-        noprompt=0;
-        sprintf(mess,"%s finishes entering a profile",ustr[user].say_name);
-        writeall_str(mess, 1, user, 0, user, NORM, NONE, 0);
-	/* give them back their saved flags */
-        strcpy(ustr[user].flags,ustr[user].mutter);
-        ustr[user].mutter[0]=0;
-        redo=0;
-        return;
-        }
-else if (*c=='.') {
-if ( (*(c+1)=='s') || (*(c+1)=='r') || (*(c+1)=='a') ||
-     (*(c+1)=='v') ) {
-  *c=*(c+1);
-  *(c+1)=0;
-  quickdone=1;
-  goto QUICKDONE;
-  }
-} /* end of else if */
-
-/* write string to memory */
-while(*c) *ustr[user].pro_end++=*c++;
-*ustr[user].pro_end++='\n';
-
-/* end of lines */
-if (ustr[user].pro_enter==PRO_LINES) {
-            ustr[user].pro_enter= PRO_LINES + 1;
-            write_str_nr(user,PROFILE_PROMPT);
-		 telnet_write_eor(user);
-            noprompt=1;  return;
-        }
-sprintf(mess,"%d: ",++ustr[user].pro_enter);
-write_str_nr(user,mess);
-telnet_write_eor(user);
-}
 
 /* Edit a user profile from the command line */
 /* op_mode = 0       Straight editing of a line               */
@@ -3191,65 +2947,6 @@ sscanf(inpstr,"%s",newpass);
   newpass[0]=0; 
 } 
 
-/** entermessage so instead of "walks in" if one chooses **/
-void enterm(int user, char *inpstr)
-{
-
-if (!strlen(inpstr)) { 
-   sprintf(mess,"^HYYour entermessage is:^ %s",ustr[user].entermsg);
-   write_str(user,mess);
-   return; 
-   }
-if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
-    !strcmp(inpstr,"-c")) {
-    strcpy(ustr[user].entermsg,DEF_ENTER);
-    copy_from_user(user);
-    write_user(ustr[user].name);
-    write_str(user,"Entermsg set to default.");
-    return;
-    }
-if (strlen(inpstr) > MAX_ENTERM) {
-   write_str(user,"Message too long.");
-   return;
-   }
-
-strcpy(ustr[user].entermsg,inpstr);
-copy_from_user(user);
-write_user(ustr[user].name);
-sprintf(mess,"^HYNew entermsg:^ %s",ustr[user].entermsg);
-write_str(user,mess);
-
-}
-
-/** exitmessage so instead of "goes to the" if one chooses **/
-void exitm(int user, char *inpstr)
-{
-
-if (!strlen(inpstr)) { 
-   sprintf(mess,"^HYYour exitmessage is:^ %s",ustr[user].exitmsg);
-   write_str(user,mess);
-   return; 
-   }
-if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") ||
-    !strcmp(inpstr,"-c")) {
-    strcpy(ustr[user].exitmsg,DEF_EXIT);
-    copy_from_user(user);
-    write_user(ustr[user].name);
-    write_str(user,"Exitmsg set to default.");
-    return;
-    }
-if (strlen(inpstr) > MAX_EXITM) {
-   write_str(user,"Message too long.");
-   return;
-   }
-
-strcpy(ustr[user].exitmsg,inpstr);
-copy_from_user(user);
-write_user(ustr[user].name);
-sprintf(mess,"^HYNew exitmsg:^ %s",ustr[user].exitmsg);
-write_str(user,mess);
-
-}
 
 /** list abbreviations **/
 void abbrev(int user, char *inpstr)
@@ -3955,142 +3652,12 @@ if (!check_for_user(other_user))
 }
 
 
-/** set your fail message for when you are not online **/
-void failm(int user, char *inpstr)
-{
-
-if (!strlen(inpstr)) { 
-   sprintf(mess,"^HYYour fail is:^ %s",ustr[user].fail);
-   write_str(user,mess);
-   return; 
-   }
-if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") || 
-    !strcmp(inpstr,"-c")) {
-    ustr[user].fail[0]=0;
-    copy_from_user(user);
-    write_user(ustr[user].name);
-    write_str(user,"Fail message cleared.");
-    return; 
-    } 
-
-if (strlen(inpstr) > MAX_ENTERM) {
-   write_str(user,"Message too long.");
-   return;
-   }
-
-if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
-
-strcpy(ustr[user].fail,inpstr);
-copy_from_user(user);
-write_user(ustr[user].name);
-sprintf(mess,"^HYNew fail:^ %s",ustr[user].fail);
-write_str(user,mess);
-
-}
-
-/** set succ message for tells, remotes, beeps **/
-void succm(int user, char *inpstr)
-{
-
-if (!strlen(inpstr)) { 
-   sprintf(mess,"^HYYour success is:^ %s",ustr[user].succ);
-   write_str(user,mess);
-   return; 
-   }
-if (!strcmp(inpstr,"clear") || !strcmp(inpstr,"none") || 
-    !strcmp(inpstr,"-c")) {
-    ustr[user].succ[0]=0;
-    copy_from_user(user);
-    write_user(ustr[user].name);
-    write_str(user,"Success message cleared.");
-    return; 
-    } 
-if (strlen(inpstr) > MAX_ENTERM) {
-   write_str(user,"Message too long.");
-   return;
-   }
-
-if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
-
-strcpy(ustr[user].succ,inpstr);
-copy_from_user(user);
-write_user(ustr[user].name);
-sprintf(mess,"^HYNew success:^ %s",ustr[user].succ);
-write_str(user,mess);
-
-}
-
-
-/*------------------------------------------------*/
-/* set autoread                                   */
-/*------------------------------------------------*/
-void set_autoread(int user)
-{
-
-  if (ustr[user].autor==3)
-    {
-      write_str(user, "Autoread now ^HYoff^.");
-      ustr[user].autor = 0;
-    }
-   else if (ustr[user].autor==2)
-    {
-      write_str(user, "Autoread now on ^HYfor logins and online^.");
-      ustr[user].autor = 3;
-    }
-   else if (ustr[user].autor==1)
-    {
-      write_str(user, "Autoread now on ^HYfor online only^.");
-      ustr[user].autor = 2;
-    }
-   else if (ustr[user].autor==0)
-    {
-      write_str(user, "Autoread now on ^HYfor logins only^.");
-      ustr[user].autor = 1;
-    }
-  write_str(user,"* .set autoread again for more options *");  
-
-  copy_from_user(user);
-  write_user(ustr[user].name);
-}
-
-/** auto forward mail to email_addr **/
-void set_autofwd(int user)
-{
-
-  if (ustr[user].autof==2)
-    {
-      write_str(user, "Autofwd now ^HYoff^.");
-      ustr[user].autof = 0;
-    }
-   else if (ustr[user].autof==0)
-    {
-      write_str(user, "Autofwd now on ^HYall the time^.");
-      ustr[user].autof = 1;
-    }
-   else if (ustr[user].autof==1)
-    {
-      write_str(user, "Autofwd now on ^HYonly when you're not online^.");
-      ustr[user].autof = 2;
-    }
-  write_str(user,"* .set autofwd again for more options *");  
-
-  copy_from_user(user);
-  write_user(ustr[user].name);
-}
-
-
 /** forward mail to an email address **/
 void fmail(int user, char *inpstr)
 {
-int u=0;
-int sendmail=0;
-char line[301];
 char mail_addr[ARR_SIZE];
 char temp[EMAIL_LENGTH+1];
-char filename[FILE_NAME_LEN];
 char filename2[FILE_NAME_LEN];
-FILE *fp;
-FILE *wfp=NULL;
 
 if (!strlen(inpstr)) {
     write_str(user,"Where do you want to forward your mail?");
@@ -4126,6 +3693,7 @@ if (!check_for_file(filename2)) {
     return;
     }
 
+/* set recipient */
 if (!strcmp(inpstr,"mine") || !strcmp(inpstr,"Mine")) {
     if (!strcmp(ustr[user].email_addr,DEF_EMAIL)) {
        write_str(user,"Email address not valid.");
@@ -4140,78 +3708,17 @@ else if (!strstr(inpstr,".") || !strstr(inpstr,"@")) {
       }
 else strcpy(mail_addr,inpstr);
 
- if (!(fp=fopen(filename2,"r"))) {
-  write_log(ERRLOG,YESTIME,"Couldn't open mailfile(r) \"%s\" in fmail! %s\n",filename2,get_error());
-  return;
- }
-
-/*---------------------------------------------------*/
-/* write email message                               */
-/*---------------------------------------------------*/
-
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-	   sprintf(mess,"%s : fmail message cannot be written\n", syserror);
-	   fclose(fp);
-	   write_str(user,mess);
-	   write_log(ERRLOG,YESTIME,"Couldn't open new queue file in fmail! %s\n",get_error());
-	   return;
-        }
-        fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-        fprintf(wfp,"%s\n",mail_addr);
+/* send external email */
+if (send_ext_mail(-2, -2, 2, NULL, filename2, DATA_IS_FILE, mail_addr)==-1) {
+	write_log(ERRLOG,YESTIME,"FMAIL: Couldn't send external email in fmail()\n");
+	return;
 }
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s %s",MAILPROG,mail_addr);
-  if (strstr(MAILPROG,"-s"))
-	u=0;
-  else
-	u=1;
-  }  
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-if (!mailgateway_port) {
- if (!(wfp=popen(filename,"w"))) 
-  {
-   sprintf(mess,"%s : fmail message cannot be written\n", syserror);
-   fclose(fp);
-   write_str(user,mess);
-   write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in fmail! %s\n",filename,get_error());
-   return;
-  }
-}
-
-if (sendmail || mailgateway_port) {
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-fprintf(wfp,"To: %s <%s>\n",strip_color(ustr[user].say_name),mail_addr);
-fprintf(wfp,"Subject: Your mailfile from %s\n\n",SYSTEM_NAME);
-}
-else if (u) {
-fprintf(wfp,"Your mailfile from %s\n",SYSTEM_NAME);
-}
-
-fgets(line,300,fp);
-
-while (!feof(fp)) {
-   fputs(strip_color(line),wfp);
-   fgets(line,300,fp);
-  } /* end of while */
-fclose(fp);
-
-fputs("\n",wfp);
-fputs(EXT_MAIL1,wfp);
-fputs(".\n",wfp);
-
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
 
 write_str(user,"Mail forwarded.");
 write_str(user,"**Note: If email address is not valid, mail will bounce.");
 
 }
+
 
 /*** wipe suggestionboard (erase file) ***/
 void swipe(int user, char *inpstr)
@@ -4683,7 +4190,7 @@ void regnif(int user, char *inpstr)
         write_str(user,"Illegal character in address");
         return;
         }
-   if ((!strlen(inpstr)) || (strlen(inpstr) < 8)) {
+   if ((!strlen(inpstr)) || (strlen(inpstr) < 8) || (!strstr(inpstr,"@"))) {
        write_str(user,"You need to specify address in form: user@host");
        return;
        }
@@ -5592,7 +5099,7 @@ else if (!strcmp(n_option,"-n")) {
 /* Auto expire users at midnight */
 void auto_expire(void)
 {
-int i=0,num=0,warns=0,sendmail=0,nosubject=0;
+int i=0,num=0,warns=0;
 int found=0;
 int add=0;
 unsigned long diff=0;
@@ -5601,13 +5108,9 @@ unsigned long to_go=0;
 char small_buff[64];
 char tempname[NAME_LEN+1];
 char filerid[FILE_NAME_LEN];
-char filename[FILE_NAME_LEN];
-char line[513];
 time_t tm;
 struct dirent *dp;
 DIR  *dirp;
-FILE *fp;
-FILE *wfp=NULL;
 
 /* check to see if we need to do anything */
 if (autoexpire==0) return;
@@ -5677,76 +5180,13 @@ if ((to_go <= (TIME_TO_GO*86400)) && (to_go >= ((TIME_TO_GO-1)*86400))) {
 		  continue;
 	    } /* email not set correctly or at all */
 	    else {
-		if (!(fp=fopen(NUKEWARN,"r"))) {
-		  write_log(ERRLOG,YESTIME,"EXPIRE: Couldn't open file(r) \"%s\" in auto_expire! %s\n",NUKEWARN,get_error());
+		/* send external email */
+		if (send_ext_mail(-2, -1, 3, NULL, NUKEWARN, DATA_IS_FILE, NULL)==-1) {
+		  write_log(ERRLOG,YESTIME,"EXPIRE: Couldn't send external email in auto_expire!\n");
 		  t_ustr.last_site[0]=0;
 		  t_ustr.rawtime=0;
 		  continue;
-		  }
-
-		if (mailgateway_port) {
-		        if (!(wfp=get_mailqueue_file())) {
-		           fclose(fp);
-		           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in auto_expire! %s\n",get_error());
-		           return;
-		        }
-		        fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-		        fprintf(wfp,"%s\n",t_ustr.email_addr);
 		}
-		else if (strstr(MAILPROG,"sendmail")) {
-		  sprintf(t_mess,"%s",MAILPROG);
-		  sendmail=1;
-		  }
-		else {
-  		  sprintf(t_mess,"%s %s",MAILPROG,t_ustr.email_addr);
-		  if (strstr(MAILPROG,"-s"))
-			nosubject=0;
-		  else
-			nosubject=1;
-		  }
-		strncpy(filename,t_mess,FILE_NAME_LEN);
-
-		if (!mailgateway_port) {
-		if (!(wfp=popen(filename,"w")))
-		  {
-		   write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in auto_expire! %s\n",filename,get_error());
-		   fclose(fp);
-		   continue;
-		  }    
-  		}
-
-		if (sendmail || mailgateway_port) {
-		fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-		fprintf(wfp,"To: %s <%s>\n",strip_color(t_ustr.say_name),t_ustr.email_addr);
-		fprintf(wfp,"Subject: Your account on %s\n\n",SYSTEM_NAME);
-		}  
-		else if (nosubject) {
-		fprintf(wfp,"Your account on %s\n",SYSTEM_NAME);
-		}
-   
-		fgets(line,512,fp);
-		strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
-		strcpy(line,check_var(line,USER_VAR,t_ustr.say_name));
-		strcpy(line,check_var(line,HOST_VAR,thishost));
-		strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
-		strcpy(line,check_var(line,"%var1%",itoa(TIME_TO_GO)));
-
-		while (!feof(fp)) {
-		   fputs(line,wfp);
-		   fgets(line,512,fp);
-		   strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
-		   strcpy(line,check_var(line,USER_VAR,t_ustr.say_name));
-		   strcpy(line,check_var(line,HOST_VAR,thishost));
-		   strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
-		   strcpy(line,check_var(line,"%var1%",itoa(TIME_TO_GO)));
-		  } /* end of while */
-		fclose(fp);
-
-		fputs("\n",wfp);
-		fputs(EXT_MAIL1,wfp);
-		fputs(".\n",wfp);
-		if (mailgateway_port) fclose(wfp);
-		else pclose(wfp);
 
 		write_log(SYSTEMLOG,YESTIME,"EXPIRE: Sent out nukewarn to %s at %s\n",t_ustr.say_name,t_ustr.email_addr);
 		warns++;
@@ -6023,6 +5463,9 @@ copy_from_user(new_user);
 write_user(lowername);
 
 write_str(user,"User created.");
+
+/* update staff list file */
+if (ustr[new_user].super >= WIZ_LEVEL) do_stafflist();
 
 /* Reset user structure */
 reset_user_struct(new_user,1);
@@ -9577,6 +9020,8 @@ tot_mem=
 	+2 /* miscnum4 */
 	+2 /* miscnum5 */
 	+2 /* tempnum1 */
+	+2 /* term_type */
+	+strlen(t_ustr.prev_term_type)
 	+2 /* hang_wins */
 	+2 /* hang_losses */
 	+2 /* hang_stage */
@@ -9796,7 +9241,9 @@ if (tmpConv != NULL) {
 	+ustr[u].alloced_size
 	+2 /* log_stage */
 	+MY_SIZE(ustr[u].temp_buffer,mode)
-	+2; /* tempnum1 */
+	+2 /* tempnum1 */
+	+2 /* term_type */
+	+MY_SIZE(ustr[u].prev_term_type,mode);
 
        if (ustr[u].pro_enter)
          userm += (82*PRO_LINES);
@@ -10240,6 +9687,7 @@ fclose(fp);
 void suicide_user(int user, char *inpstr)
 {
 char nuke_name[NAME_LEN+1];
+int new_pos = 0;
 
 /* Demotion check. If user was demoted to a 0 and they were */
 /* promoted at the beginning, dont let them suicide         */
@@ -10274,7 +9722,8 @@ sprintf(mess,"%s SUICIDE: By user %s",STAFF_PREFIX,strip_color(ustr[user].say_na
 writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
 
 strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-bt_count = ( ++bt_count ) % NUM_LINES;
+new_pos = ( ++bt_count ) % NUM_LINES;
+bt_count = new_pos;
 
 write_log(SYSTEMLOG,YESTIME,"SUICIDE: By user %s\n",ustr[user].say_name);
 
@@ -11488,30 +10937,30 @@ telnet_write_eor(user);
    return;
 
 START_DOWN:
-if (treboot==1) (void)setsignal(SIGALRM,SIG_IGN);
-(void)setsignal(SIGILL,SIG_IGN);
-(void)setsignal(SIGINT,SIG_IGN);
-(void)setsignal(SIGABRT,SIG_IGN);
-(void)setsignal(SIGFPE,SIG_IGN);
-(void)setsignal(SIGSEGV,SIG_IGN);
-(void)setsignal(SIGTERM,SIG_IGN);
+if (treboot==1) (void)setsignal(SIGALRM,(handler_t)SIG_IGN);
+(void)setsignal(SIGILL,(handler_t)SIG_IGN);
+(void)setsignal(SIGINT,(handler_t)SIG_IGN);
+(void)setsignal(SIGABRT,(handler_t)SIG_IGN);
+(void)setsignal(SIGFPE,(handler_t)SIG_IGN);
+(void)setsignal(SIGSEGV,(handler_t)SIG_IGN);
+(void)setsignal(SIGTERM,(handler_t)SIG_IGN);
 
 #if !defined(WINDOWS)
-(void)setsignal(SIGTRAP,SIG_IGN);
+(void)setsignal(SIGTRAP,(handler_t)SIG_IGN);
 #if !defined(__CYGWIN32__)
-(void)setsignal(SIGIOT,SIG_IGN);
+(void)setsignal(SIGIOT,(handler_t)SIG_IGN);
 #endif
-(void)setsignal(SIGBUS,SIG_IGN);
-(void)setsignal(SIGTSTP,SIG_IGN);
-(void)setsignal(SIGCONT,SIG_IGN);
-(void)setsignal(SIGHUP,SIG_IGN);
-(void)setsignal(SIGQUIT,SIG_IGN);
+(void)setsignal(SIGBUS,(handler_t)SIG_IGN);
+(void)setsignal(SIGTSTP,(handler_t)SIG_IGN);
+(void)setsignal(SIGCONT,(handler_t)SIG_IGN);
+(void)setsignal(SIGHUP,(handler_t)SIG_IGN);
+(void)setsignal(SIGQUIT,(handler_t)SIG_IGN);
 #if !defined(__CYGWIN32__)
-(void)setsignal(SIGURG,SIG_IGN);
+(void)setsignal(SIGURG,(handler_t)SIG_IGN);
 #endif
-(void)setsignal(SIGPIPE,SIG_IGN);
-(void)setsignal(SIGTTIN,SIG_IGN);
-(void)setsignal(SIGTTOU,SIG_IGN);
+(void)setsignal(SIGPIPE,(handler_t)SIG_IGN);
+(void)setsignal(SIGTTIN,(handler_t)SIG_IGN);
+(void)setsignal(SIGTTOU,(handler_t)SIG_IGN);
 #endif
 
 if (!treboot) do_tracking(0, NULL);
@@ -11647,30 +11096,30 @@ char *args=strdup(thisprog); strcat(args," "); strcat(args,datadir);
 char *args[]={ PROGNAME,datadir,NULL };
 #endif
 
-if (treboot==1) (void)setsignal(SIGALRM,SIG_IGN);
-(void)setsignal(SIGILL,SIG_IGN);
-(void)setsignal(SIGINT,SIG_IGN);
-(void)setsignal(SIGABRT,SIG_IGN);
-(void)setsignal(SIGFPE,SIG_IGN);
-(void)setsignal(SIGSEGV,SIG_IGN);
-(void)setsignal(SIGTERM,SIG_IGN);
+if (treboot==1) (void)setsignal(SIGALRM,(handler_t)SIG_IGN);
+(void)setsignal(SIGILL,(handler_t)SIG_IGN);
+(void)setsignal(SIGINT,(handler_t)SIG_IGN);
+(void)setsignal(SIGABRT,(handler_t)SIG_IGN);
+(void)setsignal(SIGFPE,(handler_t)SIG_IGN);
+(void)setsignal(SIGSEGV,(handler_t)SIG_IGN);
+(void)setsignal(SIGTERM,(handler_t)SIG_IGN);
 
 #if !defined(WINDOWS)
-(void)setsignal(SIGTRAP,SIG_IGN);
+(void)setsignal(SIGTRAP,(handler_t)SIG_IGN);
 #if !defined(__CYGWIN32__)
-(void)setsignal(SIGIOT,SIG_IGN);
+(void)setsignal(SIGIOT,(handler_t)SIG_IGN);
 #endif
-(void)setsignal(SIGBUS,SIG_IGN);
-(void)setsignal(SIGTSTP,SIG_IGN);
-(void)setsignal(SIGCONT,SIG_IGN);
-(void)setsignal(SIGHUP,SIG_IGN);
-(void)setsignal(SIGQUIT,SIG_IGN);
+(void)setsignal(SIGBUS,(handler_t)SIG_IGN);
+(void)setsignal(SIGTSTP,(handler_t)SIG_IGN);
+(void)setsignal(SIGCONT,(handler_t)SIG_IGN);
+(void)setsignal(SIGHUP,(handler_t)SIG_IGN);
+(void)setsignal(SIGQUIT,(handler_t)SIG_IGN);
 #if !defined(__CYGWIN32__)
-(void)setsignal(SIGURG,SIG_IGN);
+(void)setsignal(SIGURG,(handler_t)SIG_IGN);
 #endif
-(void)setsignal(SIGPIPE,SIG_IGN);
-(void)setsignal(SIGTTIN,SIG_IGN);
-(void)setsignal(SIGTTOU,SIG_IGN);
+(void)setsignal(SIGPIPE,(handler_t)SIG_IGN);
+(void)setsignal(SIGTTIN,(handler_t)SIG_IGN);
+(void)setsignal(SIGTTOU,(handler_t)SIG_IGN);
 #endif
 
 if (!treboot) do_tracking(0, NULL);
@@ -11850,30 +11299,30 @@ char *args=strdup(thisprog); strcat(args," "); strcat(args,datadir);
 char *args[]={ PROGNAME,datadir,NULL };
 #endif
 
-if (treboot==1) (void)setsignal(SIGALRM,SIG_IGN);
-(void)setsignal(SIGILL,SIG_IGN);
-(void)setsignal(SIGINT,SIG_IGN);
-(void)setsignal(SIGABRT,SIG_IGN);
-(void)setsignal(SIGFPE,SIG_IGN);
-(void)setsignal(SIGSEGV,SIG_IGN);
-(void)setsignal(SIGTERM,SIG_IGN);
+if (treboot==1) (void)setsignal(SIGALRM,(handler_t)SIG_IGN);
+(void)setsignal(SIGILL,(handler_t)SIG_IGN);
+(void)setsignal(SIGINT,(handler_t)SIG_IGN);
+(void)setsignal(SIGABRT,(handler_t)SIG_IGN);
+(void)setsignal(SIGFPE,(handler_t)SIG_IGN);
+(void)setsignal(SIGSEGV,(handler_t)SIG_IGN);
+(void)setsignal(SIGTERM,(handler_t)SIG_IGN);
 
 #if !defined(WINDOWS)
-(void)setsignal(SIGTRAP,SIG_IGN);
+(void)setsignal(SIGTRAP,(handler_t)SIG_IGN);
 #if !defined(__CYGWIN32__)
-(void)setsignal(SIGIOT,SIG_IGN);
+(void)setsignal(SIGIOT,(handler_t)SIG_IGN);
 #endif
-(void)setsignal(SIGBUS,SIG_IGN);
-(void)setsignal(SIGTSTP,SIG_IGN);
-(void)setsignal(SIGCONT,SIG_IGN);
-(void)setsignal(SIGHUP,SIG_IGN);
-(void)setsignal(SIGQUIT,SIG_IGN);
+(void)setsignal(SIGBUS,(handler_t)SIG_IGN);
+(void)setsignal(SIGTSTP,(handler_t)SIG_IGN);
+(void)setsignal(SIGCONT,(handler_t)SIG_IGN);
+(void)setsignal(SIGHUP,(handler_t)SIG_IGN);
+(void)setsignal(SIGQUIT,(handler_t)SIG_IGN);
 #if !defined(__CYGWIN32__)
-(void)setsignal(SIGURG,SIG_IGN);
+(void)setsignal(SIGURG,(handler_t)SIG_IGN);
 #endif
-(void)setsignal(SIGPIPE,SIG_IGN);
-(void)setsignal(SIGTTIN,SIG_IGN);
-(void)setsignal(SIGTTOU,SIG_IGN);
+(void)setsignal(SIGPIPE,(handler_t)SIG_IGN);
+(void)setsignal(SIGTTIN,(handler_t)SIG_IGN);
+(void)setsignal(SIGTTOU,(handler_t)SIG_IGN);
 #endif
 
 /* If we're going down, move the lastcommand to lastcommand.CRASH so we dont lose it */
@@ -13055,54 +12504,6 @@ else {
 }
 
 
-/*** set user description ***/
-void set_desc(int user, char *inpstr)
-{
-int i=0,number_of_carets=0;
-
-if (!strlen(inpstr)) 
-  {
-   sprintf(mess,"Your description is : %s",ustr[user].desc);
-   write_str(user,mess);  
-   return;
-  }
-
-if (!strcmp(inpstr,DEF_DESC) && !strcmp(ustr[user].desc,DEF_DESC)) {
-   write_str(user,"No, you need to set a different one.");
-   return;
-   }
-
-/* count the carets */
-for(i=0;i<strlen(inpstr);i++)
-{
-  if (inpstr[i]=='^') number_of_carets++;
-}
-
-if (number_of_carets%2)
-	strcat(inpstr,"^");
-  
-if (strlen(inpstr) > DESC_LEN-1) 
-  {
-    write_str(user,"Description too long");  
-    return;
-  }
-
-strcpy(ustr[user].desc,inpstr);
-
-if (autopromote == 1)
- check_promote(user,6);
-
-if ((ustr[user].tempsuper==0) && (ustr[user].area==new_room))
- strcpy(ustr[user].home_room,astr[INIT_ROOM].name);
-
-copy_from_user(user);
-write_user(ustr[user].name);
-sprintf(mess,"New desc: %s",ustr[user].desc);
-write_str(user,mess);
-
-}
-
-
 /*** print out greeting in large letters ***/
 void greet(int user, char *inpstr)
 {
@@ -13667,25 +13068,30 @@ write_user(ustr[user].name);
  
 /*-----------------------------------------------------------*/
 /* Send mail routing                                         */
+/* mode == 0 is a non-interactive mail                       */
 /*-----------------------------------------------------------*/
 void send_mail(int user, char *inpstr, int mode)
 {
-int u=-1,ret=0;
-int newread=0,sendmail=0,nosubject=0;
+int u=-1,ret=0,done=0,bad=0,i=0;
+int multi=0,level=0,count=0,current=0;
+int point=0,point2=0,lastspace=0,lastcomma=0,gotchar=0;
+int newread=0;
 long filesize=0;
 char stm[20],mess2[ARR_SIZE+25],filename[FILE_NAME_LEN],name[SAYNAME_LEN+1];
 char other_user[ARR_SIZE];
 char message[ARR_SIZE];
+char filerid[FILE_NAME_LEN];
+char multilist[MAX_MULTIS][ARR_SIZE];
+char multiliststr[ARR_SIZE];
 struct stat fileinfo;
 time_t tm;
 FILE *fp;
-FILE *wfp=NULL;
+DIR  *dirp=NULL;
+struct dirent *dp;
 
-/* Check if user is gagcommed */
-if (ustr[user].gagcomm) {
-   write_str(user,NO_COMM);
-   return;
-   }
+
+for (i=0;i<MAX_MULTIS;++i) multilist[i][0]=0;
+multiliststr[0]=0;
 
 /*-------------------------------------------------------*/
 /* check for any input                                   */
@@ -13693,56 +13099,344 @@ if (ustr[user].gagcomm) {
 
 if (!strlen(inpstr)) 
   {
-   write_str(user,"Who do you want to mail?"); 
+   if (!mode) write_str(user,"Who do you want to mail?"); 
    return;
   }
+
+/* Check if user is gagcommed */
+if (ustr[user].gagcomm) {
+   if (!mode) write_str(user,NO_COMM);
+   return;
+   }
+
+if (ustr[user].frog) {
+   if (!mode) write_str(user,"Frogs cant write, silly.");
+   return;
+}
 
 /*-------------------------------------------------------*/
 /* get the other user name                               */
 /*-------------------------------------------------------*/
 
 sscanf(inpstr,"%s ",other_user);
+/*
 other_user[NAME_LEN+1]=0;
 CHECK_NAME(other_user);
 strtolower(other_user);
 remove_first(inpstr);
+*/
 
-/*-------------------------------------------------------*/
-/* check to see if a message was supplied                */
-/*-------------------------------------------------------*/
+if (!strcmp(other_user,"-f")) {
+        other_user[0]=0;
+        for (i=0;i<MAX_ALERT;++i) {
+         if (strlen(ustr[user].friends[i])) {
+          strcpy(multilist[count],ustr[user].friends[i]);
+          count++;
+          if (count==MAX_MULTIS) break;
+          }
+        }
+        if (!count) {
+                write_str(user,"You dont have any friends!");
+                return;
+        }
+        i=0;
+	multi=5;
+        remove_first(inpstr);
+} /* -f */
+else if (!strcmp(other_user,"-a")) {
+ multi=2;
+ level=MAX_LEVEL;
+ remove_first(inpstr);
 
-if (!strlen(inpstr)) 
-  {
-   write_str(user,"You have not specified a message"); 
+/* write_it(ustr[user].sock,"in -a all\n"); */
+
+ sprintf(t_mess,"%s",USERDIR);
+ strncpy(filerid,t_mess,FILE_NAME_LEN);
+
+ dirp=opendir((char *)filerid);
+
+ if (dirp == NULL) {
+        sprintf(t_mess,"SEND_EMAIL: Can't open users directory \"%s\" in send_email! %s\n",filerid,get_error());
+        write_log(ERRLOG,YESTIME,t_mess);
+        write_str(user,t_mess);
+        return;
+ }
+/* write_it(ustr[user].sock,"opened user dir\n"); */
+} /* -a */
+else if (!strcmp(other_user,"from") || !strcmp(other_user,"to")) {
+	remove_first(inpstr);
+        sscanf(inpstr,"%s",message);
+        remove_first(inpstr);
+        for (i=0;i<strlen(message);++i) {
+                if (!isdigit((int)message[i])) {
+			write_str(user,"Invalid level passed to from/to");
+			return;
+		}
+        }
+        if (!strcmp(other_user,"from")) multi=1;
+        else if (!strcmp(other_user,"to")) multi=2;
+        level=atoi(message);
+        if (level > MAX_LEVEL) level=MAX_LEVEL;
+        message[0]=0;
+
+ sprintf(t_mess,"%s",USERDIR);
+ strncpy(filerid,t_mess,FILE_NAME_LEN);
+
+ dirp=opendir((char *)filerid);
+
+ if (dirp == NULL) {
+        sprintf(t_mess,"SEND_EMAIL: Can't open users directory \"%s\" in send_email! %s\n",filerid,get_error());
+        write_log(ERRLOG,YESTIME,t_mess);
+        write_str(user,t_mess);
+        return;
+ }
+} /* from <level>, to <level> */
+else {
+        for (i=0;i<strlen(other_user);++i) {
+                if (!isdigit((int)other_user[i])) {
+                /* probably a user that doesn't exist */
+		goto NORMTELL;
+                }
+        }
+
+ multi=3;
+ level=atoi(other_user);
+ remove_first(inpstr);
+ if (level > MAX_LEVEL) level=MAX_LEVEL;
+
+ sprintf(t_mess,"%s",USERDIR);
+ strncpy(filerid,t_mess,FILE_NAME_LEN);
+
+ dirp=opendir((char *)filerid);
+
+ if (dirp == NULL) {
+        sprintf(t_mess,"SEND_EMAIL: Can't open users directory \"%s\" in send_email! %s\n",filerid,get_error());
+        write_log(ERRLOG,YESTIME,t_mess);
+        write_str(user,t_mess);
+        return;
+ }
+
+NORMTELL:
+ if (!multi) {
+ /* check for multi-mail, specific users  */
+  other_user[0]=0;
+  for (i=0;i<strlen(inpstr);++i) {
+        if (inpstr[i]==' ') {
+                if (lastspace && !gotchar) { point++; point2++; continue; }
+                if (!gotchar) { point++; point2++; }
+                lastspace=1;
+                continue;
+          } /* end of if space */
+        else if (inpstr[i]==',') {
+                if (!gotchar) {
+                        lastcomma=1;
+                        point++;
+                        point2++;
+                        continue;
+                }
+                else {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+/*
+sprintf(mess,"multia %d is: \"%s\"\n",count,multilist[count]);
+write_it(ustr[user].sock,mess);
+*/
+                count++;
+                }
+                point=i+1;
+                point2=point;
+                gotchar=0;
+                lastcomma=1;
+                continue;
+                }
+
+        } /* end of if comma */
+        if ((inpstr[i-1]==' ') && (gotchar)) {
+                if (count <= MAX_MULTIS-1) {
+                midcpy(inpstr,multilist[count],point,point2-1);
+/*
+sprintf(mess,"multib %d is: \"%s\"\n",count,multilist[count]);
+write_it(ustr[user].sock,mess);
+*/
+                count++;
+                }
+                break;
+        }
+        gotchar=1;
+        lastcomma=0;
+        lastspace=0;
+        point2++;
+  } /* end of for */
+  midcpy(inpstr,multiliststr,i,ARR_SIZE);
+
+/*
+sprintf(mess,"multiliststr1 is: \"%s\"\n",multiliststr);
+write_it(ustr[user].sock,mess);
+sprintf(mess,"inpstr1 is: \"%s\"\n",inpstr);
+write_it(ustr[user].sock,mess);
+*/
+
+  if (!strlen(multiliststr)) {
+        /* no message string, copy last user */
+        midcpy(inpstr,multilist[count],point,point2);
+/*
+sprintf(mess,"multiliststr2 is: \"%s\"\n",multilist[count]);
+write_it(ustr[user].sock,mess);
+*/
+        count++;
+        strcpy(inpstr,"");
+        }
+  else {
+        strcpy(inpstr,multiliststr);
+/*
+sprintf(mess,"inpstr2 is: \"%s\"\n",inpstr);
+write_it(ustr[user].sock,mess);
+*/
+        multiliststr[0]=0;
+     }
+  if (count > 1) multi=4;
+  multiliststr[0]=0;
+ } /* !multi */
+} /* else just one level, single, or multi user */
+
+i=0;
+point=0;
+point2=0;
+gotchar=0;
+
+if (!strlen(inpstr)) {
+   if (!mode) write_str(user,"You have not specified a message");
    return;
+}
+
+if (multi && multi<4) {
+ if ((ustr[user].tempsuper < MMAIL_LEVEL) || (ustr[user].tempsuper < level)) {
+  /* only staff members can mass-mail */
+  /* and staff members can only mass-mail up to their level */
+  write_str(user,"You don't have that much power!");
+  (void) closedir(dirp);
+  return;
+ }
+}
+
+/* write_it(ustr[user].sock,"after users check\n"); */
+
+/* Create prefix to describe multiple recipients */
+if (multi) {
+ if (multi==1) sprintf(message,"To ALL USERS LEVEL %d AND UP: ",level);
+ else if (multi==2) {
+  if (level==MAX_LEVEL)
+   strcpy(message,"To ALL USERS: ");
+  else
+   sprintf(message,"To ALL USERS UP TO LEVEL %d: ",level);
+ }
+ else if (multi==3) sprintf(message,"To ALL USERS OF LEVEL %d: ",level);
+ else if (multi==4) {
+  for (i=0;i<count;++i) {
+   if (i) strcat(multiliststr,",");
+   strcat(multiliststr,multilist[i]);
+  }
+  sprintf(message,"To %s: ",multiliststr);
+ }
+ else if (multi==5) strcpy(message,"To ALL FRIENDS: ");
+}
+else message[0]=0;
+
+/* cat on actual message */
+strcat(message,inpstr);
+
+/* multi:
+   0: single user
+   1: from <level> to MAX_LEVEL
+   2: from lowest level to <level>
+   3: just <level>
+   4: specific multiple users
+   5: friends
+   all is multi=2 with <level>=MAX_LEVEL
+*/
+
+/* START OF LOOP */
+
+while (!done) {
+/* write_it(ustr[user].sock,"in while\n"); */
+
+if (!multi || multi==4 || multi==5) {
+    /* friends or specified */
+    if (current >= count) { done=1; continue; }
+    strcpy(other_user,multilist[current]);
+    current++;
+} /* !multi || multi==4 || multi==5 */
+else if (multi<4) {
+	if ((dp = readdir(dirp)) == NULL) {
+		done=1;
+		continue;
+	}
+	else {
+/*
+write_it(ustr[user].sock,"d_name is\n");
+write_it(ustr[user].sock,dp->d_name);
+write_it(ustr[user].sock,"\n");
+*/
+		if (dp->d_name[0]=='.') continue;
+		sprintf(other_user,"%s",dp->d_name);
+		count++;
+	}
+} /* multi<4 */
+
+/*
+write_it(ustr[user].sock,"other user is\n");
+write_it(ustr[user].sock,other_user);
+write_it(ustr[user].sock,"\n");
+*/
+
+/* plug security hole */
+if (check_fname(other_user,user))
+  {
+   if (!mode) write_str(user,"Illegal name.");
+   bad++;
+   if (multi) continue;
+   else break;
   }
 
-if (ustr[user].frog) {
-  if (mode==0)
-   write_str(user,"Frogs cant write, silly.");
-   return;
-   }
-
-if (!check_for_user(other_user)) 
-  {
-   write_str(user,NO_USER_STR);
-   return;
-  }
+strtolower(other_user);
 
 ret=check_gag2(user,other_user);
-if (!ret) return;
+if (!ret) {
+ bad++;
+ if (multi) continue;
+ else break;
+}
 else if (ret==2) {
- write_str(user,BAD_FILEIO);
- write_log(ERRLOG,YESTIME,"Couldn't open file(r) for \"%s\" in check_gag2! %s\n",other_user); 
- return;
- }
+  write_str(user,NO_USER_STR);
+  /* write_str(user,BAD_FILEIO); */
+  write_log(ERRLOG,YESTIME,"Couldn't open file(r) for \"%s\" in check_gag2! %s\n",other_user,get_error());
+  bad++;
+  if (multi) continue;
+  else break;
+}
 
 if (!read_user(other_user)) {
  write_str(user,BAD_FILEIO);
- write_log(ERRLOG,YESTIME,"Couldn't open user file for \"%s\" in check_gag2! %s\n",other_user); 
- return;
- }
+ write_log(ERRLOG,YESTIME,"Couldn't open user file for \"%s\" in check_gag2! %s\n",other_user,get_error());
+ bad++;
+ if (multi) continue;
+ else break;
+}
 
+/* write_it(ustr[user].sock,"checking levels\n"); */
+
+/* check level-based mailing */
+if ( (multi==1 && (t_ustr.super < level)) ||
+     (multi==2 && (t_ustr.super > level)) ||
+     (multi==3 && (t_ustr.super != level)) ) {
+	count--; continue;
+}
+
+/*
+write_it(ustr[user].sock,"GOOD user is\n");
+write_it(ustr[user].sock,other_user);
+write_it(ustr[user].sock,"\n");
+*/
 
 /*--------------------------------------------------*/
 /* prepare message to be sent                       */
@@ -13751,8 +13445,6 @@ time(&tm);
 midcpy(ctime(&tm),stm,4,15);
 strcpy(name,ustr[user].say_name);
 
-
-strcpy(message,inpstr);
 sprintf(mess,"(%s) From %s: %s\n",stm,name,message);
 
 sprintf(t_mess,"%s/%s",MAILDIR,other_user);
@@ -13763,15 +13455,19 @@ if (stat(filename, &fileinfo) == -1) {
     if (check_for_file(filename)) {
     write_log(WARNLOG,YESTIME,"Couldn't read inbox size for \"%s\" in read_mail! %s\n",filename,get_error());
     }
-   }
+}
 else filesize = fileinfo.st_size;
+
+/* write_it(ustr[user].sock,"checking filesize\n"); */
 
 /* THIS IS TO PREVENT EXCESSIVE MAIL SPAMMING */
 /* If recepients mailsize is at or over size limit, tell sender the */
 /* mail send failed, mail recepient from the talker that mailfile   */
 /* is over limit, and notify user, if online.                       */
+
 if (filesize >= MAX_MAILSIZE) {
-   if (mode==0)
+
+ if (mode==0 && !multi)
    write_str(user,"Recipient's mailfile is at or over the size limit. Send failed.");
 
  if (t_ustr.mail_warn == 0) {
@@ -13780,11 +13476,13 @@ if (filesize >= MAX_MAILSIZE) {
    t_mess[0]=0;
    if (!(fp=fopen(filename,"a")))
      {
-	if (mode==0) {
+	if (mode==0 && !multi) {
          sprintf(mess,"%s : message cannot be written\n", syserror);
          write_str(user,mess);
 	}
-      return;
+      bad++;
+      if (multi) continue;
+      else break;
      }
    fputs(mess,fp);
    FCLOSE(fp);
@@ -13792,11 +13490,11 @@ if (filesize >= MAX_MAILSIZE) {
    t_ustr.new_mail = TRUE;
    t_ustr.mail_num++;
 
-/*-------------------------------------------------------*/
-/* write users to inform them of transaction             */
-/*-------------------------------------------------------*/
+ /*-------------------------------------------------------*/
+ /* write users to inform them of transaction             */
+ /*-------------------------------------------------------*/
 
-if ((u=get_user_num(other_user,user))!= -1) 
+ if ((u=get_user_num(other_user,user)) != -1) 
   {
    strcpy(t_mess,MAILFROM_TALKER);
    write_str(u,t_mess);
@@ -13810,200 +13508,76 @@ if ((u=get_user_num(other_user,user))!= -1)
        }
      t_ustr.mail_num--;
      newread=1;
-   } /* end if autor */
+   } /* end if autor > 1 */
    else ustr[u].mail_num++;
 
    if ((ustr[u].autof==1) && (ustr[u].automsgs < MAX_AUTOFORS)) {
-       if ((strlen(ustr[u].email_addr) < 8) ||
-           !strcmp(ustr[u].email_addr,DEF_EMAIL)) { 
+       /* autofwd - USER ONLINE */
+       if ((strlen(ustr[u].email_addr) < 8) || !strcmp(ustr[u].email_addr,DEF_EMAIL)) { 
+	   /* bad email address */
            write_str(u,"Your set email address is not a valid address..aborting autofwd.");
            copy_from_user(u);
-           write_user(ustr[u].name);
-           return;
-           }
-
-/*---------------------------------------------------*/
-/* write email message                               */
-/*---------------------------------------------------*/
-
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-	   if (mode==0) {
-            sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-            write_str(user,mess);
-	   }
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in send_mail(1)! %s\n",get_error());
-           return;
-        }
-       fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-       fprintf(wfp,"%s\n",ustr[u].email_addr);
-}
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s %s",MAILPROG,ustr[u].email_addr);
-  if (strstr(MAILPROG,"-s"))
-	nosubject=0;
-  else
-	nosubject=1;
-  }  
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-if (!mailgateway_port) {
-if (!(wfp=popen(filename,"w"))) 
-  {
-	if (mode==0) {
-   	sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-   	write_str(user,mess);
-	write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in send_mail(1)! %s\n",filename,get_error());
+       }
+       else {
+	/* Send external email */
+	if (send_ext_mail(-2, u, 0, NULL, mess, DATA_IS_MSG, NULL)==-1) {
+		write_log(ERRLOG,YESTIME,"Couldn't send external email in send_mail()\n");
 	}
-   return;
-  }
-}
-
-if (sendmail || mailgateway_port) {
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-fprintf(wfp,"To: %s <%s>\n",strip_color(ustr[u].say_name),ustr[u].email_addr);
-fprintf(wfp,"Subject: Mailfile error on %s\n\n",SYSTEM_NAME);
-}
-else if (nosubject) {
-nosubject=0;
-fprintf(wfp,"Mailfile error on %s\n",SYSTEM_NAME);
-}
-
-strcpy(mess, strip_color(mess));
-fputs(mess,wfp);
-fputs(EXT_MAIL1,wfp);
-sprintf(mess,EXT_MAIL2,SYSTEM_NAME);
-fputs(mess,wfp);
-
-fputs(EXT_MAIL4,wfp);
-fputs(EXT_MAIL5,wfp);
-   fputs(EXT_MAIL8,wfp);
-
-fputs(EXT_MAIL7,wfp);
-fputs(".\n",wfp);
-
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
-
-/*
-      sprintf(mess,"%s -s \'Mailfile error on %s\' %s < %s/%s.email 2> /dev/null",MAILPROG,SYSTEM_NAME,ustr[u].email_addr,MAILDIR,ustr[u].say_name); 
-      system(mess);
-      remove(filename);
-*/
-      write_str(u,MAIL_AUTOFWD);
-      ustr[u].automsgs++;
+	else {
+		write_str(u,MAIL_AUTOFWD);
+		ustr[u].automsgs++;
+	}
+       } /* good email address */
      } /* end of if autof */
   } /* end of if user online if */
  else if ((t_ustr.autof > 0) && (t_ustr.automsgs < MAX_AUTOFORS)) {
-     if ((strlen(t_ustr.email_addr) < 8) ||
-         !strcmp(t_ustr.email_addr,DEF_EMAIL)) { write_user(t_ustr.name); return; }
-
-/*---------------------------------------------------*/
-/* write email message                               */
-/*---------------------------------------------------*/
-
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-	   if (mode==0) {
-            sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-            write_str(user,mess);
-	   }
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in send_mail(2)! %s\n",get_error());
-           return;
-        }
-       fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-       fprintf(wfp,"%s\n",t_ustr.email_addr);
-}
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s %s",MAILPROG,t_ustr.email_addr);
-  if (strstr(MAILPROG,"-s"))
-	nosubject=0;
-  else
-	nosubject=1;
-  }  
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-if (!mailgateway_port) {
-if (!(wfp=popen(filename,"w"))) 
-  {
-	if (mode==0) {
- 	sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-   	write_str(user,mess);
-	write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in send_mail(2)! %s\n",filename,get_error());
+       /* autofwd - USER NOT ONLINE */
+       if ((strlen(t_ustr.email_addr) < 8) || !strcmp(t_ustr.email_addr,DEF_EMAIL)) {
+	 /* bad email address */
+       }
+       else {
+	/* Send external email */
+	if (send_ext_mail(-2, -1, 0, NULL, mess, DATA_IS_MSG, NULL)==-1) {
+		write_log(ERRLOG,YESTIME,"Couldn't send external email in send_mail()\n");
 	}
-   return;
-  }
-}
+	else {
+		t_ustr.automsgs++;
+	}
+       } /* good email address */
 
-if (sendmail || mailgateway_port) {
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-fprintf(wfp,"To: %s <%s>\n",strip_color(t_ustr.say_name),t_ustr.email_addr);
-fprintf(wfp,"Subject: Mailfile error on %s\n\n",SYSTEM_NAME);
-}
-else if (nosubject) {
-nosubject=0;
-fprintf(wfp,"Mailfile error on %s\n",SYSTEM_NAME);
-}
-
-strcpy(mess, strip_color(mess));
-fputs(mess,wfp);
-fputs(EXT_MAIL1,wfp);
-sprintf(mess,EXT_MAIL2,SYSTEM_NAME);
-fputs(mess,wfp);
-
-fputs(EXT_MAIL4,wfp);
-fputs(EXT_MAIL5,wfp);
-   fputs(EXT_MAIL8,wfp);
-
-fputs(EXT_MAIL7,wfp);
-fputs(".\n",wfp);
-
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
-
-/*
-   sprintf(mess,"%s -s \'Mailfile error on %s\' %s < %s/%s.email 2> /dev/null",MAILPROG,SYSTEM_NAME,t_ustr.email_addr,MAILDIR,t_ustr.say_name); 
-   system(mess);
-   remove(filename);
-*/
-   t_ustr.automsgs++;
    } /* end of if autof */
  } /* end of if mail warn is 0 */
  else { }
 
  write_user(other_user);
-/* If recepient is online and has autoread in dual mode, */
-/* read their new message                                */
 
-if (u && newread) read_mail(u,"1");
+ /* If recepient is online and has autoread in dual mode, */
+ /* read their new message                                */
 
-  return;
- } /* end of if over filesize */
+ if (u && newread) read_mail(u,"1");
+
+ bad++;
+ if (multi) continue;
+ else break;
+} /* end of if over filesize */
 
 /* End of mailfile size check */
 
 filesize = 0;
 
 /*---------------------------------------------------*/
-/* write mail message                                */
+/* write message to recipient's mailfile             */
 /*---------------------------------------------------*/
 
-if (!(fp=fopen(filename,"a"))) 
-  {
-	if (mode==0) {
-   	sprintf(mess,"%s : message cannot be written\n", syserror);
-  	write_str(user,mess);
-	}
-   return;
-  }
+if (!(fp=fopen(filename,"a"))) {
+ if (mode==0) {
+  sprintf(mess,"Mail message cannot be written for user %s! %s", other_user, get_error());
+  write_str(user,mess);
+ }
+ bad++;
+ if (multi) continue;
+ else break;
+}
 fputs(mess,fp);
 FCLOSE(fp);
 
@@ -14014,58 +13588,12 @@ FCLOSE(fp);
 t_ustr.new_mail = TRUE;
 t_ustr.mail_num++;
 
-/*--------------------------------------------------------*/
-/* write sent mail message                                */
-/*--------------------------------------------------------*/
-
-sprintf(mess2,"(%s) To %s: %s\n",stm,other_user,message);
-
-sprintf(t_mess,"%s/%s.sent",MAILDIR,ustr[user].name);
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-/* Get filename size */
-if (stat(filename, &fileinfo) == -1) {
-    if (check_for_file(filename)) {
-    write_log(WARNLOG,YESTIME,"Couldn't read sent-box size for \"%s\" in read_mail! %s\n",filename,get_error());
-    }
-   }
-else filesize = fileinfo.st_size;
-
-if (filesize >= MAX_SMAILSIZE) {
-	if (mode==0) {
-    	sprintf(t_mess,MAILFILE2_NOTIFY,filesize-MAX_SMAILSIZE);
-    	write_str(user,t_mess);
-	}
-    t_mess[0]=0;
-    }
-else {
-if (!(fp=fopen(filename,"a"))) 
-  {
-	if (mode==0) {
-  	sprintf(mess2,"%s : sent mail message cannot be written\n", syserror);
-   	write_str(user,mess2);
-	}
-   goto NEXT;
-  }
-fputs(mess2,fp);
-FCLOSE(fp);
-}
-
-NEXT:
-/* End of mailfile size check */
-
-filesize = 0;
-
-
 /*-------------------------------------------------------*/
 /* write users to inform them of transaction             */
 /*-------------------------------------------------------*/
 
-if (mode==0) {
-  sprintf(t_mess,MAIL_TO,other_user);
-  write_str(user,t_mess);
-  }
-if ((u=get_user_num_exact(other_user,user))!= -1) 
+/* Inform recipient of new mail */
+ if ((u=get_user_num_exact(other_user,user)) != -1) 
   {
    sprintf(t_mess,MAILFROM_USER,ustr[user].say_name);
    write_str(u,t_mess);
@@ -14078,225 +13606,46 @@ if ((u=get_user_num_exact(other_user,user))!= -1)
        }
      t_ustr.mail_num--;
      newread=1;
-   }
+   } /* if autor > 1 */
    else ustr[u].mail_num++;
 
    if ((ustr[u].autof==1) && (ustr[u].automsgs < MAX_AUTOFORS)) {
-       if ((strlen(ustr[u].email_addr) < 8) ||
-           !strcmp(ustr[u].email_addr,DEF_EMAIL)) { 
+       /* autofwd - USER ONLINE */
+       if ((strlen(ustr[u].email_addr) < 8) || !strcmp(ustr[u].email_addr,DEF_EMAIL)) { 
+	/* bad email address */
            write_str(u,"Your set email address is not a valid address..aborting autofwd.");
            copy_from_user(u);
-           write_user(ustr[u].name);
-           return;
-           }
-/*---------------------------------------------------*/
-/* write email message                               */
-/*---------------------------------------------------*/
-
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-	   if (mode==0) {
-            sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-            write_str(user,mess);
-	   }
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in send_mail(3)! %s\n",get_error());
-           return;
-        }
-       if (!ustr[user].semail && strstr(ustr[user].email_addr,"@"))
-        fprintf(wfp,"%s\n",ustr[user].email_addr);
-       else
-        fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-
-       fprintf(wfp,"%s\n",ustr[u].email_addr);
-}
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s %s",MAILPROG,ustr[u].email_addr);
-  if (strstr(MAILPROG,"-s"))
-	nosubject=0;
-  else
-	nosubject=1;
-  }  
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-if (!mailgateway_port) {
-if (!(wfp=popen(filename,"w"))) 
-  {
-	if (mode==0) {
-   	sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-   	write_str(user,mess);
-	write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in send_mail(3)! %s\n",filename,get_error());
+       }
+       else {
+	/* Send external email */
+	if (send_ext_mail(user, u, 1, NULL, mess, DATA_IS_MSG, NULL)==-1) {
+		write_log(ERRLOG,YESTIME,"Couldn't send external email in send_mail()\n");
 	}
-   goto NEXT3;
-  }
-}
+	else {
+		write_str(u,MAIL_AUTOFWD);
+		ustr[u].automsgs++;
+	}
+       } /* good email address */
 
-if (sendmail || mailgateway_port) {
-if (!ustr[user].semail && strstr(ustr[user].email_addr,"@"))
-fprintf(wfp,"From: %s on %s <%s>\n",strip_color(ustr[user].say_name),SYSTEM_NAME,ustr[user].email_addr);
-else
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-
-fprintf(wfp,"To: %s <%s>\n",strip_color(ustr[u].say_name),ustr[u].email_addr);
-fprintf(wfp,"Subject: New smail from %s on %s\n\n",strip_color(ustr[user].say_name),SYSTEM_NAME);
-}
-else if (nosubject) {
-nosubject=0;
-fprintf(wfp,"New smail from %s on %s\n",strip_color(ustr[user].say_name),SYSTEM_NAME);
-}
-
-strcpy(mess, strip_color(mess));
-fputs(mess,wfp);
-fputs(EXT_MAIL1,wfp);
-sprintf(mess,EXT_MAIL2,SYSTEM_NAME);
-fputs(mess,wfp);
-if (ustr[user].semail)
- fputs(EXT_MAIL3,wfp);
-
-fputs(EXT_MAIL4,wfp);
-fputs(EXT_MAIL5,wfp);
-if (sendmail || mailgateway_port) {
-if (!ustr[user].semail && strstr(ustr[user].email_addr,"@")) {
-   fputs(EXT_MAIL8,wfp);
-   }
-else {
-   fputs(EXT_MAIL9,wfp);
-   }
-}
-else {
-if (!ustr[user].semail && strstr(ustr[user].email_addr,"@")) {
-   sprintf(mess,EXT_MAIL10,ustr[user].email_addr);
-   fputs(mess,wfp);
-   }
-else {
-   fputs(EXT_MAIL9,wfp);
-   }
-}
-
-fputs(EXT_MAIL7,wfp);
-fputs(".\n",wfp);
-
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
-
-/*
-      sprintf(mess,"%s %s < %s/%s.email 2> /dev/null",MAILPROG,ustr[u].email_addr,MAILDIR,ustr[u].name); 
-      system(mess);
-      remove(filename);
-*/
-      write_str(u,MAIL_AUTOFWD);
-      ustr[u].automsgs++;
-     }
+     } /* end of if autof */
+    /* MAYBE DO copy_from_user(u); HERE? */
   } /* end of if user online if */
  else if ((t_ustr.autof > 0) && (t_ustr.automsgs < MAX_AUTOFORS)) {
-     if ((strlen(t_ustr.email_addr) < 8) ||
-         !strcmp(t_ustr.email_addr,DEF_EMAIL)) { write_user(t_ustr.name); return; }
-
-/*---------------------------------------------------*/
-/* write email message                               */
-/*---------------------------------------------------*/
-
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-	   if (mode==0) {
-            sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-            write_str(user,mess);
-	   }
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in send_mail(4)! %s\n",get_error());
-           return;
-        }
-       if (!ustr[user].semail && strstr(ustr[user].email_addr,"@"))
-        fprintf(wfp,"%s\n",ustr[user].email_addr);
-       else
-        fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-
-       fprintf(wfp,"%s\n",t_ustr.email_addr);
-}
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s %s",MAILPROG,t_ustr.email_addr);
-  if (strstr(MAILPROG,"-s"))
-	nosubject=0;
-  else
-	nosubject=1;
-  }  
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-if (!mailgateway_port) {
-if (!(wfp=popen(filename,"w"))) 
-  {
-	if (mode==0) {
-   	sprintf(mess,"%s : autofwd message cannot be written\n", syserror);
-   	write_str(user,mess);
-	write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in send_mail(4)! %s\n",filename,get_error());
+       /* autofwd - USER NOT ONLINE */
+       if ((strlen(t_ustr.email_addr) < 8) || !strcmp(t_ustr.email_addr,DEF_EMAIL)) {
+	/* bad email address */
+       }
+       else {
+	/* Send external email */
+	if (send_ext_mail(user, -1, 1, NULL, mess, DATA_IS_MSG, NULL)==-1) {
+		write_log(ERRLOG,YESTIME,"Couldn't send external email in send_mail()\n");
 	}
-   goto NEXT3;
-  }
-}
+	else {
+		t_ustr.automsgs++;
+	}
+       } /* good email address */
+ } /* else if offline autofwd */
 
-if (sendmail || mailgateway_port) {
-if (!ustr[user].semail && strstr(ustr[user].email_addr,"@"))
-fprintf(wfp,"From: %s on %s <%s>\n",strip_color(ustr[user].say_name),SYSTEM_NAME,ustr[user].email_addr);
-else
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-
-fprintf(wfp,"To: %s <%s>\n",strip_color(t_ustr.say_name),t_ustr.email_addr);
-fprintf(wfp,"Subject: New smail from %s on %s\n\n",strip_color(ustr[user].say_name),SYSTEM_NAME);
-}
-else if (nosubject) {
-nosubject=0;
-fprintf(wfp,"New smail from %s on %s\n",strip_color(ustr[user].say_name),SYSTEM_NAME);
-}
-
-strcpy(mess, strip_color(mess));
-fputs(mess,wfp);
-fputs(EXT_MAIL1,wfp);
-sprintf(mess,EXT_MAIL2,SYSTEM_NAME);
-fputs(mess,wfp);
-if (ustr[user].semail)
- fputs(EXT_MAIL3,wfp);
-
-fputs(EXT_MAIL4,wfp);
-fputs(EXT_MAIL5,wfp);
-if (sendmail || mailgateway_port) {
-if (!ustr[user].semail && strstr(ustr[user].email_addr,"@")) {
-   fputs(EXT_MAIL8,wfp);
-   }
-else {
-   fputs(EXT_MAIL9,wfp);
-   }
-}
-else {
-if (!ustr[user].semail && strstr(ustr[user].email_addr,"@")) {
-   sprintf(mess,EXT_MAIL10,ustr[user].email_addr);
-   fputs(mess,wfp);
-   }
-else {
-   fputs(EXT_MAIL9,wfp);
-   }
-}
-
-fputs(EXT_MAIL7,wfp);
-fputs(".\n",wfp);
-
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
-
-/*
-   sprintf(mess,"%s %s < %s/%s.email 2> /dev/null",MAILPROG,t_ustr.email_addr,MAILDIR,t_ustr.name); 
-   system(mess);
-   remove(filename);
-*/
-   t_ustr.automsgs++;
-   }
-
-NEXT3:
 write_user(other_user);
 
 /* If recepient is online and has autoread in dual mode, */
@@ -14304,6 +13653,92 @@ write_user(other_user);
 
 if (u && newread) read_mail(u,"1");
 
+if (!multi) done=1; /* email to only one user, stop */
+} /* while !done */
+
+/* END OF LOOP */
+
+if (multi && multi<4) (void) closedir(dirp);
+
+if (!count) {
+ write_str(user,"Your mail did not find any recipient(s)");
+ return;
+}
+
+if (bad) {
+ sprintf(t_mess,"Your mail failed to reach %d of %d intended recipient(s) because of an error.",bad,count);
+ write_str(user,t_mess);
+}
+
+if (bad < count) {
+ /*--------------------------------------------------------*/
+ /* write sent mail message                                */
+ /*--------------------------------------------------------*/
+
+ if (multi)
+  sprintf(mess2,"(%s) %s\n",stm,message);
+ else
+  sprintf(mess2,"(%s) To %s: %s\n",stm,other_user,message);
+
+ sprintf(t_mess,"%s/%s.sent",MAILDIR,ustr[user].name);
+ strncpy(filename,t_mess,FILE_NAME_LEN);
+
+ /* Get filename size */
+ if (stat(filename, &fileinfo) == -1) {
+    if (check_for_file(filename)) {
+     write_log(WARNLOG,YESTIME,"Couldn't read sent-box size for \"%s\" in read_mail! %s\n",filename,get_error());
+    }
+ }
+ else filesize = fileinfo.st_size;
+
+ if (filesize >= MAX_SMAILSIZE) {
+	if (mode==0 && !multi) {
+    	 sprintf(t_mess,MAILFILE2_NOTIFY,filesize-MAX_SMAILSIZE);
+    	 write_str(user,t_mess);
+	}
+    t_mess[0]=0;
+ }
+ else {
+  if (!(fp=fopen(filename,"a"))) {
+	if (mode==0) {
+  	 sprintf(mess2,"Mail message cannot be written to your sent-mail box! %s", get_error());
+   	 write_str(user,mess2);
+	}
+  }
+  else {
+	fputs(mess2,fp);
+	FCLOSE(fp);
+  }
+ }
+
+ /* Notify user of any success */
+ if (!multi) {
+  sprintf(t_mess,MAIL_TO,other_user);
+ }
+ else if (multi==1) {
+  sprintf(t_mess,"^HY==^ You have mailed all users from level %d to %d a message ^HY==^",level,MAX_LEVEL);
+ }
+ else if (multi==2) {
+  if (level==MAX_LEVEL)
+   strcpy(t_mess,"^HY==^ You have mailed all users a message ^HY==^");
+  else
+   sprintf(t_mess,"^HY==^ You have mailed all users up to level %d a message ^HY==^",level);
+ }
+ else if (multi==3) {
+  sprintf(t_mess,"^HY==^ You have mailed all users of level %d a message ^HY==^",level);
+ }
+ else if (multi==4) {
+  sprintf(t_mess,"^HY==^ You have mailed %s a message ^HY==^",multiliststr);
+ }
+ else if (multi==5) {
+  strcpy(t_mess,"^HY==^ You have mailed all your friends a message ^HY==^");
+ }
+
+ write_str(user,t_mess);
+
+} /* bad < count */
+
+return;
 }
 
 
@@ -14543,6 +13978,9 @@ else
 
 sprintf(mess,"has PROMOTED %s to %s",other_user,ranks[t_ustr.super].lname);
 btell(user,mess);
+
+/* update staff list file */
+if (t_ustr.super >= WIZ_LEVEL) do_stafflist();
 }
 
 /* Check which part of auto-promotion user is in and change accordingly */
@@ -14698,6 +14136,10 @@ write_str(user,z_mess);
 
 sprintf(z_mess,"has DEMOTED %s to %s",other_user,ranks[t_ustr.super].lname);
 btell(user,z_mess);
+
+/* update staff list file */
+/* if their old level was a wiz or higher */
+if ((t_ustr.super+1) >= WIZ_LEVEL) do_stafflist();
 } 
 
 
@@ -16158,6 +15600,7 @@ if (ustr[user].Macros) init_macro_buffer(ustr[user].Macros);
 initabbrs(user);
 listen_all(user);
 
+/* ROOT_ID's first login */
 if (!strcmp(ustr[user].login_name,ROOT_ID)) 
   {
     ustr[user].super = MAX_LEVEL;
@@ -16167,6 +15610,7 @@ if (!strcmp(ustr[user].login_name,ROOT_ID))
      {
       ustr[user].security[i]='Y';
      }
+
   }
 
 }
@@ -16297,11 +15741,13 @@ ustr[user].miscnum3       =t_ustr.miscnum3;
 ustr[user].miscnum4       =t_ustr.miscnum4;
 ustr[user].miscnum5       =t_ustr.miscnum5;
 ustr[user].tempnum1       =t_ustr.tempnum1;
+ustr[user].term_type      =t_ustr.term_type;
 strcpy(ustr[user].icq,t_ustr.icq);
 strcpy(ustr[user].miscstr1,t_ustr.miscstr1);
 strcpy(ustr[user].miscstr2,t_ustr.miscstr2);
 strcpy(ustr[user].miscstr3,t_ustr.miscstr3);
 strcpy(ustr[user].miscstr4,t_ustr.miscstr4);
+strcpy(ustr[user].prev_term_type,t_ustr.prev_term_type);
 
 i=0;
 for (i=0; i<MAX_GRAVOKES; i++) {
@@ -16439,11 +15885,13 @@ t_ustr.miscnum3        =ustr[user].miscnum3;
 t_ustr.miscnum4        =ustr[user].miscnum4;
 t_ustr.miscnum5        =ustr[user].miscnum5;
 t_ustr.tempnum1        =ustr[user].tempnum1;
+t_ustr.term_type       =ustr[user].term_type;
 strcpy(t_ustr.icq,ustr[user].icq);
 strcpy(t_ustr.miscstr1,ustr[user].miscstr1);
 strcpy(t_ustr.miscstr2,ustr[user].miscstr2);
 strcpy(t_ustr.miscstr3,ustr[user].miscstr3);
 strcpy(t_ustr.miscstr4,ustr[user].miscstr4);
+strcpy(t_ustr.prev_term_type,ustr[user].prev_term_type);
 
 i=0;
 for (i=0; i<MAX_GRAVOKES; i++) {
@@ -16546,7 +15994,6 @@ t_ustr.miscnum2      = 0;
 t_ustr.miscnum3      = 0;
 t_ustr.miscnum4      = 0;
 t_ustr.miscnum5      = 0;
-t_ustr.tempnum1      = 0;
 listen_all(-1);
 
 /* first line is either version number or users name */
@@ -16844,7 +16291,6 @@ if (t_ustr.miscnum2 > 32767     || t_ustr.miscnum2 < 0)	t_ustr.miscnum2=0;
 if (t_ustr.miscnum3 > 32767     || t_ustr.miscnum3 < 0)	t_ustr.miscnum3=0;
 if (t_ustr.miscnum4 > 32767     || t_ustr.miscnum4 < 0)	t_ustr.miscnum4=0;
 if (t_ustr.miscnum5 > 32767     || t_ustr.miscnum5 < 0)	t_ustr.miscnum5=0;
-if (t_ustr.tempnum1 > 32767     || t_ustr.tempnum1 < 0)	t_ustr.tempnum1=0;
 
 FCLOSE(f);
 return 1;
@@ -16944,7 +16390,6 @@ ustr[user].miscnum2      = 0;
 ustr[user].miscnum3      = 0;
 ustr[user].miscnum4      = 0;
 ustr[user].miscnum5      = 0;
-ustr[user].tempnum1      = 0;
 listen_all(-1);
 
 /* first line is either version number or users name */
@@ -17245,7 +16690,6 @@ if (ustr[user].miscnum2  > 32767 || ustr[user].miscnum2 < 0) ustr[user].miscnum2
 if (ustr[user].miscnum3  > 32767 || ustr[user].miscnum3 < 0) ustr[user].miscnum3=0;
 if (ustr[user].miscnum4  > 32767 || ustr[user].miscnum4 < 0) ustr[user].miscnum4=0;
 if (ustr[user].miscnum5  > 32767 || ustr[user].miscnum5 < 0) ustr[user].miscnum5=0;
-if (ustr[user].tempnum1  > 32767 || ustr[user].tempnum1 < 0) ustr[user].tempnum1=0;
 
 FCLOSE(f);
 return 1;
@@ -18267,929 +17711,6 @@ write_str(user,"+---------------------------------------------------------------
    other_user[0]=0;
    inpstr[0]=0;
 
-}
-
-/*------------------------------------------------*/
-/* set email address                              */
-/*------------------------------------------------*/
-void set_email(int user, char *inpstr)
-{
-char temp[EMAIL_LENGTH+1];
-
-  if (!strlen(inpstr)) {
-	sprintf(mess,"Your email is: %s",ustr[user].email_addr);
-	write_str(user, mess);
-	return;
-	}
-
-  /* Check for illegal characters in email addy */
-  if (strpbrk(inpstr,";/[]\\") ) {
-     write_str(user,"Illegal email address");
-     return;
-     }
-
-  if (strstr(inpstr,"^")) {
-     write_str(user,"Email cannot have color or hilite codes in it.");
-     return;
-     }
-
-  if (strlen(inpstr)>EMAIL_LENGTH)
-    {
-      write_str(user,"Email address truncated");
-      inpstr[EMAIL_LENGTH-1]=0;
-    }
-
- strcpy(temp,inpstr);
- strtolower(temp);
-
- if ((!strcmp(inpstr,"-c")) || (!strcmp(inpstr,"clear"))) {
-     strcpy(inpstr,DEF_EMAIL);
-     write_str(user,"Email address cleared and reset.");
-     goto SKIP;
-     }
- else if (strstr(temp,"whitehouse.gov"))
-      {
-       write_str(user,"Email address not valid.");
-       return;
-      }
-  else if (!strstr(inpstr,".") || !strstr(inpstr,"@")) {
-       write_str(user,"Email address not valid.");
-       return;
-      }
-
-  sprintf(mess,"Set user email address to: %s",inpstr);
-  write_str(user,mess);
-
-SKIP:
-  strcpy(ustr[user].email_addr,inpstr);
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set homepage                                   */
-/*------------------------------------------------*/
-void set_homepage(int user, char *inpstr)
-{
-
-  if (!strlen(inpstr)) {
-	sprintf(mess,"Your homepage is: %s",ustr[user].homepage);
-	write_str(user, mess);
-	return;
-	}
-
-  if (strstr(inpstr,"^")) {
-     write_str(user,"Homepage cannot have color or hilite codes in it.");
-     return;
-     }
-
-  if (strlen(inpstr) > HOME_LEN) 
-     {
-      write_str(user,"Home page address truncated");
-      inpstr[HOME_LEN-1]=0;
-     }
-
-  strcpy(ustr[user].homepage,inpstr);
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-  sprintf(mess,"Set page to: %s",inpstr);
-  write_str(user,mess);
-
-}
-
-/*------------------------------------------------*/
-/* set URL where users picture can be found       */
-/*------------------------------------------------*/
-void set_webpic(int user, char *inpstr)
-{
-
-  if (!strlen(inpstr)) {
-	sprintf(mess,"Your picture URL is: %s",ustr[user].webpic);
-	write_str(user, mess);
-	return;
-	}
-
-  if (strstr(inpstr,"^")) {
-     write_str(user,"Picture URL address cannot have color or hilite codes in it.");
-     return;
-     }
-
-  if (strlen(inpstr) > HOME_LEN) 
-     {
-      write_str(user,"Picture URL address truncated");
-      inpstr[HOME_LEN-1]=0;
-     }
-
-  strcpy(ustr[user].webpic,inpstr);
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-  sprintf(mess,"Set picture URL to: %s",inpstr);
-  write_str(user,mess);
-
-}
-
-/*------------------------------------------------*/
-/* set gender                                     */
-/*------------------------------------------------*/
-void set_sex(int user, char *inpstr)
-{
-
-if (!strlen(inpstr))
-  {
-   sprintf(mess,"Your gender is : %s",ustr[user].sex);
-   write_str(user,mess);
-   return;
-  }
-
-  if (strlen(inpstr)>29)
-    {
-      write_str(user,"Gender truncated");
-      inpstr[29]=0;
-    }
-
-  strcpy(ustr[user].sex,inpstr);
-
-  if (autopromote == 1)
-   check_promote(user,7);
-
-  copy_from_user(user);
-  write_user(ustr[user].name);
-  sprintf(mess,"Set user gender to: %s",inpstr);
-  write_str(user,mess);
-}
-
-/*------------------------------------------------*/
-/* set rows                                       */
-/*------------------------------------------------*/
-void set_rows(int user, char *inpstr)
-{
-
-  int value=5;
-  
-  sscanf(inpstr,"%d", &value);
-  
-  if (value < 5 || value > 256)
-    {
-      write_str(user,"Rows set to 25 (valid range is 5 to 256)");
-      value = 25;
-    }
-    
-  ustr[user].rows = value;
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-  sprintf(mess,"Set terminal rows to: %d",value);
-  write_str(user,mess);
-}
-
-/*------------------------------------------------*/
-/* set cols                                       */
-/*------------------------------------------------*/
-void set_cols(int user, char *inpstr)
-{
-
-  int value=5;
-  
-  sscanf(inpstr,"%d", &value);
-  
-  if (value < 16 || value > 256)
-    {
-      write_str(user,"Columns set to 256 (valid range is 16 to 256)");
-      value = 256;
-    }
-    
-  ustr[user].cols = value;
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-  sprintf(mess,"Set terminal cols to: %d",value);
-  write_str(user,mess);
-}
-
-/*------------------------------------------------*/
-/* set car_return                                 */
-/*------------------------------------------------*/
-void set_car_ret(int user, char *inpstr)
-{
-
-if (!strlen(inpstr)) {
-  if (!ustr[user].car_return) {
-   write_str(user,"Set carriage returns ON");
-   ustr[user].car_return = 1;
-   }
-   else {
-   write_str(user,"Set carriage returns OFF");
-   ustr[user].car_return = 0;
-   }
- }
-else {
- if (!strcmp(inpstr,"1")) {
-   write_str(user,"Set carriage returns ON");
-   ustr[user].car_return = 1;
-   }
- else if (!strcmp(inpstr,"0")) {
-   write_str(user,"Set carriage returns OFF");
-   ustr[user].car_return = 0;
-  }
- else {
-   write_str(user,"Set carriage returns ON");
-   ustr[user].car_return = 1;
-  }   
- } /* end of else */
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set atmos                                      */
-/*------------------------------------------------*/
-void set_atmos(int user, char *inpstr)
-{
-
-  int    value  = -1;
-  int    factor = -1;
-  
-  sscanf(inpstr,"%d %d", &value, &factor);
-  
-  if (value < 0 || value > 1000)
-    {
-      value = 100;
-    }
-    
- if (factor < 0 || factor >1000)
-    {
-      factor = 5;
-    }
-
-  sprintf(mess,"Atmos frequency chance set to: %d %d",value, factor);
-  write_str(user,mess);
-
-  ATMOS_RESET     = value;
-  ATMOS_FACTOR    = factor;
-  ATMOS_COUNTDOWN = value;
-}
-
-/*------------------------------------------------*/
-/* set abbrs                                      */
-/*------------------------------------------------*/
-void set_abbrs(int user, char *inpstr)
-{
-
-
-  if (ustr[user].abbrs)
-    {
-      write_str(user, "Abbreviations are now off for you.");
-      ustr[user].abbrs = 0;
-    }
-   else
-    {
-      write_str(user, "You can now use abbreviations");
-      ustr[user].abbrs = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set white space                                */
-/*------------------------------------------------*/
-void set_white_space(int user, char *inpstr)
-{
-
-
-  if (ustr[user].white_space)
-    {
-      write_str(user, "White space removal is now off.");
-      ustr[user].white_space = 0;
-    }
-   else
-    {
-      write_str(user, "White space removal is now on.");
-      ustr[user].white_space = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set hilights                                   */
-/*------------------------------------------------*/
-void set_hilite(int user, char *inpstr)
-{
-
-  if (ustr[user].hilite==2)
-    {
-      write_str(user, "High_lighting now off.");
-      ustr[user].hilite = 0;
-    }
-  else if (ustr[user].hilite==1)
-    {
-      write_str(user, "High_lighting now on for everything except private communication which will be normal with color.");
-      ustr[user].hilite = 2;
-    }
-  else
-    {
-      write_str(user, "High_lighting now on for everything.");
-      ustr[user].hilite = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set password echo                              */
-/*------------------------------------------------*/
-void set_hidden(int user, char *inpstr)
-{
-
-
-  if (ustr[user].passhid)
-    {
-      write_str(user, "Password WILL be echoed during logins");
-      ustr[user].passhid = 0;
-    }
-   else
-    {
-      write_str(user, "Password will NOT be echoed during logins.");
-      ustr[user].passhid = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set login pause                                */
-/*------------------------------------------------*/
-void set_pause(int user)
-{
-
-  if (ustr[user].pause_login)
-    {
-      write_str(user, "You will NOT get a pause when your login");
-      ustr[user].pause_login = 0;
-    }
-   else
-    {
-      write_str(user, "You WILL get a pause when your login");
-      ustr[user].pause_login = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set break in who or not                        */
-/*------------------------------------------------*/
-void set_pbreak(int user, char *inpstr)
-{
-
-
-  if (ustr[user].pbreak)
-    {
-      write_str(user, "Who listing will be continuous.");
-      ustr[user].pbreak = 0;
-    }
-   else
-    {
-      write_str(user, "Who listing will be paged.");
-      ustr[user].pbreak = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-
-/*------------------------------------------------*/
-/* set beeps on private communication             */
-/*------------------------------------------------*/
-void set_beep(int user, char *inpstr)
-{
-
-  if (ustr[user].beeps)
-    {
-      write_str(user, "You now will ^NOT^ get beeps on private communications");
-      ustr[user].beeps = 0;
-    }
-   else
-    {
-      write_str(user, "You now ^WILL^ get beeps on private communications");
-      ustr[user].beeps = 1;
-    }
-    
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-}
-
-
-/*------------------------------------------------*/
-/* set your name capitalization                   */
-/*------------------------------------------------*/
-void set_recap(int user, char *inpstr)
-{
-int i=0,len=0,number_of_carets=0;
-char sayname[SAYNAME_LEN+1];
-char lowername[SAYNAME_LEN+1];
-char colorname[SAYNAME_LEN+3];
-
-strncpy(colorname,inpstr,SAYNAME_LEN-4);
-strcpy(sayname,strip_color(colorname));
-len = strlen(sayname);
-
-if (!len) {
-  write_str(user,GIVE_CAPNAME);
-  return;
- }
-
-if (len > NAME_LEN) {
-  write_str(user,SYS_NAME_LONG);
-  return;
- }
-
-strcpy(lowername,sayname);
-strtolower(lowername);
-
-/* name = sayname */
-/* tempname = lowername */
-
-/* if the name itself does not match the original, reject */
-if (strcmp(lowername, ustr[user].login_name)) {
-  sprintf(mess,"New name (%s) is not the same as original name (%s)",
-          sayname, ustr[user].login_name);
-  write_str(user,mess);
-  return;
-  }
-
-/* count the carets */
-for(i=0;i<strlen(colorname);i++)
-{
-  if (colorname[i]=='^') number_of_carets++;
-}
-
-/* do not allow 3 successive carets */
-for(i=0;i<strlen(colorname);i++)
-{
-  if ((colorname[i]=='^') && (colorname[i+1]=='^') && (colorname[i+2]=='^'))
-  {
-    write_str(user,"You have too many carets together.  Please redo");
-    return;
-  }
-}
-
-/* do not allow 1st and 2nd chars OR 2nd and 3rd chars to both be carets */
-if ((colorname[0]=='^' && colorname[1]=='^') || (colorname[1]=='^' && colorname[2]=='^'))
-{
-  write_str(user,"Incorrect format. Please try again.");
-  return;
-}
-
-/* if odd number of carets, cat on an ending caret */
-if (number_of_carets%2)
-	strcat(colorname,"^");
-
-if (strstr(colorname,"^")) {
-	strcat(colorname,our_delimiters);
-	strcpy(ustr[user].say_name, our_delimiters);
-	strcat(ustr[user].say_name, colorname);
-}
-else strcpy(ustr[user].say_name, colorname);
-sprintf(mess, "Your name is recapped to: %s", ustr[user].say_name);
-write_str(user,mess);
-
-/* change exempt file */
-/* first arguement is to check against names in file for user */
-/* second is the new name we're changing to */
-change_exem_data(ustr[user].name,strip_color(ustr[user].say_name));
-
-copy_from_user(user);
-write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set your home room                             */
-/*------------------------------------------------*/
-void set_home(int user, char *inpstr)
-{
-int found = 0;
-int new_area;
-
-  if (!strlen(inpstr)) {
-     sprintf(mess,"Your home room is the: %s",ustr[user].home_room);
-     write_str(user,mess);
-     return;
-     }
-
-  if (strstr(inpstr,"^")) {
-     write_str(user,"Room cannot have color or hilite codes in it.");
-     return;
-     }
-
-  if (strlen(inpstr) > NAME_LEN) 
-     {
-      write_str(user,"Room name length too long.");
-      return;
-     }
-         /* Cygnus */
-   if ( (!strcmp(inpstr,HEAD_ROOM)) || (!strcmp(inpstr,ARREST_ROOM)) ||
-        (!strcmp(inpstr,"sky_palace")) ) {
-      write_str(user,"You cannot make that room your home.");
-      return;
-      }
-
-   /*--------------------*/
-   /* see if area exists */
-   /*--------------------*/
-
-   found = FALSE;
-   for (new_area=0; new_area < NUM_AREAS; ++new_area)
-    { 
-     if (!strcmp(astr[new_area].name, inpstr) )
-       { 
-         found = TRUE;
-         break;
-       }
-    }
- 
-   if (!found)
-     {
-      write_str(user,NO_ROOM);
-      return;
-     }
-  
-/*----------------------------------------------*/
-/* check for secure room                        */
-/*----------------------------------------------*/
-
-if (ustr[user].security[new_area] == 'X')
-  {
-   write_str(user,"Your security clearance does not let you enter there");
-   return;
-  }
-
-
-/*-------------------------------------------------------------------*/
-/* see if new room has exits, if not and not wizard, no set possible */
-/*-------------------------------------------------------------------*/
-found = TRUE;
-if ( (!strlen(astr[new_area].move)) || (!strcmp(astr[new_area].move,"*")) ) 
-    {
-     found = FALSE;
-    }
-
-/*--------------------------------------------------------------*/
-/* anyone above a 3 can teleport to non-connected rooms         */
-/*--------------------------------------------------------------*/
-
-if (!found)
-  {
-    if ((ustr[user].tempsuper < TELEP_LEVEL) && (ustr[user].security[new_area] == 'N')) 
-      {
-       write_str(user,"You cannot make a non-connected room your home.");
-       return;
-      }
-  }
-
-  strcpy(ustr[user].home_room,astr[new_area].name);
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-  sprintf(mess,"Set home room to: %s",astr[new_area].name);
-  write_str(user,mess);
-}
-
-/** command to test and turn on/off color attribs. **/
-void set_color(int user, char *inpstr)
-{
-int a=0;
-
-if (!strlen(inpstr)) {
-  if (ustr[user].color==0) {
-   write_str(user,"Color is now   On");
-   ustr[user].color=1;
-   }
-  else {
-   write_str(user,"Color is now   Off");
-   ustr[user].color=0;
-   }
- }
-else if (!strcmp(inpstr,"on") || !strcmp(inpstr,"ON")) {
-   write_str(user,"Color is now   On");
-   ustr[user].color=1;
-   }
-else if (!strcmp(inpstr,"off") || !strcmp(inpstr,"OFF")) {
-   write_str(user,"Color is now   Off");
-   ustr[user].color=0;
-   }
-else if (!strcmp(inpstr,"test") || !strcmp(inpstr,"TEST")) {
-a=ustr[user].color;
-if (a==0) ustr[user].color=1;
- write_str(user,"This test is to see whether your terminal is capable of");
- write_str(user,"displaying ANSI color. During the test, you should see the color"); 
- write_str(user,"displayed next to its corresponding name, if your terminal IS compatible.");
- write_str(user,"To use a color code in something, read .h coloruse");
- write_str(user,"  COLOR                EFFECT                  CODE");
- write_str(user,"  Low Green      ^LG      XXXXXXXXXXXXXXXXX ^       LG");
- write_str(user,"  Low Yellow     ^LY      XXXXXXXXXXXXXXXXX ^       LY");
- write_str(user,"  Low Red        ^LR      XXXXXXXXXXXXXXXXX ^       LR");
- write_str(user,"  Low Blue       ^LB      XXXXXXXXXXXXXXXXX ^       LB");
- write_str(user,"  Low Magenta    ^LM      XXXXXXXXXXXXXXXXX ^       LM");
- write_str(user,"  Low White      ^LW      XXXXXXXXXXXXXXXXX ^       LW");
- write_str(user,"  Low Cyan       ^LC      XXXXXXXXXXXXXXXXX ^       LC");
- write_str(user,"  High Green     ^HG      XXXXXXXXXXXXXXXXX ^       HG");
- write_str(user,"  High Yellow    ^HY      XXXXXXXXXXXXXXXXX ^       HY");
- write_str(user,"  High Red       ^HR      XXXXXXXXXXXXXXXXX ^       HR");
- write_str(user,"  High Blue      ^HB      XXXXXXXXXXXXXXXXX ^       HB");
- write_str(user,"  High Magenta   ^HM      XXXXXXXXXXXXXXXXX ^       HM");
- write_str(user,"  High White     ^HW      XXXXXXXXXXXXXXXXX ^       HW");
- write_str(user,"  High Cyan      ^HC      XXXXXXXXXXXXXXXXX ^       HC");
- write_str(user,"  Bold       ^          XXXXXXXXXXXXXXXXX ^       None");
- write_str(user,"  Blinking             ^BLXXXXXXXXXXXXXXXXX ^       BL");
- write_str(user,"  Underlined           ^ULXXXXXXXXXXXXXXXXX ^       UL");
- write_str(user,"  Reverse Video        ^RVXXXXXXXXXXXXXXXXX ^       RV");
-if (a==0) ustr[user].color=0;
- write_str(user,"<Ok>"); 
- }
-else {
-   write_str(user,"Usage: .set color        -  Toggle your color switch on/off");
-   write_str(user,"       .set color on     -  Turns colored attributes on");
-   write_str(user,"       .set color off    -  Turns colored attributes off");
-   write_str(user,"       .set color test   -  Tests your terminal for ANSI color");
- }
-
-   read_user(ustr[user].login_name);
-   t_ustr.color = ustr[user].color;
-   write_user(ustr[user].login_name);
-}
-
-
-/** show email address - yes or no **/
-void set_visemail(int user)
-{
-
-  if (ustr[user].semail)
-    {
-      write_str(user, "Email address now visible.");
-      ustr[user].semail = 0;
-    }
-   else
-    {
-      write_str(user,"Email address now hidden.");
-      ustr[user].semail = 1;
-    }
-    
-  read_user(ustr[user].login_name);
-  t_ustr.semail = ustr[user].semail;
-  write_user(ustr[user].login_name);
-}
-
-/* Set .help style */
-void set_help(int user)
-{
- char type[4][7];
-
-   strcpy(type[0],"OURS  ");
-   strcpy(type[1],"IFORMS");
-   strcpy(type[2],"NUTS3 ");
-   strcpy(type[3],"NUTS2 ");
-
- if (ustr[user].help==0)
-    ustr[user].help=1;
- else if (ustr[user].help==1)
-    ustr[user].help=2;
- else if (ustr[user].help==2)
-    ustr[user].help=3;
- else if (ustr[user].help==3)
-    ustr[user].help=0;
-
-    sprintf(mess,".help type now set to: ^HY%s^",type[ustr[user].help]);
-    write_str(user,mess);
-
-  read_user(ustr[user].login_name);
-  t_ustr.help = ustr[user].help;
-  write_user(ustr[user].login_name);
-}
-
-/* Set .who style */
-void set_who(int user)
-{
- char type[4][7];
-
-   strcpy(type[0],"OURS  ");
-   strcpy(type[1],"NUTS  ");
-   strcpy(type[2],"IFORMS");
-   strcpy(type[3],"NEW   ");
-
- if (ustr[user].who==0)
-    ustr[user].who=1;
- else if (ustr[user].who==1)
-    ustr[user].who=2;
- else if (ustr[user].who==2)
-    ustr[user].who=3;
- else if (ustr[user].who==3)
-    ustr[user].who=0;
-
-    sprintf(mess,".who type now set to: ^HY%s^",type[ustr[user].who]);
-    write_str(user,mess);
-
-  read_user(ustr[user].login_name);
-  t_ustr.who = ustr[user].who;
-  write_user(ustr[user].login_name);
-}
-
-/*------------------------------------------------*/
-/* set icq number                                 */
-/*------------------------------------------------*/
-void set_icq(int user, char *inpstr)
-{
-
-  if (!strlen(inpstr)) {
-	sprintf(mess,"Your ICQ # is: %s",ustr[user].icq);
-	write_str(user, mess);
-	return;
-	}
-
-  if (strstr(inpstr,"^")) {
-     write_str(user,"ICQs cannot have color or hilite codes in them.");
-     return;
-     }
-
-  if (strlen(inpstr) > 20) 
-     {
-      write_str(user,"ICQ number truncated");
-      inpstr[20-1]=0;
-     }
-
-  strcpy(ustr[user].icq,inpstr);
-
-  copy_from_user(user);
-  write_user(ustr[user].login_name);
-  sprintf(mess,"Set ICQ # to: %s",inpstr);
-  write_str(user,mess);
-
-}
-
-
-/*------------------------------------------------*/
-/* set user stuff                                 */
-/*------------------------------------------------*/
-void set(int user, char *inpstr)
-{
-  char onoff[3][4];
-  char yesno[2][4];
-  char whotype[4][7];
-  char helptype[4][7];
-  char command[ARR_SIZE];
-
-command[0]=0;
-  sscanf(inpstr,"%s ",command);
-  remove_first(inpstr);  /* get rid of commmand word */
-  strtolower(command);
-
-  if (!strcmp("email",command))
-    {set_email(user,inpstr);
-    }
-  else if (!strcmp("gender",command))
-    {set_sex(user,inpstr);
-    }
-  else if (!strcmp("homepage",command))
-    {set_homepage(user,inpstr);
-    }
-  else if (!strcmp("picurl",command))
-    {set_webpic(user,inpstr);
-    }  
-  else if (!strcmp("rows",command) || !strcmp("lines",command))
-    {set_rows(user,inpstr);
-    }
-  else if (!strcmp("cols",command) || !strcmp("width",command))
-    {set_cols(user,inpstr);
-    }
-  else if (!strcmp("car",command) || !strcmp("carriage",command) )
-    {set_car_ret(user,inpstr);
-    }
-  else if (!strcmp("abbrs",command))
-    {set_abbrs(user,inpstr);
-    }
-  else if (!strcmp("space",command))
-    {set_white_space(user,inpstr);
-    }
-  else if (!strcmp("hi",command))
-    {set_hilite(user,inpstr);
-    }
-  else if (!strcmp("hidden",command))
-    {set_hidden(user,inpstr);
-    }
-  else if (!strcmp("pbreak",command))
-    {set_pbreak(user,inpstr);
-    }
-  else if (!strcmp("recap",command))
-    {set_recap(user,inpstr);
-    }
-  else if (!strcmp("home",command))
-    {set_home(user,inpstr);
-    }    
-  else if (!strcmp("atmos",command))
-    {set_atmos(user,inpstr);
-    }
-  else if (!strcmp("beeps",command))
-    {set_beep(user,inpstr);
-    }
-  else if (!strcmp("help",command))
-    {set_help(user);
-    }
-  else if (!strcmp("who",command))
-    {set_who(user);
-    }
-  else if (!strcmp("color",command))
-    {set_color(user,inpstr);
-    }
-  else if (!strcmp("visemail",command))
-    {set_visemail(user);
-    }
-  else if (!strcmp("icq",command))
-    {set_icq(user,inpstr);
-    }
-  else if (!strcmp("pause",command))
-    {set_pause(user);
-    }
-  else if (!strcmp("autoread",command))
-    {set_autoread(user);
-    }
-  else if (!strcmp("autofwd",command))
-    {set_autofwd(user);
-    }
-  else if (!strcmp("show",command)) {
-   strcpy(onoff[0],"OFF");
-   strcpy(onoff[1],"ON ");
-   strcpy(onoff[2],"ON ");
-   strcpy(yesno[0],"NO ");
-   strcpy(yesno[1],"YES");
-   strcpy(whotype[0],"OURS  ");
-   strcpy(whotype[1],"NUTS  ");
-   strcpy(whotype[2],"IFORMS");
-   strcpy(whotype[3],"NEW   ");
-   strcpy(helptype[0],"OURS  ");
-   strcpy(helptype[1],"IFORMS");
-   strcpy(helptype[2],"NUTS3 ");
-   strcpy(helptype[3],"NUTS2 ");
-   write_str(user,"----------------------------------------------------");
-   write_str(user," Your .set settings:");
-   write_str(user,"");
-   sprintf(mess,"Name    : %s",ustr[user].say_name);
-   write_str(user,mess);
-   sprintf(mess,"Email   : %s",ustr[user].email_addr);
-   write_str(user,mess);
-   sprintf(mess,"Homepage: %s",ustr[user].homepage);
-   write_str(user,mess);
-   sprintf(mess,"Pic URL : %s",ustr[user].webpic);
-   write_str(user,mess);
-   sprintf(mess,"Gender  : %s",ustr[user].sex);
-   write_str(user,mess);
-   sprintf(mess,"Home    : %s",ustr[user].home_room);
-   write_str(user,mess);
-   sprintf(mess,"ICQ #   : %s",ustr[user].icq);
-   write_str(user,mess);
-   write_str(user,"");
-   sprintf(mess,"Rows    : %-3d   Columns : %-3d   Who_Style   : %s",
-    ustr[user].rows,ustr[user].cols,whotype[ustr[user].who]);
-   write_str(user,mess);
-   sprintf(mess,"Abbrs   : %s   Whtspace: %s   Help_Style  : %s",
-    onoff[ustr[user].abbrs],onoff[ustr[user].white_space],helptype[ustr[user].help]);
-   write_str(user,mess);
-   sprintf(mess,"Cariages: %s   Hilites : %s   Email_Hidden: %s",
-    onoff[ustr[user].car_return],onoff[ustr[user].hilite],yesno[ustr[user].semail]);
-   write_str(user,mess);
-   sprintf(mess,"Passhid : %s   Pbreak  : %s   Pause_Login : %s",onoff[ustr[user].passhid],onoff[ustr[user].pbreak],onoff[ustr[user].pause_login]);
-   write_str(user,mess);
-   sprintf(mess,"PrivBeep: %s   Color   : %s",
-    onoff[ustr[user].beeps],onoff[ustr[user].color]);
-   write_str(user,mess);
-   write_str(user,"----------------------------------------------------");
-   return;
-  }
- else {
- write_str(user,"Valid options are: (help on these under ^.h set^)");
- write_str(user,"  cols               autoread (toggle)");
- write_str(user,"  email              beeps    (toggle)");
- write_str(user,"  gender             car      (toggle)");
- write_str(user,"  home               color    (toggle)");
- write_str(user,"  homepage           help     (toggle)");
- write_str(user,"  icq                hi       (toggle)");
- write_str(user,"  picurl             hidden   (toggle)");
- write_str(user,"  recap              pause    (toggle)");
- write_str(user,"  rows               pbreak   (toggle)");
- write_str(user,"  show               space    (toggle)");
- write_str(user,"  abbrs    (toggle)  visemail (toggle)");
- write_str(user,"  autofwd  (toggle)  who      (toggle)");
- }
 }
 
 
@@ -20885,46 +19406,6 @@ sprintf(num_ascii,"%d",num);
 return num_ascii;
 }
 
-char *check_var(char *line, char *MACRO, char *Replacement) {
-int index1;
-int tempPointer;
-char *pointer1;
-char temparray[514];
-char tempspace[514];
-char linetemp[514];
-
-	temparray[0]=0;
-	tempspace[0]=0;
-	linetemp[0]=0;
-
-   while (1) {
-	/* find string in line */
-	pointer1 = (char *)(strstr(line, MACRO));
-	/* if not found, exit */
-	if (pointer1 == NULL) break;
-	/* find at what position the result starts */
-	index1 = pointer1 - line;
-	/* copy the original line to a normal char */
-	/* so midcpy doesn't mangle it all up      */
-	strcpy(linetemp,line);
-	/* copy up to the result to our output */
-	midcpy(linetemp, temparray, 0, index1-1);
-	/* append the replacement for it to our output */
-	strcat(temparray, Replacement);
-	/* ok, where's the rest of our string */
-	tempPointer = index1+strlen(MACRO);
-	/* copy the rest to a temp spot */
-	midcpy(linetemp, tempspace, tempPointer, strlen(linetemp));
-	/* cat the rest to our output */
-	strcat(temparray, tempspace);
-	/* make the original line equal to the output for our loop */
-
-	line = temparray;
-       }
-
-	return line;
-}
-
 
 void write_rebootdb(int user) {
 int i=0;
@@ -20996,6 +19477,7 @@ wval(ustr[user].rwho);
 wchar(ustr[user].attach_port);
 wval(ustr[user].last_input);
 wval(ustr[user].invite);
+wval(ustr[user].term_type);
 wbuf(ustr[user].page_file);
 
 wval(NUM_LINES);
@@ -21065,6 +19547,7 @@ rval(ustr[user2].rwho);
 rchar(ustr[user2].attach_port);
 rval(ustr[user2].last_input);
 rval(ustr[user2].invite);
+rval(ustr[user2].term_type);
 rbuf(ustr[user2].page_file,80);
 
 rval(num_lines);
@@ -21315,12 +19798,12 @@ else write_str(user,"No logs needed to be trimmed.");
 }
 
 void do_tracking(int mode, char *downmess) {
-int sendmail=0,u=0;
-char filename[FILE_NAME_LEN];
-FILE *wfp=NULL;
 char thisip[21];
 unsigned long thisaddr;
 struct hostent *hp;
+
+
+if (DO_TRACKING != 1) return;
 
 if (mode==1) {
 #if defined(HAVE_GETHOSTBYNAME)
@@ -21337,45 +19820,7 @@ if (mode==1) {
 #endif
 } /* mode */
 
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in do_tracking! %s\n",get_error());
-           return;
-        }
-        fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-        fprintf(wfp,"%s\n","tinfo@asteroid-b612.org");
-}
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s tinfo@asteroid-b612.org",MAILPROG);
-  if (strstr(MAILPROG,"-s"))
-	u=0;
-  else
-	u=1;
-  }  
-strncpy(filename,t_mess,FILE_NAME_LEN);
-
-/* Open pipe to sendmail program */
-if (!mailgateway_port) {
-if (!(wfp=popen(filename,"w"))) 
-  {
-   write_log(ERRLOG,YESTIME,"TRACKING: Couldn't open popen(w) \"%s\" to send email in do_tracking! %s\n",filename,get_error());
-   return;
-  }
-}
-
-if (sendmail || mailgateway_port) {
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-fprintf(wfp,"To: TRACKING <%s>\n","tinfo@asteroid-b612.org");
-fprintf(wfp,"Subject: %s\n\n","TRACKING");
-}
-else if (u) {
-fprintf(wfp,"%s\n","TRACKING");
-}
-
+/* construct message */
 if (mode==1) {
 /* we are coming up */
 sprintf(mess,
@@ -21383,7 +19828,7 @@ sprintf(mess,
 SYSTEM_NAME,(unsigned int)getpid(),ROOT_ID,VERSION,thishost,thisip,PORT,
 PORT+WIZ_OFFSET,PORT+WHO_OFFSET,PORT+WWW_OFFSET,SYSTEM_EMAIL,
 system_stats.tot_users,allow_new,TTHEME,EIGHTTPLUS,thisos);
-} /* end of mode 0 */
+} /* end of mode 1 */
 else if (mode==0) {
 /* we are going down */
 	if (downmess) {
@@ -21394,13 +19839,13 @@ else if (mode==0) {
 	sprintf(mess,"SYSTEM_NAME: %s\nPID: %u\nSTATUS: DOWN Normal shutdown\nEND:\n",
 	SYSTEM_NAME,(unsigned int)getpid());
 	}
-} /* end of mode 1 */
+} /* end of mode 0 */
 
-fputs(mess,wfp);
-fputs("\n",wfp);
-fputs(".\n",wfp);
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
+/* send external email */
+if (send_ext_mail(-2, -2, 3, "TRACKING", mess, DATA_IS_MSG, "tinfo@asteroid-b612.org")==-1) {
+	write_log(ERRLOG,YESTIME,"TRACKING: Couldn't send external email in do_tracking()\n");
+	return;
+}
 
 }
 
@@ -21431,3 +19876,45 @@ tzset();
 
 }
 
+
+void old_func(int user, char *inpstr, int mode) {
+
+if (mode==1) {
+/* .desc */
+write_str(user,"NOTE! \".desc\" WILL BE DEPRECATED SOON! USE \".set desc\" INSTEAD!");
+write_str(user,"");
+set_desc(user, inpstr);
+}
+else if (mode==2) {
+/* .entpro */
+write_str(user,"NOTE! \".entpro\" WILL BE DEPRECATED SOON! USE \".set profile\" INSTEAD!");
+write_str(user,"");
+set_profile(user, inpstr);
+}
+else if (mode==3) {
+/* .fail */
+write_str(user,"NOTE! \".fail\" WILL BE DEPRECATED SOON! USE \".set fail\" INSTEAD!");
+write_str(user,"");
+set_fail(user, inpstr);
+}
+else if (mode==4) {
+/* .succ */
+write_str(user,"NOTE! \".succ\" WILL BE DEPRECATED SOON! USE \".set succ\" INSTEAD!");
+write_str(user,"");
+set_succ(user, inpstr);
+}
+else if (mode==5) {
+/* .entermsg */
+write_str(user,"NOTE! \".entermsg\" WILL BE DEPRECATED SOON! USE \".set entermsg\" INSTEAD!");
+write_str(user,"");
+set_entermsg(user, inpstr);
+}
+else if (mode==6) {
+/* .exitmsg */
+write_str(user,"NOTE! \".exitmsg\" WILL BE DEPRECATED SOON! USE \".set exitmsg\" INSTEAD!");
+write_str(user,"");
+set_exitmsg(user, inpstr);
+}
+
+
+}

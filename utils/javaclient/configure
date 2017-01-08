@@ -1,9 +1,0 @@
-#!/bin/csh -f
-# -Cygnus
-# ncohafmuta@asteroid-b612.org
-
-echo "Configuring.."
-chmod 644 *.class README *.prof Makefile java.gif index.html
-chmod 755 Doc* RCS display report socket tools display/RCS socket/RCS
-chmod 644 Doc*/* RCS/* display/*.class display/RCS/* report/*
-chmod 644 socket/*.class socket/RCS/* tools/*

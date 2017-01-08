@@ -284,7 +284,7 @@ if (mode==0) {
                         write_str(user,"----------------------------------------------------------------");
                         write_str(user,"Notice:  You are attempting to use this computer system in a way");
                         write_str(user,"         which is considered a crime under United States federal");
-                        write_str(user,"         access laws.  All attempts illegally access this site are ");
+                        write_str(user,"         access laws.  All attempts illegally accessing this site are ");
                         write_str(user,"         logged.  Repeat violators of this offense will be ");
                         write_str(user,"         prosecuted to the fullest extent of the law.");
                         write_str(user,"----------------------------------------------------------------");
@@ -553,22 +553,25 @@ void free_sock(int user, char port)
 {
                                   
 if (port=='3') {
+	if (whoport[user].sock != -1) {
 		 SHUTDOWN(whoport[user].sock, 2);
                  while (CLOSE(whoport[user].sock) == -1 && errno == EINTR)
                         ; /* empty while */
                  FD_CLR(whoport[user].sock,&readmask);
                  FD_CLR(whoport[user].sock,&writemask);
-
+	}
    whoport[user].sock=-1;
    whoport[user].site[0]=0;
    whoport[user].net_name[0]=0;
   }               
 else if (port=='4') {
+	if (wwwport[user].sock != -1) {
 		 SHUTDOWN(wwwport[user].sock, 2);
                  while (CLOSE(wwwport[user].sock) == -1 && errno == EINTR)
                         ; /* empty while */
                  FD_CLR(wwwport[user].sock,&readmask);
                  FD_CLR(wwwport[user].sock,&writemask);
+	}
    wwwport[user].sock=-1;
    wwwport[user].method=-1;
    wwwport[user].req_length=0;
@@ -582,11 +585,13 @@ else if (port=='4') {
    wwwport[user].alloced_size=0;  
   }
 else if (port=='5') {
+	if (miscconn[user].sock != -1) {
 		 SHUTDOWN(miscconn[user].sock, 2);
                  while (CLOSE(miscconn[user].sock) == -1 && errno == EINTR)
                         ; /* empty while */
                  FD_CLR(miscconn[user].sock,&readmask);
                  FD_CLR(miscconn[user].sock,&writemask);
+	}
    if (miscconn[user].type == 1) ustr[miscconn[user].user].rwho=1;
    miscconn[user].sock=-1;
    miscconn[user].user=-1;

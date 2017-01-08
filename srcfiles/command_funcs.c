@@ -291,12 +291,12 @@ if (!(fp=fopen(filename,"w"))) {
    sprintf(temp_mess,"Couldn't write last command from %s, to file! %s",strip_color(ustr[user].say_name),get_error());
    btell(user,temp_mess); 
    write_log(ERRLOG,YESTIME,"%s\n",temp_mess);
-   FCLOSE(fp);
    }
-
+else {
 fprintf(fp,"%s: Command < %s > from %s\n",get_time(0,0),inpstr,strip_color(ustr[user].say_name));
 FCLOSE(fp);
 temp_mess[0]=0;
+}
 
 if (ustr[user].numcoms==10000000) ustr[user].numcoms=1;
 ustr[user].numcoms++;
@@ -343,8 +343,8 @@ switch(sys[com_num].jump_vector) {
 	         break;  /* open */
 
 	case 35: toggle_atmos(user,inpstr); break;
-	case 36: echo(user,inpstr);  break;
-	case 37: set_desc(user,inpstr);  break;
+	case 36: my_echo(user,inpstr);  break;
+	case 37: old_func(user,inpstr,1);  break;
 	case 38: toggle_allow(user,inpstr); break;
         case 40: greet(user,inpstr); break;
 	case 41: arrest(user,inpstr,0); break;
@@ -374,7 +374,7 @@ switch(sys[com_num].jump_vector) {
 	case 70: tog_monitor(user); break;                     
 	case 71: ptell(user,inpstr); break;                
 	case 72: follow(user,inpstr); break;                
-	case 73: read_init_data(); 
+	case 73: read_init_data(1); 
 	         messcount();
 	         write_str(user,"<ok>"); 
 	         break;                  
@@ -402,7 +402,7 @@ switch(sys[com_num].jump_vector) {
 	case 102: t_who(user,inpstr,2); break;
         case 103: think(user,inpstr); break;
         case 104: sos(user,inpstr); break;
-        case 105: enter_pro(user,inpstr); break;
+        case 105: old_func(user,inpstr,2); break;
         case 106: if (!cat(FAQFILE,user,0))
                         write_str(user,NO_FAQ);
                         write_str(user,"<ok>");
@@ -416,7 +416,7 @@ switch(sys[com_num].jump_vector) {
         case 113: femote(user,inpstr); break;
         case 114: suname(user,inpstr);  break;
         case 115: supass(user,inpstr);  break;
-        case 116: enterm(user,inpstr);  break;
+        case 116: old_func(user,inpstr,5);  break;
         case 117: abbrev(user,inpstr);  break;
         case 118: newwho(user);  break;
         case 119: last_u(user,inpstr);  break;
@@ -430,8 +430,8 @@ switch(sys[com_num].jump_vector) {
                         write_str(user,NO_MAP);
                         write_str(user,"Ok");
                   break;
-        case 127: failm(user,inpstr);  break;
-        case 128: succm(user,inpstr);  break;
+        case 127: old_func(user,inpstr,3);  break;
+        case 128: old_func(user,inpstr,4);  break;
         case 129: mutter(user,inpstr);  break;
         case 130: write_board(user,inpstr,3); break; /* suggestions */
         case 131: break;
@@ -465,7 +465,7 @@ switch(sys[com_num].jump_vector) {
         case 155: descroom(user,inpstr); break;
         case 156: write_board(user,inpstr,2);  break; /* gripe_note */
         case 157: wipe_board(user,inpstr,2);  break;  /* gripe wipe */
-        case 158: exitm(user,inpstr);  break;
+        case 158: old_func(user,inpstr,6);  break;
         case 159: home_user(user);  break;
         case 160: nerf(user,inpstr);  break;
         case 161: frtell(user,inpstr); break;

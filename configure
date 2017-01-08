@@ -6,6 +6,7 @@
 #    (setenv prefix $HOME; setenv CC cc; setenv CFLAGS "-O4"; ./configure)
 
 CFLAGS="-O"
+OPTIM_CFLAGS=""
 LIBS=""
 DEBUGS=""
 EXE_EXT=""
@@ -34,9 +35,11 @@ iac_debug=0
 post_debug=0
 resolver_debug=0
 smtp_debug=0
+gcc_debug=0
 ac_option=$1
 ac_found_var=
 ac_save_LIBS=
+ac_save_CFLAGS=
 ac_func_search_save_LIBS=
 ac_hdr=
 ac_err=
@@ -46,9 +49,21 @@ ac_header_dirent=
 ac_ret_sig_type=
 ac_system_type=
 ac_config_hdr="hdrfiles/config.h"
+ac_configure_args=
 
 echo Configuration for $VERSION
 echo
+
+# Without the "./", some shells look in PATH for config.status.
+: ${CONFIG_STATUS=./config.status}
+
+for ac_option
+do
+  case "$1" in
+  *) ac_configure_args="$ac_configure_args $1" ;;
+  esac
+done
+
 
 for ac_option
 do
@@ -66,6 +81,7 @@ case "$1" in
 		echo '     --enable-post-debug       Configure to debug web server POSTing'
 		echo '     --enable-resolver-debug   Configure to debug the resolver clipon'
 		echo '     --enable-smtp-debug       Configure to debug the SMTP client'
+		echo '     --enable-gcc-debug        Configure to compile debugging code for gdb'
 		echo '     --enable-all-debug        Configure to debug everything above'
 		echo '     See docs/README.debugging for more info on the above'
 		echo ' MISC OPTIONS [you MAY choose more than 1]'
@@ -96,6 +112,8 @@ case "$1" in
 		 resolver_debug=1; shift;;
   --enable-smtp-debug) echo 'Will enable -DSMTP_DEBUG'
 		 smtp_debug=1; shift;;
+  --enable-gcc-debug) echo 'Will enable -g'
+		 gcc_debug=1; shift;;
   --enable-all-debug)
 			echo 'Will enable -DZOMBIE_DEBUG'
 			echo 'Will enable -DQWRITE_DEBUG'
@@ -254,82 +272,86 @@ echo "checking system type..." >&5
   # find system type
   case `(uname -sr || echo unknown) 2>/dev/null` in
   Linux* | linux*) ac_system_type="LINUX_SYS"
-		   CFLAGS2="-O3"
+		OPTIM_CFLAGS="-O3"
 #		   LIBS=""
 			;;
   *freebsd* | *FreeBSD*) ac_system_type="FREEBSD_SYS"
-		   CFLAGS2="-m486 -O2"
+		   OPTIM_CFLAGS="-m486 -O2"
 #		   LIBS=""
 			;;
   *openbsd* | *OpenBSD*) ac_system_type="OPENBSD_SYS"
-		   CFLAGS2="-m486 -O2"
+		   OPTIM_CFLAG="-m486 -O2"
 #		   LIBS=""
 			;;
   *netbsd* | *NetBSD*) ac_system_type="NETBSD_SYS"
-		   CFLAGS2="-m486 -O2"
+		   OPTIM_CFLAGS="-m486 -O2"
 #		   LIBS=""
 			;;
   *bsd* | *BSD*) ac_system_type="OTHERBSD_SYS"
-		   CFLAGS2="-m486 -O2"
+		   OPTIM_CFLAGS="-m486 -O2"
 #		   LIBS=""
 			;;
   *HP-UX* | *hpux*)          ac_system_type="HPUX_SYS"
-		   CFLAGS2="-O3"
-#		   CFLAGS2="-O3 -Ae"
+		   OPTIM_CFLAGS="-O3"
+#		   OPTIM_CFLAGS="-O3 -Ae"
 #		   LIBS=""
 			;;
   IRIX*)           ac_system_type="IRIX_SYS"
-		   CFLAGS2="-O3 -cckr"
+		   OPTIM_CFLAGS="-O3 -cckr"
 #                   LIBS=""
 			;;
   OSF1)            ac_system_type="OSF_SYS"
-		   CFLAGS2="-O3"
+		   OPTIM_CFLAGS="-O3"
 #                   LIBS=""
 			;;
   QNX*)            ac_system_type="QNX_SYS"
-		   CFLAGS2="-O3"
+		   OPTIM_CFLAGS="-O3"
 #                   LIBS=""
 			;;
   UnixWare* | Unixware* | unixware*)    ac_system_type="UNIXWARE_SYS"
-					CFLAGS2="-O3"
+					OPTIM_CFLAGS="-O3"
 #					LIBS="-lnsl -lsocket"
 					;;
   DYNIX* | Dynix* | dynix*)     ac_system_type="DYNIX_SYS"
-				CFLAGS2="-O3"
+				OPTIM_CFLAGS="-O3"
 #				LIBS="-lnsl -lsocket"
 				;;
   SCO*)             ac_system_type="SCO_SYS"
-		    CFLAGS2="-O3"
+		    OPTIM_CFLAGS="-O3"
 #                   LIBS="-lsocket"
 			;;
   AIX* | Aix* | aix*)       ac_system_type="AIX_SYS"
-		    CFLAGS2="-O3"
+		    OPTIM_CFLAGS="-O3"
 #                   LIBS="-lmalloc -lsocket -lnsl"
 			;;
   SunOS\ 5*)       ac_system_type="SUNOS5_SYS"
-		    CFLAGS2="-O3"
+		    OPTIM_CFLAGS="-O3"
 #                   LIBS="-lmalloc -lsocket -lnsl"
 			;;
   SunOS\ 4*)       ac_system_type="SUNOS4_SYS"
-		    CFLAGS2="-O3"
+		    OPTIM_CFLAGS="-O3"
 #                   LIBS="-lmalloc -lsocket -lnsl"
 			;;
   UNIX_System_V\ 4.2.0) ac_system_type="SYSV_SYS"
-			CFLAGS2="-O3"
+			OPTIM_CFLAGS="-O3"
 #                   LIBS=""
 			;;
   UNIX_SV\ 4.2MP) ac_system_type="SV_SYS"
-			CFLAGS2="-O3"
+			OPTIM_CFLAGS="-O3"
 #                   LIBS=""
 			;;
+  Darwin* | darwin* | DARWIN*)       ac_system_type="MACOSX_SYS"
+		    OPTIM_CFLAGS="-O"
+#                   LIBS="-lmalloc -lsocket -lnsl"
+			;;
   *cygwin* | *CYGWIN* | *CygWIN*)         ac_system_type="CYGWIN_SYS"
-			CFLAGS2="-O3"
+			OPTIM_CFLAGS="-O3"
 			EXE_EXT=".exe"
 #                   LIBS=""
 			;;
   # send working options for other systems to support@gzip.org
   *)         ac_system_type="UNKNOWN_SYS"
-			CFLAGS2="-O3"
+			OPTIM_CFLAGS="-O3"
 #                   LIBS=""
 			;;
   esac
@@ -713,6 +735,11 @@ rm -f conftest*
 if test "$ac_found_var" = "no"; then
   ac_found_var="int"
 fi
+fi
+# HACK FOR DARWIN/MACOSX, where this returns size_t, but manpages
+# and includes say int, producing warnings
+if test "$ac_system_type" = "MACOSX_SYS" && test "$ac_found_var" = "size_t"; then
+  ac_found_var="int"
 fi
 echo "$ac_found_var"
   cat >> $ac_config_hdr <<EOF
@@ -1453,6 +1480,47 @@ EOF
 
 ac_found_var="no"
 
+# START SIGNAL PROTOTYPE CHECK
+ac_save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Wstrict-prototypes"
+
+echo $ac_n "checking if SIG_IGN function declaration is a prototype... "
+echo "checking if SIG_IGN function declaration is a prototype..." >&5
+cat > conftest.$ac_ext <<EOF
+#include <sys/types.h>
+#include <signal.h>
+#ifdef signal
+#undef signal
+#endif
+
+int main(void) {
+signal(SIGINT, SIG_IGN);
+return 0; }
+EOF
+ac_try="$ac_compile >/dev/null 2>conftest.out"
+{ (eval echo configure:xxx: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  rm -rf conftest*
+  ac_found_var="yes"
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  ac_found_var="no"
+fi
+rm -f conftest*
+CFLAGS="$ac_save_CFLAGS"
+
+echo "$ac_found_var"
+if test "$ac_found_var" = "yes"; then
+cat >> $ac_config_hdr <<EOF
+#define HAVE_SIG_IGN_PROTO 1
+EOF
+fi
+
+ac_found_var="no"
+
 # check TYPE of signals
 
 echo $ac_n "checking flavor of signal routines... "
@@ -1629,6 +1697,15 @@ elif test "$warnings" -eq 3; then
 	CFLAGS2="$CFLAGS2 -Wall -Wpointer-arith -Wcast-qual -Wcast-align -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wnested-externs -Winline -Wshadow -pedantic"
 fi
 
+if test "$gcc" -eq 1 && test "$gcc_debug" -eq 1; then
+ CFLAGS2="-g $CFLAGS2"
+fi
+
+if test "$optims" -eq 1; then
+	CFLAGS2="$OPTIM_CFLAGS $CFLAGS2"
+fi
+
+
 ac_found_var="no"
 
 # START RES_NMKQUERY CHECK
@@ -1785,7 +1862,24 @@ fi
 
 rm -fr conftest*
 
+echo
+echo creating $ac_config_hdr
+echo creating $CONFIG_STATUS
+
 CFLAGS2="-DHAVE_CONFIG_H $CFLAGS2"
+
+rm -f $CONFIG_STATUS 2>/dev/null
+echo "#!/bin/sh" > $CONFIG_STATUS
+echo "#" >> $CONFIG_STATUS
+echo "# Re-run this script to generate the same configuration" >> $CONFIG_STATUS
+echo "# as you had on the last successful run of configure" >> $CONFIG_STATUS
+echo "#" >> $CONFIG_STATUS
+echo "" >> $CONFIG_STATUS
+echo $0 $ac_configure_args >> $CONFIG_STATUS
+echo "" >> $CONFIG_STATUS
+chmod a+x $CONFIG_STATUS
+
+echo creating Makefile
 
 echo "# Makefile generated on `date` for $VERSION" > Makefile
 echo "#" >> Makefile
@@ -1797,5 +1891,5 @@ echo "VERSION = $VERSION" >> Makefile
 cat Makefile.in >> Makefile
 
 echo
-echo Makefile created!
 echo You should now run \"make\" to compile the talker
+

@@ -3,9 +3,8 @@ of a good talker is its atmosphere, and you wont get that just by copying
 this code. You have to code hard, make it unique and be prepared to put in 
 major amounts of time and effort."
 
-README file for Ncohafmuta 1.2.3 Talker program
-http://www.asteroid-b612.org/ncohafmuta/
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+README file for the Ncohafmuta 1.4.x talker program
+-------------------------------------------------------------------
 
 This file is in the directory "docs/"
 
@@ -166,10 +165,6 @@ utils/restore    - Script to restore all or partial files from a backup
 utils/no_make_compile - Script for compiling the talker on systems
                         without the "make" command
 utils/code_fragments/  - Directory containing miscellaneous talker code
-utils/javaclient/ - Directory containing a JAVA telnet client for the
-                    talker if the server the talker is on is a www server.
-utils/javaclient/README  - Readme file for the java client, if you can use
-			   this.
 utils/trace      - Script to run the strace program with a pid argument
 utils/trimbackups.c - Program to trim backups created with backup script
 wizinfo          - Directory containing wizard information (emails, etc..)
@@ -177,8 +172,12 @@ warnings         - Directory containing logs for problem users (made from
                    .wlog)
 webfiles	 - Directory containing files and config for the external
 		   web port
+webfiles/connect - Directory containing files for Dave Jarvis's Terminal 
+		   Emulator. The index.html file is already configured for use
+		   under the code's webport. Read the README in there.
 
 
 -Cygnus
 ncohafmuta@asteroid-b612.org
-02-24-02
+http://www.asteroid-b612.org/ncohafmuta/
+11-05-03

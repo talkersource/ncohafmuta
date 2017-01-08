@@ -70,12 +70,12 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"quest")) {
     strcpy(info,"Vision Quest (talker.com 6000)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=6001;
     }
   else if (!strcmp(inpstr,"spell")) {
     strcpy(info,"Spellbinder (talker.com 9999)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=9990;
     }
   else if (!strcmp(inpstr,"trek")) {
@@ -95,7 +95,7 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"breck")) {
     strcpy(info,"BreckTown (talker.com 5000)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=5001;
     }
   else if (!strcmp(inpstr,"light")) {
@@ -106,22 +106,22 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"globe")) {
     strcpy(info,"The Globe (talker.com 9050)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=9051;
     }
   else if (!strcmp(inpstr,"grease")) {
     strcpy(info,"Grease (talker.com 9500)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=9510;
     }
   else if (!strcmp(inpstr,"jour")) {
     strcpy(info,"Journeys (talker.com 9000)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=8999;
     }
   else if (!strcmp(inpstr,"jungle")) {
     strcpy(info,"The Jungle (talker.com 3050)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=3051;
     }
   else if (!strcmp(inpstr,"pw")) {
@@ -131,17 +131,17 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"scu")) {
     strcpy(info,"State of Conf. Uni. (talker.com 3500)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=3501;
     }
   else if (!strcmp(inpstr,"sommer")) {
     strcpy(info,"Sommerland (talker.com 5555)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=5560;
     }
   else if (!strcmp(inpstr,"village")) {
     strcpy(info,"The Village (village.pb.net 5000)");
-    strcpy(addy,"204.117.211.4");
+    strcpy(addy,"204.117.211.9");
     portnum=5001;
     }
   else if (!strcmp(inpstr,"wjjm")) {
@@ -161,32 +161,32 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"chakrams")) {
     strcpy(info,"Chakrams and Scrolls (talker.com 8000)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=8001;
     }
   else if (!strcmp(inpstr,"dark")) {
     strcpy(info,"Dark Tower (talker.com 5432)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=5433;
     }
   else if (!strcmp(inpstr,"flirt")) {
     strcpy(info,"Flirt Town (talker.com 3200)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=3201;
     }
   else if (!strcmp(inpstr,"invas")) {
     strcpy(info,"Invasions (talker.com 9786)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=9788;
     }
   else if (!strcmp(inpstr,"mega")) {
     strcpy(info,"Mega MoviePlex (talker.com 7000)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=7002;
     }
   else if (!strcmp(inpstr,"merlin")) {
     strcpy(info,"Merlin\'s Hideaway (talker.com 9876)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=9873;
     }
   else if (!strcmp(inpstr,"north")) {
@@ -196,12 +196,12 @@ if (inpstr[0]=='@') {
     }
   else if (!strcmp(inpstr,"ocean")) {
     strcpy(info,"Oceanhome (talker.com 4000)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=4005;
     }
   else if (!strcmp(inpstr,"path")) {
     strcpy(info,"The Path Of The Unicorn (talker.com 4444)");
-    strcpy(addy,"66.100.254.11");
+    strcpy(addy,"66.101.11.58");
     portnum=4446;
     }
   else if (!strcmp(inpstr,"emerald")) {

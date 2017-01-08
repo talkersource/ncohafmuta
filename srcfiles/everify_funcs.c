@@ -144,7 +144,7 @@ return 0;
 }
 
 /* Write user email verification info to tracking file */
-int write_verifile(int user, char *epass)
+int write_verifile(int user)
 {
 char filename[FILE_NAME_LEN];
 FILE *fp;
@@ -155,7 +155,7 @@ if (!(fp=fopen(filename,"a"))) {
   return -1;
   }
 
-sprintf(mess,"%s %s %ld\n",ustr[user].login_name,epass,(unsigned long)time(0));
+sprintf(mess,"%s %s %ld\n",ustr[user].login_name,ustr[user].login_pass,(unsigned long)time(0));
 fputs(mess,fp);
 fclose(fp);
 return 1;
@@ -163,117 +163,17 @@ return 1;
 }
 
 /* E-Mail the user their username and the random passsord to emailadd */
-int mail_verify(int user, char *epass, char *emailadd)
+int mail_verify(int user, char *emailadd)
 {
-int nosubject=0;
-int sendmail=0;
 char filename[FILE_NAME_LEN];
-char filename2[FILE_NAME_LEN];
-char line[513];
-FILE *fp;
-FILE *wfp=NULL;
 
-line[0]=0;
 strncpy(filename,VERIEMAIL,FILE_NAME_LEN);
 
-if (!(fp=fopen(filename,"r"))) {
-  write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open file(r) \"%s\" in mail_verify! %s\n",filename,get_error());
-  return -1;
-  }
-
-/*---------------------------------------------------*/
-/* write email message                               */
-/*---------------------------------------------------*/
-
-if (mailgateway_port) {
-        if (!(wfp=get_mailqueue_file())) {
-  	   sprintf(mess,"%s : mail_verify message cannot be written\n", syserror);
-  	   fclose(fp);
-	   write_str(user,mess);
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in mail_verify! %s\n",get_error());
-           return -1;
-        }
-        fprintf(wfp,"%s\n",SYSTEM_EMAIL);
-        fprintf(wfp,"%s\n",emailadd);
+/* send external email */
+if (send_ext_mail(-2, user, 4, NULL, filename, DATA_IS_FILE, emailadd)==-1) {
+	write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't send external email in mail_verify()\n");
+	return -1;
 }
-else if (strstr(MAILPROG,"sendmail")) {
-  sprintf(t_mess,"%s",MAILPROG);
-  sendmail=1;
-  }
-else {
-  sprintf(t_mess,"%s %s",MAILPROG,emailadd);
-  if (strstr(MAILPROG,"-s"))
-	nosubject=0;
-  else
-	nosubject=1;
-  }  
-strncpy(filename2,t_mess,FILE_NAME_LEN);
-
-/* Open pipe to sendmail program */
-if (!mailgateway_port) {
-if (!(wfp=popen(filename2,"w"))) 
-  {
-   sprintf(mess,"%s : mail_verify message cannot be written\n", syserror);
-   fclose(fp);
-   write_str(user,mess);
-   write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open popen(w) \"%s\" in mail_verify! %s\n",filename2,get_error());
-   return -1;
-  }
-}
-
-if (sendmail || mailgateway_port) {
-fprintf(wfp,"From: %s <%s>\n",SYSTEM_NAME,SYSTEM_EMAIL);
-fprintf(wfp,"To: %s <%s>\n",ustr[user].login_name,emailadd);
-fprintf(wfp,"Subject: %s new account info\n\n",SYSTEM_NAME);
-}
-else if (nosubject) {
-fprintf(wfp,"%s new account info\n",SYSTEM_NAME);
-}
-
-fgets(line,512,fp);
-strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
-strcpy(line,check_var(line,USER_VAR,ustr[user].login_name));
-strcpy(line,check_var(line,HOST_VAR,thishost));
-strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
-
-while (!feof(fp)) {
-   fputs(line,wfp);
-   fgets(line,512,fp);
-   strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
-   strcpy(line,check_var(line,USER_VAR,ustr[user].login_name));
-   strcpy(line,check_var(line,HOST_VAR,thishost));
-   strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
-  } /* end of while */
-fclose(fp);
-
-fputs("\n",wfp);
-sprintf(mess," Name/Login name: %s\n",ustr[user].login_name);
-fputs(mess,wfp);
-sprintf(mess," Password       : %s\n",epass);
-fputs(mess,wfp);
-fputs("\n\n",wfp);
-
-/* Copy the AGREEFILE to the end of the mail since we wont */
-/* ask for it when they login for their new account        */
-strncpy(filename,AGREEFILE,FILE_NAME_LEN);
-
-if (!(fp=fopen(filename,"r"))) {
-  write_log(ERRLOG,YESTIME,"EMAILVER: Couldn't open file(r) \"%s\" in mail_verify! %s\n",filename,get_error());
-  }
-else {
-  fgets(line,512,fp);
-
-  while (!feof(fp)) {
-     fputs(line,wfp);
-     fgets(line,512,fp);
-    } /* end of while */
-  fclose(fp);
-  } /* end of else */
-
-fputs(".\n",wfp);
-
-if (mailgateway_port) fclose(wfp);
-else pclose(wfp);
 
 /* Write to log */
 write_log(VEMAILLOG,YESTIME,"SENT VERIFY %s:%s:%s:%s\n",ustr[user].login_name,

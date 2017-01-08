@@ -34,7 +34,7 @@ extern int autopromote; /* allowing users to promote themselves? */
 /* logging_in = 11  User at info press-return prompt (normal)	    */
 /* logging_in = 12  User at info press-return prompt (new user)	    */
 /*------------------------------------------------------------------*/
-void login(int user, char *inpstr)
+void my_login(int user, char *inpstr)
 {
   char         name[ARR_SIZE];
   char         passwd[ARR_SIZE];
@@ -81,20 +81,19 @@ void login(int user, char *inpstr)
       return;
       }
     /* Generate password */
-    strcpy(email_pass,generate_password());
+    strcpy(ustr[user].login_pass,generate_password());
+    strcpy(ustr[user].say_name,ustr[user].login_name);
 
     /* Email user with password */
-    if (mail_verify(user,email_pass,email) == -1) {
+    if (mail_verify(user,email) == -1) {
       write_str(user,"Mail message could not be sent. Try later.");
-      email_pass[0]=0;
       user_quit(user,1);
       return;
       }
 
     /* Encrypt password writing time, user, and password to VERIFILE */
-    st_crypt(email_pass);
-    write_verifile(user,email_pass);
-    email_pass[0]=0;
+    st_crypt(ustr[user].login_pass);
+    write_verifile(user);
 
     /* Tell them their username and a password was mailed to them */
     write_str(user,"");
@@ -255,7 +254,7 @@ if (ustr[user].pause_login==1) {
      /* If they pass ask them for the password                   */
    if (allow_new==1) {
      if (check_verify(user,0) == 1) {
-	     if (check_restriction(user, NEW) == 1)
+	     if (check_restriction(user, NEW, ANY) == 1)
 		{
 		write_log(BANLOG,YESTIME,"MAIN: Creation attempt by %s, back from emailver, BANNEWed site %s:%s:sck#%d:slt#%d\n",ustr[user].login_name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
 		attempts(user);
@@ -273,7 +272,7 @@ if (ustr[user].pause_login==1) {
      } /* end of check_verify */
 
         /* First check if new users are banned from this site */
-        if (check_restriction(user, NEW) == 1)
+        if (check_restriction(user, NEW, ANY) == 1)
          {
 	  write_log(BANLOG,YESTIME,"MAIN: Creation attempt by %s, BANNEWed site %s:%s:sck#%d:slt#%d\n",ustr[user].login_name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
           attempts(user);
@@ -487,7 +486,7 @@ write_str(user,"+---------------------------------------------------------------
      /* The file does not exists, so the user has   */      
      /* no previous account                         */      
      /*---------------------------------------------*/      
-     if (check_restriction(user, NEW) == 1)
+     if (check_restriction(user, NEW, ANY) == 1)
        {
 	write_log(BANLOG,YESTIME,"MAIN: Creation attempt by %s, BANNEWed site %s:%s:sck#%d:slt#%d\n",ustr[user].login_name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
         attempts(user);
@@ -563,6 +562,10 @@ write_str(user,"+---------------------------------------------------------------
      init_user(user);
      copy_from_user(user);                        
      write_user(ustr[user].login_name);            
+     /* update staff list file */
+     /* this will probably only get hit on ROOT_ID creation */
+     /* since no NEW user is given a level of WIZ_LEVEL     */
+     if (ustr[user].super >= WIZ_LEVEL) do_stafflist();
      ustr[user].logging_in=12;
      if (ustr[user].pause_login==1) {
       write_str_nr(user,"--- Press <ENTER> to complete login ---");

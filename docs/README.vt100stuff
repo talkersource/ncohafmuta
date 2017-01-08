@@ -1,3 +1,35 @@
+TELOPT NEGOTIATION
+------------------------
+CLIENT		RESPONSE
+TinyFugue
+ TTYPE		WONT
+ NAWS		WILL
+ ECHO		DONT
+ EOR		DO
+Gmud
+ All		No IAC response
+Windows Telnet
+ TTYPE		WILL,term_type
+ ECHO		DO
+Linux Telnet
+ TTYPE		WILL,term_type
+ ECHO		DO
+ EOR		DONT
+SecureCRT
+ TTYPE		WILL,term_type
+ ECHO		DO
+ EOR		DONT
+ GA		Not recognized
+Putty
+ TTYPE		WILL,term_type
+ NAWS		WILL
+ ECHO		WILL
+ SGA		WILL,DO
+ EOR		DONT
+ TSPEED		WILL
+ NEW_ENVIRON	WILL
+
+
 VT100/ANSI Code Reference
 -------------------------
 

@@ -1153,12 +1153,12 @@ switch (resolves[slot].result) {
 		break;
     } /* end of switch */
 #if defined(HAVE_SNPRINTF)
-snprintf(mess,256,"%d %s %s",resolves[slot].user,resolves[slot].site,resolves[slot].hostname);
+snprintf(mess,256,"%d %s %s ",resolves[slot].user,resolves[slot].site,resolves[slot].hostname);
 #else
-sprintf(mess,"%d %s %s",resolves[slot].user,resolves[slot].site,resolves[slot].hostname);
+sprintf(mess,"%d %s %s ",resolves[slot].user,resolves[slot].site,resolves[slot].hostname);
 #endif
 write_stdout(mess);
-write_log(RESOLVELOG,YESTIME,"CLIPON: RESULT: Wrote results \"%s\" to talker (total time %d secs)\n",mess,(int)(time(0)-resolves[slot].starttime));
+write_log(RESOLVELOG,YESTIME,"CLIPON: RESULT: Wrote results \"%s\" from fd %d to talker (total time %d secs)\n",mess,resolves[slot].fd,(int)(time(0)-resolves[slot].starttime));
 init_structs(slot);
 }
 
@@ -2113,7 +2113,7 @@ setsignal(int sig, handler_t handler)
         new.sa_flags |= SA_RESTART;
 #endif
         if (sigaction(sig, &new, &old) < 0)
-                return (SIG_ERR);
+                return ((handler_t)SIG_ERR);
         oldh = old.sa_handler;
 
 #elif defined(HAVE_SIGMASK)

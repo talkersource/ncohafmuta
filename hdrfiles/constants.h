@@ -1,5 +1,5 @@
 /*----------------------------------------------------------------------*/
-/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.2.3    */
+/* Now Come on Over Here And Fuck Me Up The Ass - Ncohafmuta V 1.4.x    */
 /*----------------------------------------------------------------------*/
 /*  This code is a collection of software that originally started       */
 /*  as a system called:                                                 */
@@ -17,20 +17,31 @@
 /*----------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------*/
+/* NOTES:                                                               */
+/*                                                                      */
+/* I apologize for how spread apart and disorganized the options and    */
+/* settings in this file are. Some settings should not be changed,      */
+/* others, you really should. Most are labeled as such for you. It's    */
+/* long overdue for all the talker options to go into a dynamic, global */
+/* config file. Believe me though, it's in the works. If you have any   */
+/* questions, let me know.                                              */
+/*                                                                      */
 /* For the programically-challenged..                                   */
 /* If you need to put double quotes (") inside a #define string         */
 /* i.e. a #define enclosed by quotes, you MUST escape the double quote  */
 /* like this:  \"                                                       */
 /* THIS IS WRONG: #define VARIABLE "This a my "first" string"           */
 /* THIS IS RIGHT: #define VARIABLE "This a my \"first\" string"         */
+/*                                                                      */
+/*                                                      -Cygnus         */
 /*----------------------------------------------------------------------*/
 
-/* last modified: Mar 2nd, 2002  Cygnus */
+/* last modified: Oct 5th, 2003  Cygnus */
 
 #ifndef _CONSTANTS_H
 #define _CONSTANTS_H
 
-#define VERSION  "Ncohafmuta 1.2.3 by Cygnus"
+#define VERSION  "Ncohafmuta 1.4.0 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
@@ -76,25 +87,25 @@
 /*------------------------------------------------------------*/
 #define DEF_HOSTNAME ""
 
-/*--------------------------------------------------------*/
-/* change BOT_ID to the bot's id on this system           */
-/* if you're using the bot, otherwise comment out         */
-/* THIS SHOULD BE ALL LOWERCASE!                          */
-/*--------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* change BOT_ID to the bot's id on this system,              */
+/* if you're using the bot, otherwise comment out             */
+/* THIS SHOULD BE ALL LOWERCASE!                              */
+/*------------------------------------------------------------*/
 #define BOT_ID       "spokes"
 
-/*--------------------------------------------------------*/
-/* change this to the name of the owner of the bot        */
-/* THIS SHOULD BE ALL LOWERCASE!                          */
-/*--------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* change this to the username, of the owner, of the bot,     */
+/* if you're using the bot, otherwise comment out             */
+/* THIS SHOULD BE ALL LOWERCASE!                              */
+/*------------------------------------------------------------*/
 #define BOTS_ROOTID  "cygnus"
 
-/*---------------------------------------------------------------------*/
-/* Set to what you want to call the talker and then change the rest of */
-/* occurences where you see the marker  SYSNAME                        */
-/*                                                                     */
-/* DO NOT USE A DOUBLE QUOTE (") IN THE NAME                           */
-/*---------------------------------------------------------------------*/
+/*------------------------------------------------------------*/
+/* Set this to what you want to call the talker               */
+/*                                                            */
+/* DO NOT USE A DOUBLE QUOTE (") IN THE NAME                  */
+/*------------------------------------------------------------*/
 #define SYSTEM_NAME "Test-Talker2"
 
 /*------------------------------------------------------------*/
@@ -289,7 +300,10 @@ extern int num_locks;
 #define INVIS_TALK_LABEL   "A mysterious voice"
 #define INVIS_MOVES        "Something disturbs the air."
 
-#define STAFF_PREFIX       "<wiz>" /* goes before wiztells and wiz messes */
+			   /* goes before wiztells and wiz messes */
+#define STAFF_PREFIX       "<wiz>"
+			   /* rank header for .wlist output. %s is the rank */
+#define STAFF_FILE_HEADER  "                             ^HG---===^ ^HY%s^ ^HG===---^"
 
 #define NOW_PUBLIC      "Room access returned to public"
 #define WHO_COLOR       "Current citizens on ^HM%s^"
@@ -396,15 +410,15 @@ extern int num_locks;
 #define MAIL_NEW "\07You have  ^HG%i ^ new mail message%s"
 #define MAIL_ACCESS "==> last mail access was %s"
 
-/* SYSNAME */
+/* Banner for the external who port                     */
+/* EXT_WHO3 inserts SYSTEM_NAME and the who port number */
 #define EXT_WHO1 "+------------------------------------------+\n\r"
-#define EXT_WHO2 "| External who list                V1.2    |\n\r"
-#define EXT_WHO3 "| For PinWHeeLs  Port %-4d                 |\n\r"
+#define EXT_WHO2 "  External who list              V1.4\n\r"
+#define EXT_WHO3 "  For %-25s  Port %-4d\n\r"
 #define EXT_WHO4 "+------------------------------------------+\n\r\n\r"
-/* SYSNAME */
 
 /*------------------------------------------------------------------*/
-/* these are the files needed to run the talker                     */
+/* These are the files needed to run the talker                     */
 /*------------------------------------------------------------------*/
 
 #define INIT_FILE    "init_data"
@@ -539,8 +553,8 @@ extern int num_locks;
 /* room or area constants                                            */
 /*-------------------------------------------------------------------*/
 
-#define MAX_AREAS   60      /* max rooms for server                       */
-#define PRINUM      2       /* no. of users in room b4 it can be private  */ 
+#define MAX_AREAS   60      /* Max num. of rooms the talker will support  */
+#define PRINUM      2       /* Num. of users in room b4 it can be private */ 
 #define ARREST_ROOM "outhouse"  /* room that arrested users go to         */
 #define HEAD_ROOM   "headquarters"  /* room for special users only, which */
                                     /* are defined in go()                */
@@ -563,24 +577,34 @@ extern int num_locks;
 /*-----------------------------------------------*/
 /* wiz only flag                                 */
 /*-----------------------------------------------*/
+/* only Cygnus should change */
 #define WIZ_ONLY -4
 
 /*--------------------------------------------------------*/
 /* terminal control switch settings                       */
 /*--------------------------------------------------------*/
+/* only Cygnus should change */
 #define NORM      0
 #define BOLD      1
 
 /* Restriction variables */
+/* only Cygnus should change */
 #define NEW             1
 #define ANY             2
+#define THEIR_IP	3
+#define THEIR_HOST	4
 
+/* Buffer variables */
+/* only Cygnus should change */
 #define SIZ            500
 #define MAX_CHAR_BUFF  560 /* max output a user can give in one shot */   
                            /* default was 380, about 4.5 lines, now  */   
                            /* 7 lines.. 80 chars x 7 lines is 560    */   
 
-#define SHOW_HIDDEN     1
+/* Options you can set - requires recompile and soft or hard reboot */
+#define SHOW_HIDDEN     1   /* determines whether users with a rank at */
+			    /* or above ROOMVIS_LEVEL can see the name */
+			    /* of a hidden/invis room a user is in     */
 
 #define SHOW_SREBOOT	2   /* set to 2 if you want to show all users */
 			    /* that a soft-reboot is taking place.    */
@@ -639,8 +663,8 @@ extern int num_locks;
                             /* 0 disables who at the login prompt      */
 			    /* 1 is a .swho   2 is a normal .who       */
 
-#define REBOOT_A_CRASH  0   /* if we crash from a segmentation fault or */
-                            /* bus error (usual crash causes) should we */
+#define REBOOT_A_CRASH  0   /* if we crash from a segmentat. fault, bus */
+                            /* error, or other fatal causes, should we  */
                             /* reboot? 1 for yes, 0 for no              */
 
 #define NUM_MOTDS       2   /* number of MOTDs in the lib directory     */
@@ -656,7 +680,8 @@ extern int num_locks;
                             /* ,etc.. will be banned                    */
                             /* Set to 1 for sub-strings, 0 for exactly  */
 
-#define MAX_NEW_PER_DAY 50  /* Max new users per day the system allows  */
+#define MAX_NEW_PER_DAY 50  /* The maximum new users per day the system */
+			    /* allows to be created.                    */
 			    /* Can change online with ".quota"          */
 
 #define TRIM_BACKUPS	3   /* days to trim backup logs to		*/
@@ -709,6 +734,41 @@ extern int num_locks;
 				/* CHANGING THIS REQUIRES A HARD-REBOOT	*/
 				/* OR NORMAL BOOT FOR IT TO TAKE EFFECT	*/
 
+#define DO_TRACKING	1	/* set this to 1 if you want the talker */
+				/* to send an email out to cygnus when  */
+				/* the talker comes up or goes down.    */
+				/* This does not send any sensitive     */
+				/* information, and is used mainly to   */
+				/* keep track of who is using the code  */
+				/* and to see if they need assistance.  */
+				/* See docs/README.tracking 4 more info */
+				/* Normally set to 1. 0 to turn off.    */
+
+#define IDLE_TIME	240	/* time in mins. a user can idle before */
+				/* they are disconnected from talker    */
+
+#define LOGIN_TIMEOUT	2	/* time in mins. before a user is       */
+				/* kicked out of the login prompt       */
+
+/*-------------------------------------------------------------------*/
+/* Login-limiting                                                    */
+/*                                                                   */
+/* Login-limiting by the talker prevents a client/user from a single */
+/* ip, from hammering a login port in order to hog system resources  */
+/* or fill up all connection slots, preventing other users from      */
+/* logging in. This feature tries to stop this by only allowing X    */
+/* connection per minute by a single IP. If an ip violates that amt. */
+/* the talker auto-restricts said ip, and kills all current connexs  */
+/* currently held by said ip                                         */
+/*-------------------------------------------------------------------*/
+#define LOGIN_LIMITING		1	/* should we enable login-limiting? */
+					/* 1 for yes, 0 for no              */
+#define MAX_CONNLIST_ENTRIES    20      /* how many UNIQUE ips should we    */
+                                        /* hold at one time, per minute?    */
+#define MAX_CONNS_PER_MIN       10      /* how many connections should we   */
+                                        /* allow from an ip before we ban?  */
+
+
 /* Standard footer that is put on the end of an auto-forwarded smail */
 #define EXT_MAIL1     "\n          ---------------------------------------------------------------\n"
 #define EXT_MAIL2     "                       This is your new mail from %s\n"
@@ -742,6 +802,7 @@ extern int num_locks;
 
 /*-------------------------------------------------------------------*/
 /* alarm, timers, countdowns, and atmos info                         */
+/* see helpfiles/set_atmos for more info                             */
 /*-------------------------------------------------------------------*/
 #ifdef _DEFINING_CONSTANTS
 int     ATMOS_RESET     = 5;
@@ -758,9 +819,6 @@ extern int ATMOS_LAST;
 #define MAX_ATIME     60    /* alarm time in seconds */
                             /* DONT CHANGE unless you know what */
                             /* you're doing                     */
-#define IDLE_TIME     240   /* time in mins. user can idle before booting */
-#define LOGIN_TIMEOUT 2     /* time in mins. before the user is       */
-                            /* kicked out of the login prompt         */
 
 /*---------------------------------------*/
 /* Definitions for the types of commands */
@@ -776,11 +834,12 @@ extern int ATMOS_LAST;
 #define BANS 7
 #define SETS 8
 
+
 /* Globals that have to do with ranks */
 /* NOTE: It is not wise to EVER make the superuser rank and the  */
 /* Senior level the same number                                  */
 
-/* the structure, NOT the actual ranks */
+/* the structure, NOT the actual ranks - only cygnus should change */
 typedef struct
 {
         char *lname;   /* long level name */
@@ -791,7 +850,7 @@ typedef struct
 } rank_struct;
 #ifdef _DEFINING_CONSTANTS
 rank_struct ranks[] = {
-			/* CHANGE THESE */
+			/* YOU SHOULD CHANGE THESE */
 	/* LONG NAME */		/* SHORT */	/* ABBR */ /* ODDS */
         {"a Newbie",              "Newbie",       '0',    10},
         {"a Wheeler",             "Wheeler",      '1',    30},
@@ -805,6 +864,8 @@ rank_struct ranks[] = {
 extern rank_struct ranks[];
 #endif
 
+/* Features restricted by level */
+/* You can change these */
 #define RANK_LEN	8    /* length of your longest SHORT rank name	*/
 			     /* (sname). for formatting in .who		*/
 #define MIN_HIDE_LEVEL  2    /* level at which invisibility is allowed */
@@ -824,16 +885,17 @@ extern rank_struct ranks[];
 #define IDLE_LEVEL      2    /* level exempt from idle timeouts  */
 #define TELEP_LEVEL     2    /* level that can teleport to rooms */
 #define VOTE_LEVEL	3    /* level that can do -c and -d and read tallies on votes */
+#define MMAIL_LEVEL     2    /* lowest level that can mass-mail */
 #define PRIV_ROOM_RANK  2    /* rank before private without two users   */
 #define EXPIRE_EXEMPT  -1    /* users at or above this level get 30     */
                              /* extra days before they're up for an     */
                              /* expire.  Set to -1 to disable the bonus */
-#define WIZ_LEVEL       2    /* wiz rank         */
-                             /* this user is seen under .wizards, gets */
-                             /* wiztells, can go through gags and      */
-                             /* other priv-com stopage, etc.. */
-#define SENIOR_LEVEL    3    /* level that can unmuzzle THEMSELVES  */
-#define MAX_LEVEL       4    /* highest level in the system  */
+#define WIZ_LEVEL       2    /* Wizard/Staff rank			*/
+                             /* this user is seen under .wizards, gets	*/
+                             /* wiztells, can go through gags and	*/
+                             /* other priv-com stopage, etc..		*/
+#define SENIOR_LEVEL    3    /* level that can unmuzzle THEMSELVES	*/
+#define MAX_LEVEL       4    /* highest level in the system		*/
 
 
 /* Do NOT make TO_SAME and TO_ABOVE both 1..it doesn't work      */
@@ -1249,6 +1311,8 @@ struct profile {
 	int log_stage;		/* 1.2.2b */
 	char temp_buffer[80];	/* 1.2.2b */
 	int tempnum1;		/* 1.2.2 - temp - was igtell */
+	int term_type;		/* 1.3.2 */
+	char prev_term_type[10];	/* 1.3.2 */
         };
 /* typedef profile *UserPtr; */
 #ifdef _DEFINING_CONSTANTS
@@ -1335,6 +1399,12 @@ struct {
 	char site[21];
 	} miscconn[MAX_MISC_CONNECTS];
 
+struct {
+        char site[16];
+        time_t starttime;
+        int connections;
+} connlist[MAX_CONNLIST_ENTRIES];
+
 /* Log facility definitions */
 #define VEMAILLOG	0	/* email verification */
 #define LOGINLOG	1	/* connect and login log */
@@ -1371,20 +1441,53 @@ log_struct logfacil[] = {
 extern log_struct logfacil[];
 #endif
 
+typedef struct {
+	int jump_vector;
+        char name[10];
+        char hion[10];
+        char hioff[10];
+        char cls[20];
+} term_struct;
+
+#ifdef _DEFINING_CONSTANTS
+term_struct terms[] = {
+                {0, "xterm", "\033[1m", "\033[m", "\033[H\033[2J"},
+                {1, "vt220", "\033[1m", "\033[m", "\033[H\033[J"},
+                {2, "vt100", "\033[1m", "\033[m", "50\033[;H\0332J"},
+                {3, "vt102", "\033[1m", "\033[m", "50\033["},
+                {4, "ansi", "\033[1m", "\033[0m", "50\033[;H\0332J"},
+                {5, "wyse-30", "\033G4", "\033G0", ""},
+                {6, "tvi912", "\033l", "\033m", "\032"},
+                {7, "sun", "\033[1m", "\033[m", "\014"},
+                {8, "adm", "\033)", "\033(", "1\032"},
+                {9, "hp2392", "\033&dB", "\033&d@", "\033H\033J"},
+                {-1, "", "", "", ""}
+                };
+#else
+extern term_struct terms[];
+#endif
+
 /***** EXPERIMENTAL VARIABLES *****/
 
 /* Web server return errors */
 #define BAD_REQUEST		1
 #define NOT_FOUND		2
+#define WEB_FORBIDDEN		3
+#define WEB_SERVER_ERROR	4
 
 /* Do we need a web server header for the response? */
 #define NO_HEADER		0
 #define YES_HEADER		1
 
+/* send_ext_email function stuff */
+#define DATA_IS_MSG		0
+#define DATA_IS_FILE		1
+
 #define SYS_VAR		"%system%"
 #define USER_VAR	"%user%"
 #define HOST_VAR	"%host%"
 #define MAINPORT_VAR	"%mainport%"
+#define WEBPORT_VAR	"%webport%"
 
 /*----------------------------------------------------------------------*/
 /* Define some macros                                                   */

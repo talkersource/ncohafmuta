@@ -6,4 +6,4 @@ Results:  Allows you to get stats on a specified user. Name, desc, gender,
           <user> is case INsensitive, (meaning it doesn't matter if you
           type it upper or lower case)
 
-See also: set, examine, entpro
+See also: set, examine, set_profile

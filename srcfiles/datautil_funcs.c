@@ -25,7 +25,7 @@ extern char web_opts[11][64];
 /* extern char conv[MAX_AREAS][NUM_LINES][MAX_LINE_LEN+1]; */
 
 /** read in initialize data **/
-void read_init_data()
+void read_init_data(int mode)
 {
 char filename[FILE_NAME_LEN],line[512];
 char hide1[MAX_AREAS+1];
@@ -182,6 +182,7 @@ while (fgets(line,256,fp) != NULL) {
 
  if (a < 11) {
  strcpy(web_opts[a],line);
+ write_log(SYSTEMLOG,YESTIME,"INIT: web_opts[%d]: \"%s\"\n",a,web_opts[a]);
  a++;
  }
  else break;
@@ -189,6 +190,10 @@ while (fgets(line,256,fp) != NULL) {
 a=0;
 
 FCLOSE(fp);
+
+/* redo the staff list file */
+if (mode) do_stafflist();
+
 }
 
 /** read in exempted users for expire **/
@@ -543,6 +548,8 @@ for (u=0; u<MAX_USERS; ++u)
    ustr[u].log_stage	 = 0;
    ustr[u].temp_buffer[0]= 0;
    ustr[u].file_posn	 = 0;
+   ustr[u].term_type     = -1;
+   ustr[u].prev_term_type[0] = 0;
 
    initabbrs(u);
    listen_all(u);
@@ -794,6 +801,8 @@ if (ustr[u].conv) free(ustr[u].conv);
 ustr[u].conv = NULL;
 if (ustr[u].Macros) free(ustr[u].Macros);
 ustr[u].Macros = NULL;
+   ustr[u].term_type     = -1;
+   ustr[u].prev_term_type[0] = 0;
 }
 
 }

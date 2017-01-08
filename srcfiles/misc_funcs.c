@@ -99,6 +99,46 @@ else {
 
 }
 
+
+int in_connlist(int user) {
+int z=-1;
+
+for (z=0;z<MAX_CONNLIST_ENTRIES;++z) {
+ if (!strcmp(connlist[z].site,ustr[user].site)) {
+	write_log(DEBUGLOG,YESTIME,"in_connlist: found in connlist pos %d\n",z);
+	return z;
+ }
+} /* for */
+
+return -1;
+}
+
+
+int find_free_connslot(void) {
+int z=0;
+int lowest=0,lowestpos=0;
+
+for (z=0;z<MAX_CONNLIST_ENTRIES;++z) {
+ if (connlist[z].connections == 0) return z;
+} /* for */
+
+write_log(DEBUGLOG,YESTIME,"find_free_connslot: all slots full\n");
+
+/* all slots used, bump lowest one */
+lowest=connlist[0].connections; /* we need to start somewhere */
+lowestpos=0;
+
+for (z=1;z<MAX_CONNLIST_ENTRIES;++z) {
+ if (connlist[z].connections <= lowest) {
+  lowest=connlist[z].connections;
+  lowestpos=z;
+ } /* if */
+} /* for */
+
+return lowestpos;
+}
+
+
 void realloc_str(char** strP, int size) {
 int maxsizeP;
 
@@ -158,4 +198,40 @@ switch(myerr) {
 
 return 1;
 }
+
+
+void check_connlist_entries(int mode) {
+int z=0;
+
+for (z=0;z<MAX_CONNLIST_ENTRIES;++z) {
+ if (mode==-1) {
+  /* boot init */
+  goto DOCLEAR;
+ }
+ else if (mode==-2) {
+  /* per-minute clear */
+/*
+  write_log(DEBUGLOG,YESTIME,"check_connlist_entries: per-minute: checking connlist pos %d\n",z);
+*/
+  if ((time(0) - connlist[z].starttime) >= 60) goto DOCLEAR;
+  else continue;
+ } /* else if */
+ else {
+  /* specific clear */
+  z=mode;
+  goto DOCLEAR;
+ } /* else */
+
+DOCLEAR:
+/*
+ write_log(DEBUGLOG,YESTIME,"check_connlist_entries: expiring connlist pos %d\n",z);
+*/
+ connlist[z].site[0]=0;
+ connlist[z].connections=0;
+ connlist[z].starttime=0;
+ if (mode >= 0) break;
+} /* for */
+
+}
+
 

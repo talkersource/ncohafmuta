@@ -1,7 +1,7 @@
 #####          YOU SHOULD NOT NEED TO EDIT ANYTHING AFTER THIS LINE  #####
 ##########################################################################
 # Temp sub-directory that will be made for "make dist" processing
-DIST-DIR	= ncoh123
+DIST-DIR	= ncohafmuta-1.4.0
 
 # The directory where the exectuable,
 # and all other main files/dirs lie
@@ -41,7 +41,8 @@ OFILES   = $(OBJDIR)/main.o $(OBJDIR)/socket_funcs.o \
 		$(OBJDIR)/social_funcs.o $(OBJDIR)/snprintf_funcs.o\
 		$(OBJDIR)/signal_funcs.o $(OBJDIR)/datautil_funcs.o \
 		$(OBJDIR)/telopt_funcs.o $(OBJDIR)/resolve_funcs.o \
-		$(OBJDIR)/whowww_funcs.o $(OBJDIR)/resolver_client.o
+		$(OBJDIR)/whowww_funcs.o $(OBJDIR)/set_funcs.o \
+		$(OBJDIR)/resolver_client.o
 RES_OFILES    = $(OBJDIR)/resolver_clipon.o
 
 # Makefile arguments
@@ -102,9 +103,13 @@ make_res: $(RES_OFILES) Makefile
 #$(RES_CFILES):
 ########## END OLD STUFF
 
-clean:
+clean:	objclean
 	rm -f $(SERVBIN) $(TESTBIN) $(RESBIN) core config.log
-	rm -f $(OBJDIR)/*.o
+
+distclean:	clean smtpclean logclean
+	rm -f hdrfiles/config.h	
+	rm -f junk/*
+	rm -f Makefile
 
 objclean:
 	rm -f $(OBJDIR)/*.o
@@ -475,6 +480,8 @@ $(OBJDIR)/telopt_funcs.o: $(SRCDIR)/telopt_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/telopt_funcs.o -c $(SRCDIR)/telopt_funcs.c
 $(OBJDIR)/whowww_funcs.o: $(SRCDIR)/whowww_funcs.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/whowww_funcs.o -c $(SRCDIR)/whowww_funcs.c
+$(OBJDIR)/set_funcs.o: $(SRCDIR)/set_funcs.c Makefile
+	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/set_funcs.o -c $(SRCDIR)/set_funcs.c
 $(OBJDIR)/resolver_client.o: $(SRCDIR)/resolver_client.c Makefile
 	$(CC) $(CFLAGS) $(HDRS) -o $(OBJDIR)/resolver_client.o -c $(SRCDIR)/resolver_client.c
 $(OBJDIR)/resolver_clipon.o: $(SRCDIR)/resolver_clipon.c Makefile

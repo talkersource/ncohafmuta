@@ -423,6 +423,7 @@ down_time = offset;
 void check_idle(void)
 {
 int min,user;
+int new_pos = 0;
 
 for (user=0; user<MAX_USERS; ++user) 
   {
@@ -450,7 +451,8 @@ for (user=0;user<MAX_USERS;++user)
       sprintf(mess,"%s XCOM OFF: %s, by the talker.",STAFF_PREFIX,strip_color(ustr[user].say_name));
       writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
       strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-      bt_count = ( ++bt_count ) % NUM_LINES;
+      new_pos = ( ++bt_count ) % NUM_LINES;
+      bt_count = new_pos;
     }
    else if (ustr[user].suspended && (ustr[user].xco_time > 1)) {
       ustr[user].xco_time--;
@@ -464,7 +466,8 @@ for (user=0;user<MAX_USERS;++user)
       sprintf(mess,"%s FROG OFF: %s, by the talker.",STAFF_PREFIX,strip_color(ustr[user].say_name));
       writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
       strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-      bt_count = ( ++bt_count ) % NUM_LINES;
+      new_pos = ( ++bt_count ) % NUM_LINES;
+      bt_count = new_pos;
     }
    else if (ustr[user].frog && (ustr[user].frog_time > 1)) {
       ustr[user].frog_time--;
@@ -478,7 +481,8 @@ for (user=0;user<MAX_USERS;++user)
       sprintf(mess,"%s ANCHOR OFF: %s, by the talker.",STAFF_PREFIX,strip_color(ustr[user].say_name));
       writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
       strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-      bt_count = ( ++bt_count ) % NUM_LINES;
+      new_pos = ( ++bt_count ) % NUM_LINES;
+      bt_count = new_pos;
     }
    else if (ustr[user].anchor && (ustr[user].anchor_time > 1)) {
       ustr[user].anchor_time--;
@@ -492,7 +496,8 @@ for (user=0;user<MAX_USERS;++user)
       sprintf(mess,"%s GCOM OFF: %s, by the talker.",STAFF_PREFIX,strip_color(ustr[user].say_name));
       writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
       strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-      bt_count = ( ++bt_count ) % NUM_LINES;
+      new_pos = ( ++bt_count ) % NUM_LINES;
+      bt_count = new_pos;
     }
    else if (ustr[user].gagcomm && (ustr[user].gag_time > 1)) {
       ustr[user].gag_time--;
@@ -508,7 +513,8 @@ for (user=0;user<MAX_USERS;++user)
        sprintf(mess,"%s UNMUZZLE: %s, by the talker.",STAFF_PREFIX,strip_color(ustr[user].say_name));
        writeall_str(mess, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
        strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-       bt_count = ( ++bt_count ) % NUM_LINES;
+       new_pos = ( ++bt_count ) % NUM_LINES;
+       bt_count = new_pos;
      }
    else if (!ustr[user].shout && (ustr[user].muz_time > 1)) {
       ustr[user].muz_time--;
@@ -653,5 +659,46 @@ if (!mailgateway_port) return;
  need_connections--;
  }
 
+}
+
+
+char *check_var(char *line, char *MACRO, char *Replacement) {
+int index1;
+int tempPointer;
+char *pointer1;
+char temparray[514];
+char tempspace[514];
+char linetemp[514];
+        
+        temparray[0]=0;
+        tempspace[0]=0;
+        linetemp[0]=0;
+        
+   while (1) {
+        /* find string in line */
+        pointer1 = (char *)(strstr(line, MACRO));
+        /* if not found, exit */
+        if (pointer1 == NULL) break;
+        /* find at what position the result starts */
+        index1 = pointer1 - line;
+        /* copy the original line to a normal char */
+        /* so midcpy doesn't mangle it all up      */
+        strcpy(linetemp,line);
+        /* copy up to the result to our output */
+        midcpy(linetemp, temparray, 0, index1-1);
+        /* append the replacement for it to our output */
+        strcat(temparray, Replacement);
+        /* ok, where's the rest of our string */ 
+        tempPointer = index1+strlen(MACRO);
+        /* copy the rest to a temp spot */
+        midcpy(linetemp, tempspace, tempPointer, strlen(linetemp));
+        /* cat the rest to our output */
+        strcat(temparray, tempspace);
+        /* make the original line equal to the output for our loop */
+        
+        line = temparray;
+       }
+        
+        return line;
 }
 

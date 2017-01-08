@@ -11,8 +11,8 @@ These rooms can be made "private" by a user, for private conversations.
 2 or more users must be in a room before it can be made "private".
 Once private, noone else can enter the room unless invited (see help on 
 .invite) 
-Once a private room is left with < 2 user, the room automatically becomes
-public again. 
+Once a private room is left with less than 2 users, the room automatically 
+becomes public again. 
 Some rooms are LOCKED public, meaning the admin has made them so that they
 can't be changed to private. They are usually the main room and other rooms
 which are party to heavy public conversations.
@@ -36,7 +36,7 @@ To request to enter a room that is "private":
        .knock <room name>
 
 By default, when you log into the talker, you are put back into the
-smae room you logged out from. So if you were in the "foyer" when you
+same room you logged out from. So if you were in the "foyer" when you
 left, you will log back into the "foyer". Assuming the "foyer" isn't
 private at the time.
 You can make a room on the talker your "home" room. You will be moved 

@@ -99,6 +99,7 @@ if (ustr[user].frog) strcpy(inpstr,FROG_TALK);
 void shout(int user, char *inpstr)
 {
 int pos = sh_count%NUM_LINES;
+int new_pos = 0;
 int f; 
 
 if (!ustr[user].shout) 
@@ -117,7 +118,8 @@ if (!strlen(inpstr))
          {
 	  write_str(user,sh_conv[pos]);  
 	 }
-	pos = ++pos % NUM_LINES;
+	new_pos = ( ++pos ) % NUM_LINES;
+	pos = new_pos;
       }
 
     write_str(user,"<Done>");  
@@ -137,7 +139,8 @@ if (!ustr[user].vis)
 
 /** Store the shout in the buffer **/
 strncpy(sh_conv[sh_count],mess,MAX_LINE_LEN);
-sh_count = ( ++sh_count ) % NUM_LINES;
+new_pos = ( ++sh_count ) % NUM_LINES;
+sh_count = new_pos;
 	
 writeall_str(mess, 0, user, 0, user, NORM, SHOUT, 0);
 sprintf(mess,YOU_SHOUT,inpstr);
@@ -567,6 +570,7 @@ tell_usr(user,inpstr,1);
 void shemote(int user, char *inpstr)
 {
 int pos = sh_count%NUM_LINES;
+int new_pos = 0;
 int f; 
 char comstr[ARR_SIZE];
 
@@ -586,7 +590,8 @@ if (!strlen(inpstr))
          {
 	  write_str(user,sh_conv[pos]);  
 	 }
-	pos = ++pos % NUM_LINES;
+	new_pos = ( ++pos ) % NUM_LINES;
+	pos = new_pos;
       }
 
     write_str(user,"<Done>");  
@@ -625,7 +630,8 @@ if (ustr[user].vis) {
 
 /** Store the shemote in the buffer **/
 strncpy(sh_conv[sh_count],mess,MAX_LINE_LEN);
-sh_count = ( ++sh_count ) % NUM_LINES;
+new_pos = ( ++sh_count ) % NUM_LINES;
+sh_count = new_pos;
 
 writeall_str(mess, 0, user, 0, user, NORM, SHOUT, 0);
 write_str(user,mess);
@@ -641,6 +647,7 @@ write_str(user,mess);
 void shout_think(int user, char *inpstr)
 {
 int pos = sh_count%NUM_LINES;
+int new_pos = 0;
 int f; 
 
 if (!ustr[user].shout) 
@@ -659,7 +666,8 @@ if (!strlen(inpstr))
          {
 	  write_str(user,sh_conv[pos]);  
 	 }
-	pos = ++pos % NUM_LINES;
+	new_pos = ( ++pos ) % NUM_LINES;
+	pos = new_pos;
       }
 
     write_str(user,"<Done>");  
@@ -679,7 +687,8 @@ if (!ustr[user].vis)
 
 /** Store the shout in the buffer **/
 strncpy(sh_conv[sh_count],mess,MAX_LINE_LEN);
-sh_count = ( ++sh_count ) % NUM_LINES;
+new_pos = ( ++sh_count ) % NUM_LINES;
+sh_count = new_pos;
 	
 writeall_str(mess, 0, user, 0, user, NORM, SHOUT, 0);
 sprintf(mess,YOU_SHTHINKS,inpstr);
@@ -1746,6 +1755,7 @@ emote(user,t_mess);
 /*** sos - request help from all logged in wizards ***/
 void sos(int user, char *inpstr)
 {
+int new_pos = 0;
 
 if (!ustr[user].shout)
   {
@@ -1772,7 +1782,8 @@ write_log(SYSTEMLOG,YESTIME,"SOS: by %s, \"%s\"\n",ustr[user].say_name,mess);
 /*---------------------------*/
 
 strncpy(bt_conv[bt_count],mess,MAX_LINE_LEN);
-bt_count = ( ++bt_count ) % NUM_LINES;
+new_pos = ( ++bt_count ) % NUM_LINES;
+bt_count = new_pos;
 }
 
 
@@ -1942,7 +1953,7 @@ ustr[user].mutter[0]=0;
 /*----------------------------------------------*/
 /* Echo function writes straight text to screen */
 /*----------------------------------------------*/
-void echo(int user, char *inpstr)
+void my_echo(int user, char *inpstr)
 {
 char fword[ARR_SIZE];
 char *err="Sorry - you cant echo that";
@@ -2134,6 +2145,7 @@ void btell(int user, char *inpstr)
 char line[ARR_SIZE];
 char comstr[ARR_SIZE];
 int pos = bt_count%NUM_LINES;
+int new_pos = 0;
 int f;
  
 if (user==-1)
@@ -2151,7 +2163,8 @@ if (!strlen(inpstr))
          {
           write_str(user,bt_conv[pos]);
          }
-        pos = ++pos % NUM_LINES;
+	new_pos = ( ++pos ) % NUM_LINES;
+	pos = new_pos;
       }
 
     write_str(user,"<Done>");
@@ -2187,8 +2200,8 @@ writeall_str(line, WIZ_ONLY, user, 0, user, BOLD, WIZT, 0);
 /*-------------------------------------*/
   
 strncpy(bt_conv[bt_count],line,MAX_LINE_LEN);
-bt_count = ( ++bt_count ) % NUM_LINES;
-   
+new_pos = ( ++bt_count ) % NUM_LINES;
+bt_count = new_pos;   
 }
 
 

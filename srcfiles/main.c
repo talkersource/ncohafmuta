@@ -137,28 +137,6 @@ int debug	= 0;
 
 /*** END OF GLOBAL DELCARATIONS ***/
 
-/*** START OF MISC STRUCTURES ***/
-
-/* Terminal definitions for future implementation */
-struct {
-	char name[10];
-	char hion[10];
-	char hioff[10];
-	char cls[20];
-	} terms[] = {
-		{"xterm", "\033[1m", "\033[m", "\033[H\033[2J"},
-		{"vt220", "\033[1m", "\033[m", "\033[H\033[J"},
-		{"vt100", "\033[1m", "\033[m", "50\033[;H\0332J"},
-		{"vt102", "\033[1m", "\033[m", "50\033["},
-		{"ansi", "\033[1m", "\033[0m", "50\033[;H\0332J"},
-		{"wyse-30", "\033G4", "\033G0", ""},
-		{"tvi912", "\033l", "\033m", "\032"},
-		{"sun", "\033[1m", "\033[m", "\014"},
-   		{"adm", "\033)", "\033(", "1\032"},
- 	  	{"hp2392", "\033&dB", "\033&d@", "\033H\033J"},
-   		{"", "", "", ""}
-		};
-
 /****************************************************************************
      Main function - 
      Sets up network data, signals, accepts user input and acts as 
@@ -299,7 +277,7 @@ abbrcount();
 
 /* read system data */
 printf("Reading area data from dir. %s ...\n",datadir);
-read_init_data();
+read_init_data(0);
 
 /* read exempt users */
 printf("Reading user exempt data from file  %s ...\n",EXEMFILE);
@@ -314,6 +292,9 @@ init_user_struct();
 init_area_struct();
 init_misc_struct();
 
+/* Clear out login-limiting struct */
+if (LOGIN_LIMITING) check_connlist_entries(-1);
+
 /* see if there's a colon in MAILPROG, if so, they want to use a SMTP gateway */
 atpos=strchr(MAILPROG,':');
 if (atpos) {
@@ -321,7 +302,7 @@ if (atpos) {
 	atpos++; /* move past the : */
 	if ((strlen(MAILPROG)-((MAILPROG+strlen(MAILPROG)-atpos)+1)) > (sizeof(mailgateway_ip)-1)) {
 		printf("\nBad length for SMTP gateway ip in MAILPROG variable. Size: %d Max: %d\n\n",
-		strlen(MAILPROG)-((MAILPROG+strlen(MAILPROG)-atpos)+1),sizeof(mailgateway_ip)-1);
+		(int)strlen(MAILPROG)-((MAILPROG+strlen(MAILPROG)-atpos)+1),(int)sizeof(mailgateway_ip)-1);
 		exit(0);
 	}
 	if ((MAILPROG+strlen(MAILPROG)-atpos) > 5) {
@@ -366,6 +347,9 @@ check_mess(1);
 
 puts("Counting users in user directory...");
 check_total_users(1);
+
+puts("Updating staff list...");
+do_stafflist();
 
 puts("Counting messages...");
 messcount();
@@ -986,6 +970,42 @@ if (resolve_names==2 || resolve_names==3) {
 	     ustr[new_user].lockafk        = 0;
 	     ustr[new_user].attach_port    = port;
 
+             /*------------------------*/
+	     /* get internet site info */
+	     /*------------------------*/
+
+  ustr[new_user].site[0]=0;
+  ustr[new_user].net_name[0]=0;
+
+  ip_address = acc_addr.sin_addr.s_addr;
+
+  /* Get ip address of new user..we do this no matter what */
+  resolve_add(new_user,ip_address,1);
+
+	     /*---------------------------------*/
+	     /* Check for totally restricted ip */
+	     /*---------------------------------*/
+	     
+             if (check_restriction(new_user, ANY, THEIR_IP) == 1) 
+               {
+                write_log(BANLOG,YESTIME,"MAIN: Connection attempt, RESTRICTed IP %s:%s:sck#%d:slt#%d\n",ustr[new_user].site,ustr[new_user].net_name,ustr[new_user].sock,new_user);
+                user_quit(new_user,1);
+		mess[0]=0;
+                continue;
+               }     
+
+		if (LOGIN_LIMITING) {
+			if (check_connlist(new_user) == 1) {
+				write_log(BANLOG,YESTIME,"MAIN: Banned user for login hammering! %s:%s:sck#%d:slt#%d\n",ustr[new_user].site,ustr[new_user].net_name,ustr[new_user].sock,new_user);
+				user_quit(new_user,1);
+				mess[0]=0;
+				continue;
+			}
+		}
+
+/* Telopt negotiation for terminal type */
+telnet_neg_ttype(new_user, 0);
+
              if (checked)
               write_str(new_user,"System in check or in progress of booting, please wait..");
 
@@ -1006,18 +1026,6 @@ if (resolve_names==2 || resolve_names==3) {
              sprintf(mess,TOTAL_USERS_MESS,system_stats.tot_users);
              write_str(new_user,mess);
 
-             /*------------------------*/
-	     /* get internet site info */
-	     /*------------------------*/
-
-  ustr[new_user].site[0]=0;
-  ustr[new_user].net_name[0]=0;
-
-  ip_address = acc_addr.sin_addr.s_addr;
-
-  /* Get ip address of new user..we do this no matter what */
-  resolve_add(new_user,ip_address,1);
-
   /* If global to resolve address, resolve address to hostname */
   if (resolve_names >= 1) resolve_add(new_user,ip_address,2);
   else strcpy(ustr[new_user].net_name,SYS_RES_OFF);
@@ -1027,13 +1035,13 @@ if (resolve_names==2 || resolve_names==3) {
   writeall_str(mess, -2, new_user, 0, new_user, BOLD, NONE, 0);
   mess[0]=0;
 
-	     /*---------------------------*/
-	     /* Check for restricted site */
-	     /*---------------------------*/
+	     /*-------------------------------*/
+	     /* Check for restricted hostname */
+	     /*-------------------------------*/
 	     
-             if (check_restriction(new_user, ANY) == 1) 
+             if (check_restriction(new_user, ANY, THEIR_HOST) == 1) 
                {
-                write_log(BANLOG,YESTIME,"MAIN: Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",ustr[new_user].site,ustr[new_user].net_name,ustr[new_user].sock,new_user);
+                write_log(BANLOG,YESTIME,"MAIN: Connection attempt, RESTRICTed host %s:%s:sck#%d:slt#%d\n",ustr[new_user].site,ustr[new_user].net_name,ustr[new_user].sock,new_user);
                 user_quit(new_user,1);
 		mess[0]=0;
                 continue;
@@ -1048,6 +1056,7 @@ if (resolve_names==2 || resolve_names==3) {
 	     /* until we find out if we can use EORs */
 	     /* telnet_write_eor(new_user); */
 
+	     /* Telopt negotiation for prompt terminator    */
 	     /* ask if we can send EORs for clients like TF */
 	     telnet_ask_eor(new_user);
  
@@ -1149,7 +1158,7 @@ if (resolve_names==2 || resolve_names==3) {
 		/*-------------------------------*/
 		if (ustr[user].logging_in) 
 		  { 
-		   login(user,inpstr);  
+		   my_login(user,inpstr);  
 		   continue; 
 		  }
 
@@ -1251,7 +1260,7 @@ ustr[user].file_posn-file_count_bytes(ustr[user].page_file, i, ustr[user].line_c
               /*---------------------------------------*/
               if (ustr[user].pro_enter) {
                if (ustr[user].pro_enter > PRO_LINES) strtolower(inpstr);
-               enter_pro(user,inpstr);  continue;
+               set_profile(user,inpstr);  continue;
                }
 
               /*---------------------------------------*/
@@ -1376,9 +1385,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 		case -7: /* fatal read error */ break;
                 default:
 		if (FD_ISSET(wwwport[user].sock,&writemask)) {
-			if (!queue_flush_www(user)) {
-			free_sock(user,'4');
-			}
+			queue_flush_www(user);
 		} /* end of FD_ISSET */
 		break;
 		} /* end of switch */
@@ -1386,9 +1393,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 		} /* end of if retval */
 		else {
 		if (FD_ISSET(wwwport[user].sock,&writemask)) {
-			if (!queue_flush_www(user)) {
-			free_sock(user,'4');
-			}
+			queue_flush_www(user);
 		} /* end of FD_ISSET */
 		} /* end of else */
 

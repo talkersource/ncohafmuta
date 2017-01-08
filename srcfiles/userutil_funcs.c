@@ -385,3 +385,93 @@ for (u=0;u<MAX_USERS;++u)
 return num;
 }
 
+
+/* dynamically create the staff list file for .wlist     */
+/* this will be called whenever a promote/demote is done */
+void do_stafflist(void) {
+int ret=0;
+char filename[FILE_NAME_LEN];
+char small_buffer[FILE_NAME_LEN];
+char z_mess[ARR_SIZE];
+char filerid[FILE_NAME_LEN];
+char tempranks[MAX_LEVEL+1][1000];
+int temprankscount[MAX_LEVEL+1];
+struct dirent *dp;
+FILE *fp;
+DIR *dirp;
+char *lineprefix = "             ";
+char *linespacer = "  ";
+
+for (ret=0;ret<MAX_LEVEL+1;++ret) {
+ tempranks[ret][0]=0;
+ temprankscount[ret]=0;
+}
+
+sprintf(z_mess,"%s",USERDIR);
+strncpy(filerid,z_mess,FILE_NAME_LEN);
+
+dirp=opendir((char *)filerid);
+
+if (dirp == NULL) {
+ write_log(ERRLOG,YESTIME,"Can't open directory \"%s\" for do_stafflist! %s\n",filerid,get_error());
+ return;
+}
+
+sprintf(filename,"%s",WIZFILE);
+
+if (!(fp=fopen(filename,"w"))) {
+ (void) closedir(dirp);
+ return;
+}
+
+while ((dp = readdir(dirp)) != NULL)
+   {            
+    sprintf(small_buffer,"%s",dp->d_name);
+        if (small_buffer[0] == '.')
+         continue;
+
+         strtolower(small_buffer);
+         ret=read_user(small_buffer);
+         if (ret==0) {
+          write_log(ERRLOG,YESTIME,"Can't open userfile \"%s\" in do_stafflist. Permission problem probably\n",small_buffer);
+          continue;
+         }
+         else if (ret==-1) {
+          write_log(ERRLOG,YESTIME,"Can't open userfile \"%s\" 0 length file! Removed. Continuing..\n",small_buffer);
+          continue;
+         }
+
+	if (t_ustr.super >= WIZ_LEVEL) {
+
+	 if (!temprankscount[t_ustr.super]) strcat(tempranks[t_ustr.super], lineprefix);
+	 else if (temprankscount[t_ustr.super]==3) {
+	  strcat(tempranks[t_ustr.super], lineprefix);
+	  temprankscount[t_ustr.super]=0;
+	 }
+	 else strcat(tempranks[t_ustr.super], linespacer);
+	 sprintf(z_mess,"%-*s",NAME_LEN+count_color(t_ustr.say_name,0),t_ustr.say_name);
+	 strcat(tempranks[t_ustr.super],z_mess);
+	 temprankscount[t_ustr.super]++;
+	 if (temprankscount[t_ustr.super]==3) strcat(tempranks[t_ustr.super],"\n");
+
+	} /* if staff */
+
+   } /* while */
+
+(void) closedir(dirp);
+
+/* write out list to file */
+fputs("\n",fp);
+
+for (ret=0;ret<MAX_LEVEL+1;++ret) {
+ if (!strlen(tempranks[ret])) continue;
+ fprintf(fp,STAFF_FILE_HEADER,ranks[ret].sname);
+ fputs("\n\n",fp);
+ fputs(tempranks[ret],fp);
+ fputs("\n",fp);
+ if (temprankscount[ret] < 3) fputs("\n",fp);
+}
+
+FCLOSE(fp);
+
+}

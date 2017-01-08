@@ -28,7 +28,7 @@ if (mode==2) {
     /* address to a hostname */
    if (resolve_names==2 || resolve_names==3) {
 	/* CYGRESOLVE */
-	send_resolver_request(user_wait, ustr[user_wait].site, SYS_LOOK_FAILED);
+	send_resolver_request(user_wait, ustr[user_wait].site, "*");
 	strcpy(ustr[user_wait].net_name, SYS_LOOK_PENDING);
 	/* CYGRESOLVE */
    }

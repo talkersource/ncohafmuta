@@ -48,28 +48,28 @@ void init_signals()
 (void)setsignal(SIGSEGV,handle_sig);
 
 (void)setsignal(SIGILL,handle_sig);
-(void)setsignal(SIGINT,SIG_IGN);
-(void)setsignal(SIGABRT,SIG_IGN);
-(void)setsignal(SIGFPE,SIG_IGN);
+(void)setsignal(SIGINT,(handler_t)SIG_IGN);
+(void)setsignal(SIGABRT,(handler_t)SIG_IGN);
+(void)setsignal(SIGFPE,(handler_t)SIG_IGN);
 
 #if !defined(WINDOWS)
   /* we don't care about SIGPIPE, we notice it in select() and write() */
-  (void)setsignal(SIGPIPE, SIG_IGN);
+  (void)setsignal(SIGPIPE, (handler_t)SIG_IGN);
   (void)setsignal(SIGBUS,handle_sig);
 #if !defined(__CYGWIN32__)
-  (void)setsignal(SIGIOT,SIG_IGN);
+  (void)setsignal(SIGIOT,(handler_t)SIG_IGN);
 #endif
-  (void)setsignal(SIGTSTP,SIG_IGN);
-  (void)setsignal(SIGCONT,SIG_IGN);
-  (void)setsignal(SIGHUP,SIG_IGN);
+  (void)setsignal(SIGTSTP,(handler_t)SIG_IGN);
+  (void)setsignal(SIGCONT,(handler_t)SIG_IGN);
+  (void)setsignal(SIGHUP,(handler_t)SIG_IGN);
   (void)setsignal(SIGQUIT,handle_sig);
 #if !defined(__CYGWIN32__)
-  (void)setsignal(SIGURG,SIG_IGN);  
+  (void)setsignal(SIGURG,(handler_t)SIG_IGN);  
 #endif
-  (void)setsignal(SIGTTIN,SIG_IGN);
-  (void)setsignal(SIGTTOU,SIG_IGN);
+  (void)setsignal(SIGTTIN,(handler_t)SIG_IGN);
+  (void)setsignal(SIGTTOU,(handler_t)SIG_IGN);
 #if !defined(LINUX_SYS)
-(void)setsignal(SIGEMT,SIG_IGN); /* does win32 like us? */
+(void)setsignal(SIGEMT,(handler_t)SIG_IGN); /* does win32 like us? */
 #endif
 #endif
 
@@ -159,33 +159,38 @@ else {
 /*** switching function ***/
 RETSIGTYPE sigcall(int sig)
 {
-               /*-------------------------*/
-               /* process timed events    */
-               /*-------------------------*/
+              /*-------------------------*/
+              /* process timed events    */
+              /*-------------------------*/
 
               /*--------------------------------------*/
               /* check for out of date board messages */
               /*--------------------------------------*/
               check_mess(0);
 
-              if (down_time > 0)
-                {
-                 check_shut();
-                }
+		if (down_time > 0)
+		{
+			check_shut();
+		}
 
-              if (num_of_users)
-                {
-                 check_idle();
-                }
+		if (num_of_users)
+		{
+			check_idle();
+		}
+
+		if (LOGIN_LIMITING)
+		{
+			check_connlist_entries(-2);
+		}
 
 		check_misc_connects();
 
 		check_smtp();
 
-              if (atmos_on)
-                {
-                 atmospherics();
-                }
+		if (atmos_on)
+		{
+			atmospherics();
+		}
 
                 check_total_users(0);
                  
@@ -227,7 +232,7 @@ switch(sig) {
 		break;
         case SIGUSR2:
 		/* re-init config file */
-                read_init_data();
+                read_init_data(1);
 		messcount();
 		sprintf(mess,"%s Config file reinit done from command line",STAFF_PREFIX);
 		writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, WIZT, 0);
@@ -279,7 +284,7 @@ setsignal(int sig, handler_t handler)
         new.sa_flags |= SA_RESTART;
 #endif
         if (sigaction(sig, &new, &old) < 0)
-                return (SIG_ERR);
+                return ((handler_t)SIG_ERR);
         oldh = old.sa_handler;
 
 #elif defined(HAVE_SIGMASK)

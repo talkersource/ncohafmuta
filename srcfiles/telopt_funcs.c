@@ -27,7 +27,8 @@ unsigned char eor_seq[4]       = {IAC, WILL, TELOPT_EOR, '\0'};
 unsigned char eor_seq2[3]      = {IAC, EOR, '\0'};
 unsigned char go_ahead_str[2]  = {IAC, GA};
 /* unsigned char go_ahead_str[3]  = {IAC, GA, '\0'}; */
-/* unsigned char neg_ttype[]  = {IAC, SB, TELOPT_TTYPE,   IAC, SE, 0}; */
+unsigned char do_ttype[4]      = {IAC, DO, TELOPT_TTYPE, '\0'};
+unsigned char ask_ttype[]      = {IAC, SB, TELOPT_TTYPE, TELQUAL_SEND, IAC, SE, 0};
 /* unsigned char neg_tuid[]   = {IAC, SB, TELOPT_TUID,    IAC, SE, 0}; */
 /* unsigned char neg_tlocl[]  = {IAC, SB, TELOPT_TTYLOC,  IAC, SE, 0}; */
 
@@ -41,6 +42,12 @@ unsigned char go_ahead_str[2]  = {IAC, GA};
 #define VALUE                   1
 #define ESC                     2
 #define USERVAR                 3
+#endif
+#if !defined(TELQUAL_IS)
+#define TELQUAL_IS		0
+#endif
+#if !defined(TELQUAL_SEND)
+#define TELQUAL_SEND		1
 #endif
 
 /*----------------------------------------------*/
@@ -82,6 +89,18 @@ void telnet_echo_on(int user)
 void telnet_ask_tuid(int user)
 {
  /*  write_raw(user, neg_tuid, 6); */
+}
+
+/*----------------------------------------*/
+/* Negotiate a terminal type              */
+/*----------------------------------------*/
+void telnet_neg_ttype(int user, int mode)
+{
+
+   if (!mode)
+    write_raw(user, do_ttype, 4);
+   else if (mode==1)
+    write_raw(user, ask_ttype, 6);
 }
 
 /*----------------------------------------*/
@@ -137,16 +156,16 @@ void do_telnet_commands(int user)
     case WONT:   proc_wont(user); break;
     case WILL:   proc_will(user); break;
 
-    case SB:     break;
+    case SB:     proc_sb(user);   break;
     case GA:     break;
-    case EL:     break;
-    case EC:     break;
+    case EL:     break; /* erase line */
+    case EC:     break; /* erase character */
  
     case AYT:    write_hilite(user,"\n[Yes]\n");
-                 break;
+                 break; /* are you there? */
     
-    case AO:     break;
-    case DM:     break;
+    case AO:     break; /* abort output */
+    case DM:     break; /* urgent data? */
     case SE:     break;
     case EOR:    break;
     
@@ -230,6 +249,8 @@ void proc_wont(int user)
    {
     case ECHO:   break; 
     case TELOPT_ECHO:	break;
+    case TELOPT_TTYPE:	ustr[user].term_type = 2; break; /* the client wont respond */
+			/* with a terminal type, set the default */
  
     default:
 #if defined(IAC_DEBUG)
@@ -254,6 +275,8 @@ void proc_will(int user)
    {
     case ECHO:   break; 
     case TELOPT_ECHO:	break;
+    case TELOPT_TTYPE:	if (ustr[user].term_type==-1) telnet_neg_ttype(user, 1);
+			break;
     
     default:
 #if defined(IAC_DEBUG)
@@ -262,6 +285,76 @@ void proc_will(int user)
        break;
    }
 }   
+
+
+void proc_sb(int user)
+{
+ unsigned char inpchar[2];
+ char terminaltype[10];
+ int count=0,found=0;
+    
+ if (S_READ(ustr[user].sock, inpchar, 1) != 1)
+    return;  
+
+terminaltype[0]=0;
+
+#if defined(IAC_DEBUG)
+        write_log(DEBUGLOG,YESTIME,"NOTE: got IAC SB  %d/%s (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
+    
+ switch(inpchar[0])
+   {
+
+    case TELOPT_TTYPE:	
+			if (S_READ(ustr[user].sock, inpchar, 1) != 1) return; /* IS */
+			while ((S_READ(ustr[user].sock, inpchar, 1) == 1) &&
+				inpchar[0] != IAC) {
+			 if (count < (sizeof(terminaltype) - 1)) {
+			  terminaltype[count] = tolower((int)inpchar[0]);
+			  count++;
+			 }
+			}
+			terminaltype[count]='\0';
+			#if defined(IAC_DEBUG)
+			 write_log(DEBUGLOG,YESTIME,"GOT TTYPE %s FROM CLIENT\n",terminaltype);
+			#endif
+			if (S_READ(ustr[user].sock, inpchar, 1) != 1) return; /* SE */
+			if (!strcmp(ustr[user].prev_term_type,terminaltype)) {
+			 /* no more term types! We should pick a default */
+			 ustr[user].term_type = 2; /* vt100 default */
+			}
+			else {
+			strcpy(ustr[user].prev_term_type,terminaltype);
+			 for (count=0;terms[count].jump_vector!=-1;++count) {
+			  if (!strcmp(terms[count].name,terminaltype)) {
+			   found = 1;
+			   break;
+			  }
+			 } /* for */
+			 if (found) {
+			  #if defined(IAC_DEBUG)
+			   write_log(DEBUGLOG,YESTIME,"FOUND KNOWN TTYPE %s! SETTING\n",terms[count].name);
+			  #endif
+			  ustr[user].term_type = count;
+			 }
+			 else {
+			  #if defined(IAC_DEBUG)
+			   write_log(DEBUGLOG,YESTIME,"TTYPE %s NOT FOUND! ASKING FOR MORE\n",terminaltype);
+			  #endif
+			  telnet_neg_ttype(user, 1);
+			 }
+			} /* else */
+/*			if (inpchar[0] == IAC) do_telnet_commands(user); */
+			break;
+ 
+    default:
+#if defined(IAC_DEBUG)
+	write_log(DEBUGLOG,YESTIME,"NOTE:     IAC SB  %d/%s not recognized (site:%s)\n",(int)inpchar[0],get_iac_string(inpchar[0]),ustr[user].site);
+#endif
+       break;
+   }
+}   
+
 
 char *get_iac_string(unsigned char code)
 {

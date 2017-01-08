@@ -22,7 +22,7 @@ extern char t_mess[ARR_SIZE+25];  /* functions use t_mess as a buffer    */
 /*----------------------------------------------*/
 /* Check to see if a site or hostname is banned */
 /*----------------------------------------------*/
-int check_restriction(int user, int type)
+int check_restriction(int user, int type, int type2)
 {
 int i=0;
 char small_buff[128];
@@ -32,6 +32,12 @@ char filename[FILE_NAME_LEN];
 struct dirent *dp;
 FILE *fp;
 DIR  *dirp;
+
+if (type2==THEIR_HOST) {
+ if (!strcmp(ustr[user].net_name,SYS_RES_OFF) ||
+     !strcmp(ustr[user].net_name,SYS_LOOK_FAILED) ||
+     !strcmp(ustr[user].net_name,SYS_LOOK_PENDING)) return 0;
+}
 
 if (type==ANY) {
  sprintf(t_mess,"%s",RESTRICT_DIR);
@@ -58,7 +64,7 @@ else {
     sprintf(small_buff,"%s",dp->d_name);
     if (small_buff[0]=='.') continue;
       i=strlen(small_buff);
-      if (isdigit((int)small_buff[i-1]))
+      if (isdigit((int)small_buff[i-1]) && ((type2==THEIR_IP) || (type2==ANY)))
        {
         if (!strcmp(small_buff,ustr[user].site)) {
            sprintf(filename,"%s/%s.r",filerid,small_buff);
@@ -90,7 +96,7 @@ else {
            }
         else continue;
        }
-      else if (!isdigit((int)small_buff[i-1]))
+      else if (!isdigit((int)small_buff[i-1]) && ((type2==THEIR_HOST) || (type2==ANY)))
        {
         if (!strcmp(small_buff,ustr[user].net_name)) {   
            sprintf(filename,"%s/%s.r",filerid,small_buff);
@@ -252,6 +258,48 @@ return 1;
 }
 
 
+/*------------------------------------------------*/
+/* See if user's ip is in current connection list */
+/* and has pattern of login hammering             */
+/*------------------------------------------------*/
+int check_connlist(int user) {
+int pos=0,freeslot=0;
+
+pos=in_connlist(user);
+
+if (pos==-1) {
+        /* not in list */
+        freeslot=find_free_connslot();
+        strcpy(connlist[freeslot].site,ustr[user].site);
+        connlist[freeslot].connections=1;
+        connlist[freeslot].starttime=time(0);
+	write_log(BANLOG,YESTIME,"new conn\n");
+        }
+else {
+        /* pos is where they are */
+        if (connlist[pos].connections > MAX_CONNS_PER_MIN) {
+        /* auto ban the site */
+        auto_restrict(user);
+        check_connlist_entries(pos);
+	write_str(user,"----------------------------------------------------------------");
+	write_str(user,"Notice:  You are attempting to use this computer system in a way");
+	write_str(user,"         which is considered a crime under United States federal");
+	write_str(user,"         access laws.  All attempts illegally accessing this site are ");
+	write_str(user,"         logged.  Repeat violators of this offense will be ");
+	write_str(user,"         prosecuted to the fullest extent of the law.");
+	write_str(user,"----------------------------------------------------------------");
+        return 1;
+        }
+        else {
+	write_log(BANLOG,YESTIME,"incrementing conn\n");
+	connlist[pos].connections++;
+	}
+}
+
+return 0;
+}
+
+
 /*-----------------------------------------------*/
 /* Auto-restrict a site that is hacking on login */
 /*-----------------------------------------------*/
@@ -280,7 +328,7 @@ strncpy(filename, t_mess, FILE_NAME_LEN);
   return;
  }
 
-fputs("Your site is denied access for hacking\n",fp);
+fputs("Your site is denied access for attempted hacking or hammering\n",fp);
 FCLOSE(fp);
 
 /* Add set comment to comment file */
@@ -291,12 +339,15 @@ strncpy(filename, t_mess, FILE_NAME_LEN);
   return;
  }
 
-sprintf(mess,"Site denied access for hacking, possibly user %s\n",ustr[user].login_name);
+sprintf(mess,"Site denied access for attempted hacking or hammering, possibly user %s\n",ustr[user].login_name);
 fputs(mess,fp);
 FCLOSE(fp);
 
-write_log(BANLOG,YESTIME,
-"AUTO-RESTRICT of site %s, possibly user %s\n",ustr[user].site,ustr[user].login_name);
+write_log(BANLOG,YESTIME,"AUTO-RESTRICT of site %s, possibly user %s\n",
+		ustr[user].site,ustr[user].login_name);
+
+sprintf(mess,"%s AUTO-RESTRICT of site %s, possibly user %s",STAFF_PREFIX,ustr[user].site,ustr[user].login_name);
+writeall_str(mess, WIZ_ONLY, -1, 0, -1, BOLD, WIZT, 0);
 }
 
 /*-----------------------------------------------*/

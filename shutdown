@@ -20,6 +20,10 @@ elif [ "$SIG" = "-r" ]
 then
 	echo -n "Soft-rebooting talker.."
 	kill -QUIT `cat $BINARY.pid`
+elif [ "$SIG" = "clipon" ]
+then
+	echo -n "Killing resolver clip-on.."
+	kill `ps ux | grep -v grep | grep 'Resolver clip' | awk '{print $2}'`
 else
 	echo -n "Sending signal SIG$SIG to talker.."
 	kill $SIG `cat $BINARY.pid`

@@ -207,10 +207,9 @@ while(!feof(fp)) {
   fread(line, 1, 256, fp);
 */
 
-while ((n = fread(line, 1, sizeof line,  fp)) != 0) {
+while ((n = fread(line, 1, sizeof(line), fp)) != 0) {
    count+=S_WRITE(accept_sock,line,n);
-
-   } /* end of feof */
+   } /* end of while */
 
 fclose(fp);
 
@@ -221,9 +220,11 @@ return 1;
 /** page a file out to a socket **/
 int cat_to_www(char *filename, int user)
 {
-int n=0;
-char line[257];
+int n=0,istext=0;
+char line[512];
 FILE *fp;
+
+if (strstr(filename,".htm") || strstr(filename,".txt")) istext=1;
 
 if (!(fp=fopen(filename,"rb"))) 
   {
@@ -231,12 +232,28 @@ if (!(fp=fopen(filename,"rb")))
    return 0;
   }
 
-line[0]=0;
+for (n=0;n<sizeof(line);++n) line[n]='\0';
 
-while ((n = fread(line, 1, 256, fp)) != 0) {
-   write_str_www(user,line,n);
-   line[0]=0;
-   } /* end of feof */
+/* for now we only do macro substitutions in HTML or TEXT files */
+if (istext) {
+ while (fgets(line, 256, fp) != NULL) {
+  strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
+  strcpy(line,check_var(line,HOST_VAR,thishost));
+  strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
+  strcpy(line,check_var(line,WEBPORT_VAR,itoa(PORT+WWW_OFFSET)));
+  n=strlen(line);
+  write_str_www(user,line,n);
+  for (n=0;n<sizeof(line);++n) line[n]='\0';
+ } /* end of while */
+} /* if */
+else {
+ while ((n = fread(line, 1, 256, fp)) != 0) {
+  /* write_log(DEBUGLOG,YESTIME,"N IS %d STRLEN IS %d\n",n,strlen(line)); */
+  write_str_www(user,line,n);
+  for (n=0;n<sizeof(line);++n) line[n]='\0';
+ } /* end of while */
+} /* else */
+
 fclose(fp);
 
 return 1;
@@ -311,6 +328,7 @@ fgets(mess, sizeof(mess)-25, fp);
 		   strcpy(mess,check_var(mess,USER_VAR,ustr[user].say_name));
 		   strcpy(mess,check_var(mess,HOST_VAR,thishost));
 		   strcpy(mess,check_var(mess,MAINPORT_VAR,itoa(PORT)));
+		   strcpy(mess,check_var(mess,WEBPORT_VAR,itoa(PORT+WWW_OFFSET)));
 
 if (!ustr[user].cols) ustr[user].cols=80;
 
@@ -342,6 +360,7 @@ while(!feof(fp) && lines < max_lines)
 		   strcpy(mess,check_var(mess,USER_VAR,ustr[user].say_name));
 		   strcpy(mess,check_var(mess,HOST_VAR,thishost));
 		   strcpy(mess,check_var(mess,MAINPORT_VAR,itoa(PORT)));
+		   strcpy(mess,check_var(mess,WEBPORT_VAR,itoa(PORT)+WWW_OFFSET));
   }
   
 if (user== -1) goto SKIP;

@@ -203,6 +203,7 @@ int i;
 int bytes;
 int userfind;
 char site[21];
+char host[64];
 char readbuf[256];
 
 bytes = read(FROM_CLIENT_READ, readbuf, sizeof(readbuf));
@@ -218,9 +219,15 @@ return;
 write_log(RESOLVELOG,YESTIME,"TALKER: read_resolver_reply: \nRead from server: %d bytes \"%s\"\n",bytes,readbuf);
 #endif
 
+    while (strlen(readbuf)) {
+
 /* dont write to log if just checkpoint */
-while (!strncmp(readbuf,RESOLVER_SERVER_SEND_CHECKPOINT,strlen(RESOLVER_SERVER_SEND_CHECKPOINT)))
+while (!strncmp(readbuf,RESOLVER_SERVER_SEND_CHECKPOINT,strlen(RESOLVER_SERVER_SEND_CHECKPOINT))) {
 	remove_first(readbuf);
+/*
+	write_log(RESOLVELOG,YESTIME,"TALKER: read_resolver_reply: stripped: now %s\n",readbuf);
+*/
+}
 
 /* just a checkpoint */
 if (!strlen(readbuf)) return;
@@ -229,20 +236,37 @@ sscanf(readbuf,"%d",&userfind);
 remove_first(readbuf);
 sscanf(readbuf,"%s ",site);
 remove_first(readbuf);
+sscanf(readbuf,"%s ",host);
+remove_first(readbuf);
+if (!strcmp(host,"*")) strcpy(host,SYS_LOOK_FAILED);
+
 	/* find user that should have this hostname */
 	for (i=0;i<MAX_USERS;++i) {
-	if (userfind==i && ustr[i].sock!=-1 && !strcmp(ustr[i].site,site)) {
-		strncpy(ustr[i].net_name,readbuf,64);
+	  if (userfind==i && ustr[i].sock!=-1 && !strcmp(ustr[i].site,site)) {
+		strncpy(ustr[i].net_name,host,64);
 		if (resolve_names==2) {
 			del_from_resolver_cache(i);
 			add_to_resolver_cache(i);
 		}
-		write_log(RESOLVELOG,YESTIME,"TALKER: Copied %s to user %d %s\n",readbuf,i,ustr[i].name);
+		write_log(RESOLVELOG,YESTIME,"TALKER: Copied %s to user %d %s\n",host,i,ustr[i].name);
+/*
 		sprintf(readbuf,"Your resolve result came back as %s",ustr[i].net_name);
-/*		write_str(i,readbuf); */
+		write_str(i,readbuf);
+*/
+             /*-----------------------------------*/
+             /* Check for totally restricted host */
+             /*-----------------------------------*/
+             if (check_restriction(i, ANY, THEIR_HOST) == 1)
+               {
+                write_log(BANLOG,YESTIME,"MAIN: Connection attempt, RESTRICTed host %s:%s:sck#%d:slt#%d\n",
+		ustr[i].site,ustr[i].net_name,ustr[i].sock,i);
+                user_quit(i,1);
+               }
+
 		break;
-		}
-	}
+	  } /* if match */
+	} /* user for loop */
+    } /* readbuf while loop */
 }
 
 

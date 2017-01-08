@@ -20,6 +20,7 @@ extern char t_mess[ARR_SIZE+25];
 extern char thishost[101];     /* FQDN were running on */
 extern char mailgateway_ip[16];
 extern unsigned int mailgateway_port;
+extern int PORT;
 
 
 /* Make a connection to the SMTP server */
@@ -343,4 +344,253 @@ static FILE *tfp;
 }
 
 
+/*
+   mailsize error to recipient
+    ONLINE  send_ext_mail(-2, u, 0, NULL, mess, DATA_IS_MSG, NULL); 
+    OFFLINE send_ext_mail(-2, -1, 0, NULL, mess, DATA_IS_MSG, NULL); 
+   autofwd
+    ONLINE  send_ext_mail(user, u, 1, NULL, mess, DATA_IS_MSG, NULL); 
+    OFFLINE send_ext_mail(user, -1, 1, NULL, mess, DATA_IS_MSG, NULL); 
+   mailfile
+	    send_ext_mail(-2, -2, 2, NULL, filename2, DATA_IS_FILE, mail_addr);
+   nukewarn
+	    send_ext_mail(-2, -1, 3, NULL, NUKEWARN, DATA_IS_FILE, NULL);
+   do_tracking
+	    send_ext_mail(-2, -2, 3, "TRACKING", mess, DATA_IS_MSG, "tinfo");
+   everify
+	    send_ext_mail(-2, user, 4, NULL, filename, DATA_IS_FILE, emailadd);
+*/
+/* user   >= 0 : user did		*/
+/* user   == -1: temp struct		*/
+/* user   == -2: talker			*/
+/* target >= 0 : user			*/
+/* target == -1: temp struct		*/
+/* mode   == 0 : mailsize error		*/
+/* mode   == 1 : autofwd		*/
+/* mode   == 2 : mailfile		*/
+/* mailmess : message to send or file to send if mode == 2	*/
+/* mailtype : is data sending a text message or a whole file?	*/
+/* recipient: email address to send to if specified		*/
+int send_ext_mail(int user, int target, int mode, char *subject, char *mailmess, int mailtype, char *recipient) {
+int sendmail=0,nosubject=0;
+char fromaddr[100];
+char fromline[512];
+char toaddr[100];
+char toline[512];
+char subjline[512];
+char replyline[256];
+char filename[256];
+char line[512];
+FILE *tfp=NULL;
+FILE *wfp=NULL;
+
+
+/* CREATE RECIPIENT ENVELOPE */
+if (recipient != NULL) {
+ sprintf(toline,"To: %s",recipient);
+ strncpy(toaddr,recipient,sizeof(toaddr));
+}
+else {
+ if (target >= 0) {
+  /* recipient is a user */
+  sprintf(toline,"To: %s <%s>",strip_color(ustr[target].say_name),ustr[target].email_addr);
+  strncpy(toaddr,ustr[target].email_addr,sizeof(toaddr));
+ }
+ else if (target == -1) {
+  sprintf(toline,"To: %s <%s>",strip_color(t_ustr.say_name),t_ustr.email_addr);
+  strncpy(toaddr,t_ustr.email_addr,sizeof(toaddr));
+ }
+}
+
+/* CREATE SENDER ENVELOPE */
+if (user >= 0) {
+ /* sender is a user */
+ if (!ustr[user].semail && strstr(ustr[user].email_addr,"@")) {
+  sprintf(fromline,"From: %s on %s <%s>",strip_color(ustr[user].say_name),SYSTEM_NAME,ustr[user].email_addr);
+  strcpy(fromaddr,ustr[user].email_addr);
+  strcpy(replyline,EXT_MAIL8);
+ }
+ else {
+  sprintf(fromline,"From: %s <%s>",SYSTEM_NAME,SYSTEM_EMAIL);
+  strcpy(fromaddr,SYSTEM_EMAIL);
+  strcpy(replyline,EXT_MAIL9);
+ }
+}
+else if (user == -1) {
+ /* sender is a temp structure */
+ if (!t_ustr.semail && strstr(t_ustr.email_addr,"@")) {
+  sprintf(fromline,"From: %s on %s <%s>",strip_color(t_ustr.say_name),SYSTEM_NAME,t_ustr.email_addr);
+  strcpy(fromaddr,t_ustr.email_addr);
+  strcpy(replyline,EXT_MAIL8);
+ }
+ else {
+  sprintf(fromline,"From: %s <%s>",SYSTEM_NAME,SYSTEM_EMAIL);
+  strcpy(fromaddr,SYSTEM_EMAIL);
+  strcpy(replyline,EXT_MAIL9);
+ }
+}
+else if (user == -2) {
+ /* sender is the talker */
+ sprintf(fromline,"From: %s <%s>",SYSTEM_NAME,SYSTEM_EMAIL);
+ strcpy(fromaddr,SYSTEM_EMAIL);
+ strcpy(replyline,EXT_MAIL9);
+}
+
+/* CREATE SUBJECT HEADER */
+if (!mode) {
+ if (subject==NULL) sprintf(subjline,"Mailfile error on %s",SYSTEM_NAME);
+ else sprintf(subjline,"%s",subject);
+} /* !mode */
+else if (mode==1) {
+ if (subject==NULL) sprintf(subjline,"New smail from %s on %s",strip_color(ustr[user].say_name),SYSTEM_NAME);
+ else sprintf(subjline,"%s",subject);
+} /* mode == 1 */
+else if (mode==2) {
+ if (subject==NULL) sprintf(subjline,"Your mailfile from %s",SYSTEM_NAME);
+ else sprintf(subjline,"%s",subject);
+} /* mode == 2 */
+else if (mode==3) {
+ if (subject==NULL) sprintf(subjline,"Your account on %s",SYSTEM_NAME);
+ else sprintf(subjline,"%s",subject);
+} /* mode == 3 */
+else if (mode==4) {
+ if (subject==NULL) sprintf(subjline,"%s new account info",SYSTEM_NAME);
+ else sprintf(subjline,"%s",subject);
+} /* mode == 4 */
+
+/* OPEN FILE IF WE HAVE TO */
+
+if (mailtype==DATA_IS_FILE) {
+ if (!(tfp=fopen(mailmess,"r"))) {
+  write_log(ERRLOG,YESTIME,"Couldn't open mailfile(r) \"%s\" in send_ext_email! %s\n",mailmess,get_error());
+  return -1;
+ }
+}
+
+/* SEND MESSAGE ENVELOPE */
+
+if (mailgateway_port) {
+        if (!(wfp=get_mailqueue_file())) {
+           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in send_ext_mail(1)! %s\n",get_error());
+	   return -1;
+        }
+       fprintf(wfp,"%s\n",fromaddr);
+       fprintf(wfp,"%s\n",toaddr);
+}
+else if (strstr(MAILPROG,"sendmail")) {
+  sprintf(t_mess,"%s",MAILPROG);
+  sendmail=1;
+  }
+else {
+  sprintf(t_mess,"%s %s",MAILPROG,toaddr);
+  if (strstr(MAILPROG,"-s"))
+	nosubject=0;
+  else
+	nosubject=1;
+  }  
+strncpy(filename,t_mess,FILE_NAME_LEN);
+
+if (!mailgateway_port) {
+if (!(wfp=popen(filename,"w"))) 
+  {
+	write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in send_ext_mail(1)! %s\n",filename,get_error());
+	return -1;
+  }
+}
+
+/* SEND MESSAGE HEADERS */
+
+if (sendmail || mailgateway_port) {
+fprintf(wfp,"%s\n",fromline);
+fprintf(wfp,"%s\n",toline);
+fprintf(wfp,"Subject: %s\n\n",subjline);
+}
+else if (nosubject) {
+nosubject=0;
+fprintf(wfp,"%s\n",subjline);
+}
+
+/* SEND MESSAGE DATA */
+
+if (mailtype==DATA_IS_MSG) {
+ strcpy(mailmess, strip_color(mailmess));
+ fputs(mailmess,wfp);
+} /* mailtype == DATA_IS_MSG */
+else if (mailtype==DATA_IS_FILE) {
+fgets(line,512,tfp);
+strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
+if (target>=0) strcpy(line,check_var(line,USER_VAR,ustr[target].say_name));
+else if (target==-1) strcpy(line,check_var(line,USER_VAR,t_ustr.say_name));
+strcpy(line,check_var(line,HOST_VAR,thishost));
+strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
+strcpy(line,check_var(line,"%var1%",itoa(TIME_TO_GO)));
+while (!feof(tfp)) {
+   fputs(strip_color(line),wfp);
+   fgets(line,512,tfp);
+   strcpy(line,check_var(line,SYS_VAR,SYSTEM_NAME));
+   if (target>=0) strcpy(line,check_var(line,USER_VAR,ustr[target].say_name));
+   else if (target==-1) strcpy(line,check_var(line,USER_VAR,t_ustr.say_name));
+   strcpy(line,check_var(line,HOST_VAR,thishost));
+   strcpy(line,check_var(line,MAINPORT_VAR,itoa(PORT)));
+   strcpy(line,check_var(line,"%var1%",itoa(TIME_TO_GO)));
+  } /* end of while */
+fclose(tfp);
+fputs("\n",wfp);
+} /* mailtype == DATA_IS_FILE */
+
+fputs(EXT_MAIL1,wfp);
+
+/* SEND MESSAGE FOOTER */
+
+if (!mode) {
+ sprintf(mess,EXT_MAIL2,SYSTEM_NAME);
+ fputs(mess,wfp);
+ fputs(EXT_MAIL4,wfp);
+ fputs(EXT_MAIL5,wfp);
+ fputs(replyline,wfp);
+} /* !mode */
+else if (mode==1) {
+ sprintf(mess,EXT_MAIL2,SYSTEM_NAME);
+ fputs(mess,wfp);
+ fputs(EXT_MAIL4,wfp);
+ fputs(EXT_MAIL5,wfp);
+ if (sendmail || mailgateway_port)
+  fputs(replyline,wfp);
+ else {
+  sprintf(mess,EXT_MAIL10,ustr[user].email_addr);
+  fputs(mess,wfp);
+ }
+} /* mode == 1 */
+else if (mode==4) {
+fputs("\n",wfp);
+sprintf(mess," Name/Login name: %s\n",ustr[target].login_name);
+fputs(mess,wfp);
+sprintf(mess," Password       : %s\n",ustr[target].login_pass);
+fputs(mess,wfp);
+fputs("\n\n",wfp);
+
+strncpy(mailmess,AGREEFILE,FILE_NAME_LEN);
+
+ if (!(tfp=fopen(mailmess,"r"))) {
+  write_log(ERRLOG,YESTIME,"Couldn't open file(r) \"%s\" in send_ext_email! %s\n",mailmess,get_error());
+ }
+ else {
+  fgets(line,512,tfp);
+
+  while (!feof(tfp)) {
+     fputs(line,wfp);
+     fgets(line,512,tfp);
+    } /* end of while */
+  fclose(tfp);
+ } /* end of else */
+} /* mode == 4 */
+
+fputs(EXT_MAIL7,wfp);
+fputs(".\n",wfp);
+
+if (mailgateway_port) fclose(wfp);
+else pclose(wfp);
+
+return 1;
+}
 

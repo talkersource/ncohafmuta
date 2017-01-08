@@ -30,7 +30,7 @@ void shutdown_error(char *message);
 void web_error(int user, int header, int mode);
 RETSIGTYPE handle_sig(int sig);
 void abbrcount(void);
-void read_init_data(void);
+void read_init_data(int mode);
 void read_exem_data(void);
 void read_nban_data(void);
 void make_sockets(void);
@@ -57,8 +57,8 @@ void strtolower(char *str);
 void telnet_echo_on(int user);
 void telnet_echo_off(int user);
 void check_alert(int user, int mode);
-void login(int user, char *inpstr);
-void enter_pro(int user, char *inpstr);
+void my_login(int user, char *inpstr);
+void set_profile(int user, char *inpstr);
 void talker(int user, char *inpstr);
 void enter_votedesc(int user, char *inpstr);
 void descroom(int user, char *inpstr);
@@ -120,7 +120,7 @@ void system_status(int user);
 void move(int user, char *inpstr);
 void system_access(int user, char *inpstr, int co);
 void toggle_atmos(int user, char *inpstr);
-void echo(int user, char *inpstr);
+void my_echo(int user, char *inpstr);
 void set_desc(int user, char *inpstr);
 void toggle_allow(int user, char *inpstr);
 void greet(int user, char *inpstr);
@@ -175,7 +175,7 @@ void version(int user);
 void shemote(int user, char *inpstr);
 void suname(int user, char *inpstr);
 void supass(int user, char *inpstr);
-void enterm(int user, char *inpstr);
+void set_entermsg(int user, char *inpstr);
 void abbrev(int user, char *inpstr);
 void last_u(int user, char *inpstr);
 void bubble(int user);
@@ -183,8 +183,8 @@ void sthink(int user, char *inpstr);
 void where(int user, char *inpstr);
 void call(int user, char *inpstr);
 void creply(int user, char *inpstr);
-void failm(int user, char *inpstr);
-void succm(int user, char *inpstr);
+void set_fail(int user, char *inpstr);
+void set_succ(int user, char *inpstr);
 void mutter(int user, char *inpstr);
 void fmail(int user, char *inpstr);
 void swipe(int user, char *inpstr);
@@ -202,7 +202,7 @@ void alert(int user, char *inpstr);
 void schedule(int user);
 void sing(int user, char *inpstr);
 void show_expire(int user, char *inpstr);
-void exitm(int user, char *inpstr);
+void set_exitmsg(int user, char *inpstr);
 void reload(int user);
 void list_socs(int user);
 void check_mem(int user);
@@ -283,10 +283,12 @@ void ignore_all(int user);
 void external_www(int user);
 void external_users(int user, int mode, char *query, int photofilter);
 void telnet_ask_tuid(int user);
+void telnet_neg_ttype(int user, int mode);
 void proc_dont(int user);
 void proc_do(int user);
 void proc_wont(int user);
 void proc_will(int user);
+void proc_sb(int user);
 void junk1(int user, char *inpstr);
 void resolve_names_set(int user, char *inpstr);
 void grant_com(int user, char *inpstr);
@@ -362,7 +364,7 @@ int log_misc_connect(int user, unsigned long addr, int type);
 int find_num_in_area(int area);
 int get_length(char *filen);
 int read_user(char *name);
-int check_restriction(int user, int type);
+int check_restriction(int user, int type, int type2);
 int check_nban(char *str, char *sitename);
 int check_misc_restrict(int sock2, char *site, char *namesite);
 int check_fname(char *inpstr, int user);
@@ -378,8 +380,8 @@ int strip_level(char *str);
 int is_revoke(char *str);
 int is_grant(char *str);
 int get_emote(int user);
-int write_verifile(int user, char *epass);
-int mail_verify(int user, char *epass, char *emailadd);
+int write_verifile(int user);
+int mail_verify(int user, char *emailadd);
 int check_rwho(int user, char *inpstr);
 int get_odds_value(int user);
 int determ_rand(int u1, int u2);
@@ -431,10 +433,10 @@ struct tm *localtime(const time_t *);
 
 #if defined(SOL_SYS)
 void bcopy(const void *, void *, size_t);
-# if defined(HAVE_GETHOSTNAME)
+# if defined(HAVE_GETHOSTNAME) && !defined(CYGWIN_SYS)
 int gethostname(char *, int);
 # endif
-# if defined(HAVE_GETDOMAINNAME)
+# if defined(HAVE_GETDOMAINNAME) && !defined(CYGWIN_SYS)
 int getdomainname(char *, int);
 # endif
 # if defined(HAVE_TZSET)
@@ -443,7 +445,7 @@ void tzset(void);
 /* char *strptime(const char *buf, const char *format, struct tm *tm); */
 #endif
 
-#if defined(__OSF__) || defined(__osf__) || defined(OSF_SYS) || defined(CYGWIN_SYS)
+#if defined(__OSF__) || defined(__osf__) || defined(OSF_SYS) || defined(MACOSX_SYS)
 # if defined(HAVE_GETDOMAINNAME)
 int getdomainname(char *, int);
 # endif
@@ -482,6 +484,7 @@ char *ctime(const time_t *mytm);
 
 int SHUTDOWN(int sock, int how);
 void check_misc_connects(void);
+void do_stafflist(void);
 
 /* SMTP */
 void check_smtp(void);
@@ -492,5 +495,17 @@ int write_smtp_data(int user, int type);
 int find_queue_slot(char *inpstr);
 FILE *get_mailqueue_file(void);
 /* SMTP */
+
+/* 1.3.3 */
+int send_ext_mail(int user, int target, int mode, char *subject, char *mailmess, int mailtype, char *recipient);
+/* 1.3.3 */
+
+/* 1.3.6 */
+int find_free_connslot(void);
+int in_connlist(int user);
+int check_connlist(int user);
+void check_connlist_entries(int mode);
+void old_func(int user, char *inpstr, int mode);
+/* 1.3.6 */
 
 #endif /* _PROTOS_H */

@@ -546,7 +546,7 @@ else {
                      sprintf(t_mess,"runs behind %s and pulls their underwear up over their head. Atomic wedgie!",name);
                    
                    emote(user,t_mess);
-                   echo(user,"Now doesn't that feel goooooood?\0");
+                   my_echo(user,"Now doesn't that feel goooooood?\0");
                    }
                    else {
                    strcat(other_user," pulls your underwear up over your head for a patented atmoic wedgie! Now doesn't that feel goooooood?");

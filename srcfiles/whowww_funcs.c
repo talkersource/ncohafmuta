@@ -32,7 +32,7 @@ time_t tm;
 if (EXT_WHO1) S_WRITE(as,EXT_WHO1, strlen(EXT_WHO1) );
 if (EXT_WHO2) S_WRITE(as,EXT_WHO2, strlen(EXT_WHO2) );
 if (EXT_WHO3) {
-  sprintf(mess,EXT_WHO3,PORT+WHO_OFFSET);
+  sprintf(mess,EXT_WHO3,SYSTEM_NAME,PORT+WHO_OFFSET);
   S_WRITE(as,mess, strlen(mess) );        
   }
 if (EXT_WHO4) S_WRITE(as,EXT_WHO4, strlen(EXT_WHO4) );
@@ -153,6 +153,7 @@ char wusername[ARR_SIZE];
 char wpassword[ARR_SIZE];
 char filename[FILE_NAME_LEN+50];
 time_t tm;
+struct stat fileinfo;
 
 time(&tm);
 inpstr[3000]=0;
@@ -334,6 +335,15 @@ if (!strlen(request))
 else
  sprintf(filename,"%s/%s",WEBFILES,request);
 
+/* check to see if the file is a directory */
+if (stat(filename,&fileinfo) != -1) {
+ /* if (S_ISDIR(fileinfo.st_mode)) { */
+ if (((fileinfo.st_mode) & S_IFMT) == S_IFDIR) {
+  sprintf(mess,"%s%s%s",filename,filename[strlen(filename)-1]=='/'?"":"/",web_opts[0]);
+  strncpy(filename,mess,sizeof(filename));
+ }
+}
+
 #if defined(POST_DEBUG)
 write_log(DEBUGLOG,NOTIME,"Request: %s Filename: %s\n",request,filename);
 #endif
@@ -379,6 +389,8 @@ write_log(DEBUGLOG,NOTIME,"Request3: %s Filename3: %s\n",request,filename);
    goto FREE;
    }
  }
+
+write_log(DEBUGLOG,YESTIME,"Responding1 to %s\n",filename);
 
 	write_str_www(user,"HTTP/1.0 200 OK\n", -1);
 	sprintf(mess, "Server: %s/1.0\n",SYSTEM_NAME);
@@ -526,11 +538,15 @@ if (!strcmp(chunk,"_menu")) {
 	  goto FREE;
 } /* end of if _menu */
 
+write_log(DEBUGLOG,YESTIME,"Responding2 to %s\n",filename);
+
 i=get_length(filename);
 if (i==-1) {         
  web_error(user,YES_HEADER,BAD_REQUEST);
  goto FREE;
 }
+
+write_log(DEBUGLOG,YESTIME,"Responding3 to %s\n",filename);
 
 	 sprintf(mess,"Content-length: %d\n",i);
 	 write_str_www(user, mess, -1);
@@ -543,7 +559,9 @@ if (i==-1) {
 	sprintf(mess,"Content-type: %s\n\n",type1);
         write_str_www(user, mess, -1);
 
+write_log(DEBUGLOG,YESTIME,"Responding4 to %s\n",filename);
 cat_to_www(filename,user);
+write_log(DEBUGLOG,YESTIME,"Responding5 to %s\n",filename);
 
 FREE:
 return;
@@ -581,10 +599,12 @@ void external_www(int user)
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[2]);
 	strncpy(filename,mess,FILE_NAME_LEN);
 
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWEXT: Couldn't open file(r) \"%s\" in external_www! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
-		write_str_www(user, mess, -1);
+			write_str_www(user, mess, -1);
 		}
 		fclose(fp);
 	     }
@@ -655,7 +675,9 @@ void external_www(int user)
 	/* Write our footer file */
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[3]);
 	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWEXT: Couldn't open file(r) \"%s\" in external_www! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
 		write_str_www(user, mess, -1);
@@ -702,7 +724,9 @@ int external_login(int user, char *wusername, char *wpassword, int wlogin)
 	/* Write our header file */
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[2]);
 	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWLOGIN: Couldn't open file(r) \"%s\" in external_login! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
 		write_str_www(user, mess, -1);
@@ -825,7 +849,9 @@ else {
 	/* Write our footer file */
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[3]);
 	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWEXT: Couldn't open file(r) \"%s\" in external_login! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
 		write_str_www(user, mess, -1);
@@ -1490,7 +1516,9 @@ WEND:
 	/* Write our footer file */
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[3]);
 	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWMENU: Couldn't open file(r) \"%s\" in external_menu! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
 		write_str_www(user, mess, -1);
@@ -1567,7 +1595,9 @@ if (mode != 3) {
 /* Write our header file
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[2]);
 	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(r) \"%s\" in external_users! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
 		write_str_www(user, mess, -1);
@@ -1793,10 +1823,18 @@ else if (mode==3) {
 	/* top frame */
         sprintf(mess,"%s/.header.html",WEBFILES);
         strncpy(filename,mess,FILE_NAME_LEN);
-        if (!(wfp=fopen(filename,"w"))) { return; }
+        if (!(wfp=fopen(filename,"w"))) {
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(w) \"%s\" in external_users! %s\n",filename,get_error());
+		web_error(user,NO_HEADER,WEB_FORBIDDEN);
+		return;
+	}
         sprintf(mess,"%s/%s",WEBFILES,web_opts[2]);
         strncpy(filename2,mess,FILE_NAME_LEN);
-        if (!(fp=fopen(filename2,"r"))) { fclose(wfp); return; }
+        if (!(fp=fopen(filename2,"r"))) {
+		fclose(wfp);
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(r) \"%s\" in external_users! %s\n",filename2,get_error());
+		return;
+	}
 	if ((web_opts[4][0]=='#') || (!strstr(web_opts[4],".")))
 	 fprintf(wfp,"<HTML><BODY BGCOLOR=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
 	else
@@ -1810,10 +1848,18 @@ else if (mode==3) {
 	/* left frame */
         sprintf(mess,"%s/.left_fr.html",WEBFILES);
         strncpy(filename,mess,FILE_NAME_LEN);
-        if (!(wfp=fopen(filename,"w"))) { return; }
+        if (!(wfp=fopen(filename,"w"))) {
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(w) \"%s\" in external_users! %s\n",filename,get_error());
+		web_error(user,NO_HEADER,WEB_FORBIDDEN);
+		return;
+	}
         sprintf(mess,"%s/left_fr.html",WEBFILES);
         strncpy(filename2,mess,FILE_NAME_LEN);
-        if (!(fp=fopen(filename2,"r"))) { fclose(wfp); return; }
+        if (!(fp=fopen(filename2,"r"))) {
+		fclose(wfp);
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(r) \"%s\" in external_users! %s\n",filename2,get_error());
+		return;
+	}
 	if ((web_opts[4][0]=='#') || (!strstr(web_opts[4],".")))
 	 fprintf(wfp,"<HTML><BODY BGCOLOR=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
 	else
@@ -1827,10 +1873,18 @@ else if (mode==3) {
 	/* right frame */
         sprintf(mess,"%s/.right_fr.html",WEBFILES);
         strncpy(filename,mess,FILE_NAME_LEN);
-        if (!(wfp=fopen(filename,"w"))) { return; }
+        if (!(wfp=fopen(filename,"w"))) {
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(w) \"%s\" in external_users! %s\n",filename,get_error());
+		web_error(user,NO_HEADER,WEB_FORBIDDEN);
+		return;
+	}
         sprintf(mess,"%s/right_fr.html",WEBFILES);
         strncpy(filename2,mess,FILE_NAME_LEN);
-        if (!(fp=fopen(filename2,"r"))) { fclose(wfp); return; }
+        if (!(fp=fopen(filename2,"r"))) {
+		fclose(wfp);
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(r) \"%s\" in external_users! %s\n",filename2,get_error());
+		return;
+	}
 	if ((web_opts[4][0]=='#') || (!strstr(web_opts[4],".")))
 	 fprintf(wfp,"<HTML><BODY BGCOLOR=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
 	else
@@ -1844,7 +1898,11 @@ else if (mode==3) {
 	/* dynamic footer frame - dynamic content */
         sprintf(mess,"%s/.footer.html",WEBFILES);
         strncpy(filename,mess,FILE_NAME_LEN);
-        if (!(wfp=fopen(filename,"w"))) { return; }
+        if (!(wfp=fopen(filename,"w"))) {
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(w) \"%s\" in external_users! %s\n",filename,get_error());
+		web_error(user,NO_HEADER,WEB_FORBIDDEN);
+		return;
+	}
 	if ((web_opts[4][0]=='#') || (!strstr(web_opts[4],".")))
 	 fprintf(wfp,"<HTML><BODY BGCOLOR=\"%s\" TEXT=\"%s\" LINK=\"%s\" VLINK=\"%s\">\n\r",web_opts[4],web_opts[5],web_opts[6],web_opts[7]);
 	else
@@ -1968,7 +2026,9 @@ if (mode != 3) {
 	/* Write our footer file */
 	sprintf(mess,"%s/%s",WEBFILES,web_opts[3]);
 	strncpy(filename,mess,FILE_NAME_LEN);
-	if (!(fp=fopen(filename,"r"))) { }
+	if (!(fp=fopen(filename,"r"))) {
+		write_log(ERRLOG,YESTIME,"WWWUSERS: Couldn't open file(r) \"%s\" in external_users! %s\n",filename,get_error());
+	}
 	else {
 		while (fgets(mess,256,fp) != NULL) {
 		write_str_www(user, mess, -1);
@@ -1997,6 +2057,8 @@ switch(mode) {
 	case 0: strcpy(message,""); break;
 	case BAD_REQUEST: strcpy(message,"HTTP/1.0 400 Bad request\n"); break;
 	case NOT_FOUND: strcpy(message,"HTTP/1.0 404 Not found\n"); break;
+	case WEB_FORBIDDEN: strcpy(message,"HTTP/1.0 403 Forbidden\n"); break;
+	case WEB_SERVER_ERROR: strcpy(message,"HTTP/1.0 500 Internal Server Error\n"); break;
 	default: strcpy(message,"HTTP/1.0 500 Unknown\n"); break;
   } /* end of switch */
 
@@ -2011,12 +2073,20 @@ if (header==YES_HEADER) {
 if (mode==0) { }
 else if (mode==BAD_REQUEST) {
 	strcpy(output,"\n\rYour browser sent a message this server could not understand.");
-	size=strlen(output);
   }
 else if (mode==NOT_FOUND) {
 	strcpy(output,"<TITLE>Not Found</TITLE><H1>Not Found</H1> The requested object does not exist on this server.");
-	size=strlen(output);
   }
+else if (mode==WEB_FORBIDDEN) {
+	strcpy(output,"<TITLE>Forbidden</TITLE><H1>Forbidden</H1> You don't have permission to access that on this server.");
+  }
+else if (mode==WEB_SERVER_ERROR) {
+	strcpy(output,"<TITLE>Internal Server Error</TITLE><H1>Internal Server Error</H1> An internal server has occured.");
+  }
+
+sprintf(mess,"<br><br><i>If you feel you've reached this page in error, please contact <a href=\"mailto:%s\">%s</a></i><br>\n",SYSTEM_EMAIL,SYSTEM_EMAIL);
+strcat(output,mess);
+size=strlen(output);
 
 if ((header==YES_HEADER) && mode) {
 	sprintf(mess,"Content-length: %d\n",size);

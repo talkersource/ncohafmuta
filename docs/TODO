@@ -3,6 +3,10 @@ Things to do..in no good order!
 (if you would like to assist on any of these and are good in C,
  let me know..ncohafmuta@asteroid-b612.org)
 
+Maybe put .to messages in tell buffer for users that go idle. Alternative 
+is to auto-afk a user after XX number of minutes idle, then a .to would 
+fail since the user is idle.
+
 Put filesize or line limit on system logs so they cant fill up disk. Either
 stop logging at limit or start wrapping (might be resource wasteful). Put
 limits on amount of RSS or SIZE memory we can use, so malicious users
@@ -10,28 +14,19 @@ cant malloc() to death the talker.
 
 Ability to turn off some or all logging from in the talker.
 
-Add direct TLS/SSL/SSH support
-
 More flexible autopromotion conditions.
 
-Wildcard * site banning.
-
-Add level-based mail and massmail to .smail command with options,
-add #define MAIL_LEVEL for the level allowed to do mass mails to other
-levels
+Wildcard * site banning. Change format of restrict files.
 
 Fix/enhance write out code in write_str() write_str_nr() because it 
 doesn't take in account color codes when writing out column-specific text 
 blocks to user
 
-Change options for:
- Deleting/reading mail   and   Wiping/reading message boards
- New options:
-  <number>-             <number> to end
-  -<number>             beginning to <number>
-  <number>-<number>     <number> to <number>
-  <number>              just message number <number>
-  l<number>             the last <number> messages
+Add new options that were added to cmail/wipe to rmail/read too:
+
+Multi-user recepients for .move
+
+Add direct TLS/SSL/SSH support
 
 .admin command to administrate almost all aspects and settings of the
 talker. The command will be command line based with descendingly specific
@@ -77,8 +72,6 @@ strings, and command names.
    GLOBAL CONFIG LINE MENU COMMANDS
    COMMAND CONFIG LINE MENU COMMANDS
 
-Multi-user recepients for .smail and .move
-
 Allocate memory for structures dynamically. Right now user structures are 
 allocated on bootup for MAX_USERS. Should allocate as needed (login/logout)
 Same for rooms. All rooms are allocated on bootup. Should be as
@@ -108,18 +101,8 @@ Port code to Win95/98/NT (kind of works, cygwin support)
 
 CYGWIN STUFF:
 1. popen() doesn't work right
-2. Soft-rebooting works to a point. binary replaces ok, but users get
-   disconnected, probably because queue_flush() failing (cygwin thinks
-   replaced user descriptor is a file, not a socket).
-3. Re-enable double-fork.
-4. Put make_sockets and stdin/out/err re-direct AFTER forks (right after
-   reset_alarm)? otherwise network doesn't come up under forking.
-   Safe to do this for unix too??
-5. Remote whos SOMETIMES work. Usually fails because fork() causes cygwin
-   for some reason to think user socket is a file (as in prob #2 above)
-6. Maybe implement SMTP client so mail can be sent to a SMTP server IP/port
-   directly instead of relying on a sendmail-type binary (which doesn't work
-   here anyway since cygwin doesn't have one and popen is kind of broken too)
+2. Soft-rebooting works sporatically. Seems to depend on cygwin version
+   and windows platform
 
 Greatly enhance web port so that it can truely send and receive HTTP
 requests. (85% functional) _menu functions need to be finished for

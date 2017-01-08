@@ -168,7 +168,7 @@ if (!strcmp(ustr[user].name,BOT_ID) ||
     !strcmp(ustr[user].name,ROOT_ID)) {
   if (!strcmp(comstr,"_")) {
     sscanf(inpstr,"%s",comstr);
-    for (f=0; sys[f].su_com != -1; ++f)
+    for (f=0; botsys[f].jump_vector != -1; ++f)
       if (!instr2(0,botsys[f].command,comstr,0) && strlen(comstr)>1) return f;
     return -1;
    }

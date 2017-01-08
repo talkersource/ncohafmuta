@@ -7,9 +7,9 @@ You have 2 mailboxes, your Inbox and your Sent-mail box. Every email you
 send out to a user gets put in your Sent-mail box.
 You can mail users who are online OR offline, although mailing an online
 user is most of the times kind of pointless, since you can just .tell them.
-When you send a user a mail message, if they are online they will a message
-saying they have new mail, and vice-versa if someone sends you mail.
-If they are offline, the next time they come online they will get a message
+When you send a user a mail message, if they are online, they will get a 
+notice saying they have new mail, and vice-versa if someone sends you mail.
+If they are offline, the next time they come online they will get a notice 
 that they have X new mail messages.
 
 To read talker mail in your Inbox:

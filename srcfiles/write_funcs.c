@@ -1446,7 +1446,7 @@ void init_conv_buffer(ConvPtr buf)
 
 void write_conv_buffer(int user, ConvPtr buf)
 {
-        int pos, f;
+        int pos, f, new_pos = 0;
 
         if (buf == NULL)
         {
@@ -1461,7 +1461,8 @@ void write_conv_buffer(int user, ConvPtr buf)
                 {
                         write_str(user,buf->conv[pos]);
                 }
-                pos = ++pos % NUM_LINES;
+                new_pos = ( ++pos ) % NUM_LINES;
+		pos = new_pos;
         }
 }
 

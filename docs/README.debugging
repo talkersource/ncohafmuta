@@ -37,12 +37,15 @@ NOTE: This file can get VERY big VERY quickly, so i wouldn't suggest
 running it for too long.
 
 You can use a debugger like "gdb" to debug the talker. To do this
-you must configure the talker to compile using with a debugging switch.
--g on Linux. I dont know what it is on other OSes. You must add this in
-the Makefile manually after it's created with ./configure
-Add -g (or whatever the switch is) to the CFLAGS line.
+you must configure the talker to compile using a debugging switch.
+If you know you use gcc, you can pass --enable-gcc-debug to ./configure
+before you compile to have it enable debugging (adds the -g compile switch).
+The -g switch may not be valid for all OSes. If so, 
+you must add the proper switch into the Makefile, manually, after it's 
+created with ./configure
+Add whatever the switch is, to the CFLAGS line.
 
-As for how to use gdb, read one or more of the followign tutorials:
+As for how to use gdb, read one or more of the following tutorials:
 http://www.cs.princeton.edu/~benjasik/gdb/gdbtut.html
 http://heather.cs.ucdavis.edu/~matloff/UnixAndC/CLanguage/Debug.html
 http://oucsace.cs.ohiou.edu/~bhumphre/gdb.html

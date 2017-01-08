@@ -19,6 +19,9 @@
 /*
  ** authuser_funcs.c
  **
+ ** 10/25/01: Fixed code to adhere to the set response timeout, as it didn't
+ **           seem to before. Added some wrapper functions for compatibily 
+ **           under windows systems. General cleanup.
  ** 2/2/93: Added auth_setreadtimeout() call.
  ** 7/21/92: Fixed SIGPIPE bug in auth_tcpuser3(). <pen@lysator.liu.se>
  ** 2/9/92: authuser 4.0. Public domain.
@@ -256,7 +259,7 @@ char *auth_sockuser2(register int s, register unsigned short local, register uns
     unsigned long arg = 1;
 #endif
     
-    /* old_sig = signal(SIGPIPE, SIG_IGN); */
+    /* old_sig = signal(SIGPIPE, (handler_t)SIG_IGN); */
 	rtv.tv_sec = wtimeout;
 	rtv.tv_usec = 0;
     

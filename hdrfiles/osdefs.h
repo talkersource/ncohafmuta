@@ -175,6 +175,15 @@ HANDLE hThread;
 #endif
 typedef RETSIGTYPE (*handler_t) ARGS((int));    /* signal handler */
 
+/* If the system is missing a prototype for these functions,  */
+/* i.e. (void (*)()), such as on OS X, redefine them          */ 
+#if !defined(HAVE_SIG_IGN_PROTO)
+#undef SIG_IGN
+#undef SIG_ERR
+#define SIG_IGN         (void (*)(int))1
+#define SIG_ERR         (void (*)(int))-1
+#endif
+
 #if defined(__ultrix)
 #  if !defined(ssize_t)
 #    define ssize_t int

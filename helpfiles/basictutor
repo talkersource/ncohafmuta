@@ -54,5 +54,7 @@ To write to the current room's message board:
 To examine another user's information:
        .examine <user>
 
+You should now read the "How To Communicate" tutorial by typing 
+".h commtutor"
 ----------------------------------------------------------------------------
 
