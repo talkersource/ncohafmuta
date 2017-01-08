@@ -21,7 +21,7 @@ extern int num_of_users;       /* total number of users online */
 void external_who(int as)
 {
 int    s,u,vi,min,idl,invis=0;
-char   ud[100],un[100],an[NAME_LEN],und[200];
+char   ud[100],un[100],an[ROOM_LEN],und[200];
 char   temp[256];
 char   i_buff[5];
 time_t tm;
@@ -44,7 +44,8 @@ strcat(mess,"\n\r");
 S_WRITE(as, mess, strlen(mess));
 
 /* Give Display format */
-sprintf(mess,"Room             Time Stat Idl   Name/Description\n");
+/* sprintf(mess,"Room             Time Stat Idl   Name/Description\n"); */
+sprintf(mess,"%-*s  Time Stat Idl   Name/Description\n",ROOM_LEN,"Room");
 S_WRITE(as, mess, strlen(mess));
 
 /* display user list */
@@ -574,7 +575,7 @@ void external_www(int user)
 {
 	int u,min,idl,invis=0;
 	time_t tm;
-	char an[NAME_LEN],ud[DESC_LEN+1];
+	char an[ROOM_LEN],ud[DESC_LEN+1];
 	char i_buff[5];
 	char filename[256];
 	FILE *fp;

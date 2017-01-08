@@ -1,9 +1,10 @@
  
 ------------ ---------- Type .help <topic> for more details!
-Last Changed  HELP Topic
+Last Changed HELP Topic
 ------------ ----------
-Jul  2 13:11 TOP
-Jul  1 09:00 changes -> ../docs/CHAN
+Mar 18 18:06 changes -> ../docs/CHAN
+Sep 21 13:01 credits
+Jul  2  2003 TOP
 Jun 28  2002 exitmsg
 Jun 28  2002 entermsg
 Jun 28  2002 entpro
@@ -177,7 +178,6 @@ Apr 25  2001 close
 Apr 25  2001 cls
 Apr 25  2001 color
 Apr 25  2001 coloruse
-Apr 25  2001 credits
 Apr 25  2001 creply
 Apr 25  2001 delatmos
 Apr 25  2001 descroom

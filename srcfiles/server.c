@@ -877,7 +877,7 @@ int    s,u,v,min,idl,invis=0,count=0,ranklen=0;
 int    z=0;
 int    vi=' ';
 int    with,num=0;
-char   ud[100],un[SAYNAME_LEN+5],an[NAME_LEN],und[SAYNAME_LEN*2],rank[50];
+char   ud[100],un[SAYNAME_LEN+5],an[ROOM_LEN+5],und[SAYNAME_LEN*2],rank[50];
 char   temp[256];
 char   check[NAME_LEN+1];
 char   i_buff[5];
@@ -953,7 +953,8 @@ write_str(user,"");
 
 /* Give Display format */
 if (ustr[user].who==0) { /* OURS */
-sprintf(mess,"^LCRoom^             ");
+/* sprintf(mess,"^LCRoom^             "); */
+sprintf(mess,"%-*s",ROOM_LEN+6,"^LCRoom^");
 strcat(mess,"^HGTime^ "); 
 strcat(mess,"^HRStat^ "); 
 strcat(mess,"^Idl^   ");
@@ -965,7 +966,8 @@ if (ustr[user].pbreak) {
 else write_str(user,mess);
 } /* end of if */
 else if (ustr[user].who==2) { /* IFORMS */
-sprintf(mess,"^LCRoom^              ");
+/* sprintf(mess,"^LCRoom^              "); */
+sprintf(mess,"%-*s",ROOM_LEN+7,"^LCRoom^");
 strcat(mess,"^HMName^/^HBDescription^                           ");
 strcat(mess,"^HGTime^-"); 
 strcat(mess,"^HRStat^-"); 

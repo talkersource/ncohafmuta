@@ -5,6 +5,11 @@ cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
+ 03/20/04 1.4.2
+* Fixed glitch in t_who with buffering.
+* Try to dynamically make proper width for room column in .who headers 
+  now.
+
  03/15/04 1.4.1
 * Fixed glitch with resetting autoforward limits at midnight, where if 
   a user was online when the reset was done, their limit wouldn't get reset 
