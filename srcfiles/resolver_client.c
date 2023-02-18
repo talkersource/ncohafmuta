@@ -92,7 +92,7 @@ switch(ret) {
                         }
 		/* this method MAY change */
 		snprintf(resolver_binary,256,"./%s",RESOLVER_BINARY);
-		execlp(resolver_binary, namebuffer, 0);
+		execlp(resolver_binary, namebuffer, (char *)NULL);
 		write_log(SYSTEMLOG,YESTIME,"Failed to exec resolver clip-on binary %s %s\n",resolver_binary,get_error());
 		write_log(RESOLVELOG,YESTIME,"TALKER: Failed to exec resolver clip-on binary %s %s\n",resolver_binary,get_error());
 		cleanup_resolver();

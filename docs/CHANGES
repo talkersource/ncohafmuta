@@ -5,6 +5,16 @@ cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
+ 09/17/05
+* Changed cast of last argument of execlp() call in resolver_client.c.
+  Newer GCCs throw a sentinel warning if not cast correctly.
+
+ 09/01/04
+* Moved more DNS resolution functionality into resolve_add function, 
+  some which was in the log_misc_connect function
+* Slightly modified connection-based log entry content.
+* Slightly modified SMTP-based log entry content.
+
  04/11/04 1.5.3
 * Added a temp. user struct called bytes_read.
 * Added a function and prototype called check_flood_limits()
