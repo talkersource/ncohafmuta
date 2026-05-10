@@ -41,7 +41,7 @@
 #ifndef _CONSTANTS_H
 #define _CONSTANTS_H
 
-#define VERSION  "Ncohafmuta 1.4.3 by Cygnus"
+#define VERSION  "Ncohafmuta 1.4.4 by Cygnus"
 #define UDATA_VERSION "122.ver" /* ONLY CYGNUS CHANGES THIS!!		*/
 				/* see README.converting for more info  */
 
@@ -500,7 +500,8 @@ extern int num_locks;
 /* The paths for sendmail or mail may be different on your system. Use the   */
 /* "locate sendmail" or "which mail" command to find where yours resides     */
 /* FOR WINDOWS SYSTEMS, OPTION 2 (SMTP) IS THE ONLY OPTION YOU CAN USE       */
-#define MAILPROG     "/usr/sbin/sendmail -t"
+/* #define MAILPROG     "/usr/sbin/sendmail -t" */
+#define MAILPROG     "127.0.0.1:25"
 
 /* Program used to send a fortune. Use "which fortune" to see where yours is */
 #define FORTPROG     "/usr/local/bin/fortune"
