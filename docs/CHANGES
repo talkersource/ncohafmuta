@@ -5,10 +5,15 @@ cut off the recipients (because of the input socket limit imposed)
 * need to fix web port so you don't need to put a / after the port number
 in the URL to get it to work??
 
+ 02/13/24 1.5.6
+* Fix resolver clipon warning
+* Makefile.in cleanup
+
  09/01/23 1.5.5
 * Fixed compile error with restrict() function. Renamed to myrestrict()
 * Increased i_buff[] size in t_who
 
+ 02/15/19 1.5.4
  09/17/05
 * Changed cast of last argument of execlp() call in resolver_client.c.
   Newer GCCs throw a sentinel warning if not cast correctly.
@@ -18,6 +23,7 @@ in the URL to get it to work??
   some which was in the log_misc_connect function
 * Slightly modified connection-based log entry content.
 * Slightly modified SMTP-based log entry content.
+* Default MAILPROG to smtp server
 
  04/11/04 1.5.3
 * Added a temp. user struct called bytes_read.
