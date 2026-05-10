@@ -363,12 +363,9 @@ miscconn[i].port=port;
 miscconn[i].time=time(0);
 ustr[miscconn[i].user].rwho=2;
 
-              if (log_misc_connect(i,raddr.sin_addr.s_addr,3) == -1) {
-		 write_log(ERRLOG,YESTIME,"RWHO: Can't write connection to log!\n");
- 		 write_str(user,"^HRCan't write connection to log!^\n");
-                 free_sock(i,'5');
-                 return;
-                }
+		resolve_add(i,raddr.sin_addr.s_addr,RESOLVE_TO_OTHER,RESOLVE_RWHO);
+
+		log_misc_connect(i,3);
 
 /* we may not even get any error except for EINPROGRESS since we set the socket non-blocking */
 /* get_input will be the function that tells us when this stuff happens */

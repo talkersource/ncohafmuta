@@ -500,7 +500,8 @@ extern int num_locks;
 /* The paths for sendmail or mail may be different on your system. Use the   */
 /* "locate sendmail" or "which mail" command to find where yours resides     */
 /* FOR WINDOWS SYSTEMS, OPTION 2 (SMTP) IS THE ONLY OPTION YOU CAN USE       */
-#define MAILPROG     "/usr/sbin/sendmail -t"
+/* #define MAILPROG     "/usr/sbin/sendmail -t" */
+#define MAILPROG     "127.0.0.1:25"
 
 /* Program used to send a fortune. Use "which fortune" to see where yours is */
 #define FORTPROG     "/usr/local/bin/fortune"
@@ -1507,6 +1508,17 @@ extern term_struct terms[];
 /* send_ext_email function stuff */
 #define DATA_IS_MSG		0
 #define DATA_IS_FILE		1
+
+/* resolution stuff */
+#define RESOLVE_TO_IP		1
+#define RESOLVE_TO_NAME		2
+#define RESOLVE_TO_OTHER	3
+
+#define RESOLVE_USER		0
+#define	RESOLVE_WHO		1
+#define	RESOLVE_WWW		2
+#define	RESOLVE_SMTP		3
+#define	RESOLVE_RWHO		4
 
 #define SYS_VAR		"%system%"
 #define USER_VAR	"%user%"

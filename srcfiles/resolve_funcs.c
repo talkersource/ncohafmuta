@@ -10,14 +10,14 @@
 
 
 /*** Resolve sock address to ip or hostname ***/
-void resolve_add(int user_wait, unsigned long addr, int mode)
+void resolve_add(int user_wait, unsigned long addr, int mode, int submode)
 {
 int result=0;
 char buf[256];
 struct hostent *he;
 
 /* Resolve sock address to hostname, if cant copy failed message */
-if (mode==2) {
+if (mode==RESOLVE_TO_NAME) {
  if (resolve_names) {
  /* talker is using its own cache files instead */
  /* do the lookup in here                       */
@@ -44,13 +44,42 @@ if (mode==2) {
  } /* end of resolve_names if */
 } /* end of mode if */
 /* Copy ip address to user structure */
-else if (mode==1) {
+else if (mode==RESOLVE_TO_IP) {
  addr=ntohl(addr);
  buf[0]=0;
  sprintf(buf,"%ld.%ld.%ld.%ld", (addr >> 24) & 0xff, (addr >> 16) & 0xff,
          (addr >> 8) & 0xff, addr & 0xff);
  strcpy(ustr[user_wait].site, buf);
- }
+} /* end of mode else if */
+else if (mode==RESOLVE_TO_OTHER) {
+ addr=ntohl(addr);
+ buf[0]=0;
+ sprintf(buf,"%ld.%ld.%ld.%ld", (addr >> 24) & 0xff, (addr >> 16) & 0xff,
+         (addr >> 8) & 0xff, addr & 0xff);
+ switch(submode) {
+	case RESOLVE_WHO:
+	    strcpy(whoport[user_wait].site, buf);
+	    he = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
+	    if (he && he->h_name)
+	       strcpy(whoport[user_wait].net_name, he->h_name);
+	    else
+	       strcpy(whoport[user_wait].net_name, SYS_LOOK_FAILED);
+	   break;
+	case RESOLVE_WWW:
+	    strcpy(wwwport[user_wait].site, buf);
+	    he = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
+	    if (he && he->h_name)
+	       strcpy(wwwport[user_wait].net_name, he->h_name);
+	    else
+	       strcpy(wwwport[user_wait].net_name, SYS_LOOK_FAILED);
+	    break;
+	case RESOLVE_SMTP:
+	case RESOLVE_RWHO:
+	    strcpy(miscconn[user_wait].site, buf);
+	default:
+	    break;
+ } /* end of switch */
+} /* end of mode else if */
 }
 
 

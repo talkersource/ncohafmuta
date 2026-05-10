@@ -468,12 +468,17 @@ return 1;
 /*---------------------------------------------------------*/
 void syssign(int user, int onoff)
 {
+char portbuf[5];
 char stm[30];
 char filename[FILE_NAME_LEN];
 FILE *fp;
 
+if (ustr[user].attach_port==1) strcpy(portbuf,"MAIN");
+else if (ustr[user].attach_port==2) strcpy(portbuf,"WIZ ");
+else sprintf(portbuf,"%4d",ustr[user].attach_port);
+
 /* write to file */
-write_log(LOGINLOG,YESTIME,"%s:%s:%s:%s:sck#%d:slt#%d\n",onoff == 1 ? "IN " : "OUT",ustr[user].name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
+write_log(LOGINLOG,YESTIME,"%s:%s:%s:%s:%s:sck#%d:slt#%d\n",portbuf,onoff == 1 ? "IN " : "OUT",ustr[user].name,ustr[user].site,ustr[user].net_name,ustr[user].sock,user);
 
  if (onoff==1) {
 
@@ -569,12 +574,9 @@ midcpy(stm,stm,11,12);
 /* keep an audit trail of user logins to the who and www   */
 /* ports in the system log file                            */
 /*---------------------------------------------------------*/
-int log_misc_connect(int user, unsigned long addr, int type)
+int log_misc_connect(int user, int type)
 {
 char stm[30];
-static char buf[256];
-static char namebuf[256];
-struct hostent *he;
 time_t tm;
 
 /* write to file */
@@ -582,56 +584,21 @@ time(&tm);
 strcpy(stm,ctime(&tm));
 stm[strlen(stm)-6]=0; /* get rid of nl at end */
 
-/* Resolve sock address to hostname, if cant copy failed message */
- if (type != 3 && type != 4) {
- he = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET);
- if (he && he->h_name)
-    strcpy(namebuf, he->h_name);
- else
-    strcpy(namebuf, SYS_LOOK_FAILED);
- }
-
-/* Resolve to ip */
-addr = ntohl(addr);
-sprintf(buf,"%ld.%ld.%ld.%ld", (addr >> 24) & 0xff, (addr >> 16) & 0xff,
-         (addr >> 8) & 0xff, addr & 0xff);
-
 if (type==1) {
-  write_log(LOGINLOG,YESTIME,"WHO: Connection %s:%s:sck#%d:slt#%d\n",buf,namebuf,whoport[user].sock,user);
-  strcpy(whoport[user].site,buf);
-  strcpy(whoport[user].net_name,namebuf);
+  write_log(LOGINLOG,YESTIME,"WHO : IN : %s:%s:sck#%d:slt#%d\n",
+	whoport[user].site,whoport[user].net_name,whoport[user].sock,user);
   }
 else if (type==2) {
-  write_log(LOGINLOG,YESTIME,"WWW: Connection %s:%s:sck#%d:slt#%d\n",buf,namebuf,wwwport[user].sock,user);
-  strcpy(wwwport[user].site,buf);
-  strcpy(wwwport[user].net_name,namebuf);
+  write_log(LOGINLOG,YESTIME,"WWW : IN : %s:%s:sck#%d:slt#%d\n",
+	wwwport[user].site,wwwport[user].net_name,wwwport[user].sock,user);
   }
 else if (type==3) {
-  strcpy(namebuf,buf);
-  write_log(LOGINLOG,YESTIME,"RWHO: Connection %s:%s:sck#%d:slt#%d:%s\n",buf,namebuf,miscconn[user].sock,user,ustr[miscconn[user].user].name);
-  strcpy(miscconn[user].site,buf);
+  write_log(LOGINLOG,YESTIME,"RWHO: OUT: %s:%s:sck#%d:slt#%d:%s\n",
+	miscconn[user].site,miscconn[user].site,miscconn[user].sock,user,ustr[miscconn[user].user].name);
   }
 else if (type==4) {
-  strcpy(namebuf,buf);
-  write_log(LOGINLOG,YESTIME,"SMTP: Connection %s:%s:sck#%d:slt#%d\n",buf,namebuf,miscconn[user].sock,user);
-  strcpy(miscconn[user].site,buf);
-  }
-
-if (type==1) {
-  if (check_misc_restrict(whoport[user].sock,buf,namebuf) == 1) {
-   write_log(BANLOG,YESTIME,"WHO : Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",buf,namebuf,whoport[user].sock,user);
-   return -1;
-   }
-  else
-   return 0;
-  }
-else if (type==2) {
-  if (check_misc_restrict(wwwport[user].sock,buf,namebuf) == 1) {
-   write_log(BANLOG,YESTIME,"WWW : Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",buf,namebuf,wwwport[user].sock,user);
-   return -1;
-   }
-  else
-   return 0;
+  write_log(LOGINLOG,YESTIME,"SMTP: OUT: %s:%s:sck#%d:slt#%d\n",
+	miscconn[user].site,miscconn[user].site,miscconn[user].sock,user);
   }
 
 return 1;

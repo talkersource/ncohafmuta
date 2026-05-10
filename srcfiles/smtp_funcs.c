@@ -70,7 +70,7 @@ memset((char *)&raddr, 0, size);
         }
 
         if (MY_FCNTL(fd,MY_F_SETFL,NBLOCK_CMD)==SOCKET_ERROR) {
-                write_log(ERRLOG,YESTIME,"BLOCK: ERROR setting smtp socket to non-blocking %s\n",get_error());
+                write_log(ERRLOG,YESTIME,"SMTP: BLOCK: ERROR setting smtp socket to non-blocking %s\n",get_error());
 		SHUTDOWN(fd, 2);
 		CLOSE(fd);
                 return -1;
@@ -89,36 +89,33 @@ miscconn[i].stage=0;
 miscconn[i].port=mailgateway_port;
 miscconn[i].time=time(0);
 
-              if (log_misc_connect(i,raddr.sin_addr.s_addr,4) == -1) {
-		 write_log(ERRLOG,YESTIME,"SMTP: Can't write connection to log!\n");
-                 free_sock(i,'5');
-                 return -1;  
-                }
+		resolve_add(i,raddr.sin_addr.s_addr,RESOLVE_TO_OTHER,RESOLVE_SMTP);
 
+		log_misc_connect(i,4);
          
 /* we may not even get any error except for EINPROGRESS since we set the socket non-blocking */
 /* get_input will be the function that tells us when this stuff happens */
         if ((connect(fd, (struct sockaddr *)&raddr, sizeof(raddr)) == SOCKET_ERROR) &&
                 (errno != EINPROGRESS)) {
            if (errno == ECONNREFUSED)
-                write_log(ERRLOG,YESTIME,"SMTP: Connection refused to server!  Server may be down.");
+                write_log(ERRLOG,YESTIME,"SMTP: OUT: Connection refused to server!  Server may be down.");
            else if (errno == ETIMEDOUT)
-                write_log(ERRLOG,YESTIME,"SMTP: Connection timed out to server!  Server or internet route may be down.");
+                write_log(ERRLOG,YESTIME,"SMTP: OUT: Connection timed out to server!  Server or internet route may be down.");
            else if (errno == ENETUNREACH)
-                write_log(ERRLOG,YESTIME,"SMTP: Network remote server is on is unreachable!");
+                write_log(ERRLOG,YESTIME,"SMTP: OUT: Network remote server is on is unreachable!");
            else
-                write_log(ERRLOG,YESTIME,"SMTP: Unknown problem. Try later.");
+                write_log(ERRLOG,YESTIME,"SMTP: OUT: Unknown problem. Try later.");
          
                 /* Uncomment if you want connection errors logged
-                write_log(ERRLOG,YESTIME,"SMTP: Connection failed to %s %d %s\n",mailgateway_ip,mailgateway_port,get_error());
+                write_log(ERRLOG,YESTIME,"SMTP: OUT: Connection failed to %s %d %s\n",mailgateway_ip,mailgateway_port,get_error());
                 */
                 
                 free_sock(i,'5');    
 		return -1;
         }
 
-        write_log(SYSTEMLOG,YESTIME,"SMTP: sck#%d:slt#%d:Connection to %s %d in progress..\n",
-	miscconn[i].sock,i,mailgateway_ip,mailgateway_port);
+        write_log(SYSTEMLOG,YESTIME,"SMTP: OUT: %s:%s:sck#%d:slt#%d:Connection to port %d in progress..\n",
+	miscconn[i].site,miscconn[i].site,miscconn[i].sock,i,mailgateway_port);
 	return 1;
 }
 
@@ -148,7 +145,7 @@ else {
 dirp=opendir((char *)MAILDIR_SMTP_ACTIVE);
   
 if (dirp == NULL) {
-        write_log(ERRLOG,YESTIME,"Failed to open directory \"%s\" for reading in requeue_smtp %s\n",MAILDIR_SMTP_ACTIVE);
+        write_log(ERRLOG,YESTIME,"SMTP: Failed to open directory \"%s\" for reading in requeue_smtp %s\n",MAILDIR_SMTP_ACTIVE);
         return;
 } 
 
@@ -188,7 +185,7 @@ struct dirent *dp;
 dirp=opendir((char *)MAILDIR_SMTP_QUEUE);
 
 if (dirp == NULL) {
-	write_log(ERRLOG,YESTIME,"Failed to open directory \"%s\" for reading in queuetoactive_smtp %s\n",MAILDIR_SMTP_QUEUE);
+	write_log(ERRLOG,YESTIME,"SMTP: Failed to open directory \"%s\" for reading in queuetoactive_smtp %s\n",MAILDIR_SMTP_QUEUE);
 	return -1;
 }
 
@@ -246,23 +243,23 @@ if (type != 4) {
  if (cnt < strlen(mess)) {                                         
   switch(type) {
 	case 0:
-  	write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:NA:bad HELO write %s\n",
+  	write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:NA:bad HELO write %s\n",
   	miscconn[user].sock,user,cnt==-1?get_error():"(partial)");
 	break;
 	case 1:
-  	write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad MAIL FROM write %s\n",
+  	write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad MAIL FROM write %s\n",
   	miscconn[user].sock,user,miscconn[user].queuename,cnt==-1?get_error():"(partial)");
 	FCLOSE(miscconn[user].fd);
 	miscconn[user].fd=NULL;
 	break;
 	case 2:
-  	write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad RCPT TO write %s\n",
+  	write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad RCPT TO write %s\n",
   	miscconn[user].sock,user,miscconn[user].queuename,cnt==-1?get_error():"(partial)");
 	FCLOSE(miscconn[user].fd);
 	miscconn[user].fd=NULL;
 	break;
 	case 3:
-  	write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad DATA write %s\n",
+  	write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad DATA write %s\n",
   	miscconn[user].sock,user,miscconn[user].queuename,cnt==-1?get_error():"(partial)");
 	FCLOSE(miscconn[user].fd);
 	miscconn[user].fd=NULL;
@@ -282,7 +279,7 @@ else {
   cnt = S_WRITE(miscconn[user].sock,mess,strlen(mess));
 
   if (cnt < strlen(mess)) {                                         
-  	write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad BODY write %s\n",
+  	write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad BODY write %s\n",
   	miscconn[user].sock,user,miscconn[user].queuename,cnt==-1?get_error():"(partial)");
 	FCLOSE(miscconn[user].fd);
 	miscconn[user].fd=NULL;
@@ -327,7 +324,7 @@ static FILE *tfp;
                 sprintf(filename,"%s/%ld.%d",MAILDIR_SMTP_QUEUE,(long)tm,subtime);
         }
         if (subtime==100) {
-                write_log(ERRLOG,YESTIME,"Could not open a new queue file in fmail()\n");
+                write_log(ERRLOG,YESTIME,"SMTP: Could not open a new queue file in fmail()\n");
                 return NULL;
         }
         else {
@@ -335,7 +332,7 @@ static FILE *tfp;
  write_log(DEBUGLOG,YESTIME,"SMTP: Found unused name %s for new queue file\n",filename);
 #endif
          if (!(tfp=fopen(filename,"w"))) {
-                write_log(ERRLOG,YESTIME,"Could not open the new queue file %s in fmail() %s\n",filename,get_error());
+                write_log(ERRLOG,YESTIME,"SMTP: Could not open the new queue file %s in fmail() %s\n",filename,get_error());
                 return NULL;
          }
          else return tfp; 
@@ -462,16 +459,20 @@ else if (mode==4) {
 
 if (mailtype==DATA_IS_FILE) {
  if (!(tfp=fopen(mailmess,"r"))) {
-  write_log(ERRLOG,YESTIME,"Couldn't open mailfile(r) \"%s\" in send_ext_email! %s\n",mailmess,get_error());
+  write_log(ERRLOG,YESTIME,"SMTP: Couldn't open mailfile(r) \"%s\" in send_ext_email! %s\n",mailmess,get_error());
   return -1;
  }
 }
+
+/* LOG FROM/TO INFORMATION */
+write_log(SYSTEMLOG,YESTIME,"SMTP: NEW MAIL: From <%s>: To <%s>\n",
+	fromaddr,toaddr);
 
 /* SEND MESSAGE ENVELOPE */
 
 if (mailgateway_port) {
         if (!(wfp=get_mailqueue_file())) {
-           write_log(ERRLOG,YESTIME,"Couldn't open new queue file in send_ext_mail(1)! %s\n",get_error());
+           write_log(ERRLOG,YESTIME,"SMTP: Couldn't open new queue file in send_ext_mail(1)! %s\n",get_error());
 	   return -1;
         }
        fprintf(wfp,"%s\n",fromaddr);
@@ -493,7 +494,7 @@ strncpy(filename,t_mess,FILE_NAME_LEN);
 if (!mailgateway_port) {
 if (!(wfp=popen(filename,"w"))) 
   {
-	write_log(ERRLOG,YESTIME,"Couldn't open popen(w) \"%s\" in send_ext_mail(1)! %s\n",filename,get_error());
+	write_log(ERRLOG,YESTIME,"SMTP: Couldn't open popen(w) \"%s\" in send_ext_mail(1)! %s\n",filename,get_error());
 	return -1;
   }
 }
@@ -572,7 +573,7 @@ fputs("\n\n",wfp);
 strncpy(mailmess,AGREEFILE,FILE_NAME_LEN);
 
  if (!(tfp=fopen(mailmess,"r"))) {
-  write_log(ERRLOG,YESTIME,"Couldn't open file(r) \"%s\" in send_ext_email! %s\n",mailmess,get_error());
+  write_log(ERRLOG,YESTIME,"SMTP: Couldn't open file(r) \"%s\" in send_ext_email! %s\n",mailmess,get_error());
  }
  else {
   fgets(line,512,tfp);

@@ -36,10 +36,14 @@ Things to do..in no good order!
 11. stacked colors
 12. Add user afk status to soft-reboot DB
 13. Maybe add room conversation buffers to soft-reboot DB
-
+14. Either redesign atmospheric algorithm, or update code to say that the atmos's
+    number is not a probability/chance number!!
 
 Future
 ------
+Add IPV6 support 
+Add SSL/TLS connection encryption support 
+
 Maybe put .to messages in tell buffer for users that go idle. Alternative 
 is to auto-afk a user after XX number of minutes idle, then a .to would 
 fail since the user is idle.
@@ -114,8 +118,8 @@ allocated on bootup for MAX_USERS. Should allocate as needed (login/logout)
 Same for rooms. All rooms are allocated on bootup. Should be as
 needed..i.e. create and destroy rooms based on if users are in them, or
 are immediately ready to enter them.
-(50% done. so far have finished mallocing for area conv buffer, user conv
-buffers, and user macros, because these take the most memory)
+(start with mallocing for area conv buffer, user conv buffers, and user macros, 
+because these take the most memory)
 
 Split code into multiple C files (in progress!)
 
@@ -166,8 +170,8 @@ in the Subject: field. Or maybe just <name>.<talker_name>@<talker's host>
 cygnus.pinwheels@ncohafmuta.com
 
 
-**Things being considered still**
-
+Things being considered still
+-----------------------------
 * Using a database
 * Using Async I/O threads
 * Encrypting all user files

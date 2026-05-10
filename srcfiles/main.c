@@ -775,10 +775,17 @@ if (resolve_names==2 || resolve_names==3) {
 
               whoport[new_user].sock=as;
 
-              if (log_misc_connect(new_user,ip_address,1) == -1) {
-                 free_sock(new_user,port);
-                 continue;
+	      resolve_add(new_user,ip_address,RESOLVE_TO_OTHER,RESOLVE_WHO);
+
+              log_misc_connect(new_user,1);
+
+	      if (check_misc_restrict(whoport[new_user].sock,whoport[new_user].site,whoport[new_user].net_name) == 1) {
+		write_log(BANLOG,YESTIME,"WHO : IN : Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",
+		whoport[new_user].site,whoport[new_user].net_name,whoport[new_user].sock,new_user);
+		free_sock(new_user,port);
+		continue;
                 }
+
               if (who_access) {
 		/* Send out who list to person or remote who connected to who port */
 		external_who(whoport[new_user].sock);
@@ -848,10 +855,17 @@ if (resolve_names==2 || resolve_names==3) {
 
               wwwport[new_user].sock=as;
 
-              if (log_misc_connect(new_user,ip_address,2) == -1) {
-                 free_sock(new_user,port);
-                 continue;
+	      resolve_add(new_user,ip_address,RESOLVE_TO_OTHER,RESOLVE_WWW);
+
+              log_misc_connect(new_user,2);
+
+	      if (check_misc_restrict(wwwport[new_user].sock,wwwport[new_user].site,wwwport[new_user].net_name) == 1) {
+		write_log(BANLOG,YESTIME,"WWW : IN : Connection attempt, RESTRICTed site %s:%s:sck#%d:slt#%d\n",
+		wwwport[new_user].site,wwwport[new_user].net_name,wwwport[new_user].sock,new_user);
+		free_sock(new_user,port);
+		continue;
                 }
+
               if (!www_access) {
 	       strcpy(mess,WWW_CLOSED);
 	       write_it(wwwport[new_user].sock,mess);
@@ -982,7 +996,7 @@ if (resolve_names==2 || resolve_names==3) {
   ip_address = acc_addr.sin_addr.s_addr;
 
   /* Get ip address of new user..we do this no matter what */
-  resolve_add(new_user,ip_address,1);
+  resolve_add(new_user,ip_address,RESOLVE_TO_IP,RESOLVE_USER);
 
 	     /*---------------------------------*/
 	     /* Check for totally restricted ip */
@@ -1029,7 +1043,7 @@ telnet_neg_ttype(new_user, 0);
              write_str(new_user,mess);
 
   /* If global to resolve address, resolve address to hostname */
-  if (resolve_names >= 1) resolve_add(new_user,ip_address,2);
+  if (resolve_names >= 1) resolve_add(new_user,ip_address,RESOLVE_TO_NAME,RESOLVE_USER);
   else strcpy(ustr[new_user].net_name,SYS_RES_OFF);
 
   /* Send connection info to staff who ask to get it */
@@ -1449,7 +1463,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 				}
 				else if (!strcmp(smtpcode,"501")) {
 				 /* our HELO message was bad */
-				 write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:NA:bad HELO:server said \"%s\"\n",
+				 write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:NA:bad HELO:server said \"%s\"\n",
 				 miscconn[user].sock,user,inpstr);
 				 free_sock(user,'5');
 				 continue;
@@ -1468,7 +1482,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 				 /* our MAIL FROM message was bad */
 				 /* 500 error, 501 syntax, 571 relay */
 				 FCLOSE(miscconn[user].fd);
-				 write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad MAIL FROM:server said \"%s\"\n",
+				 write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad MAIL FROM:server said \"%s\"\n",
 				 miscconn[user].sock,user,miscconn[user].queuename,inpstr);
 				 requeue_smtp(user);
 				 free_sock(user,'5');
@@ -1488,7 +1502,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 				 /* our RCPT TO message was bad */
 				 /* 500 error, 501 syntax, 571 relay */
 				 FCLOSE(miscconn[user].fd);
-				 write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad RCPT TO:server said \"%s\"\n",
+				 write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad RCPT TO:server said \"%s\"\n",
 				 miscconn[user].sock,user,miscconn[user].queuename,inpstr);
 				 requeue_smtp(user);
 				 free_sock(user,'5');
@@ -1508,7 +1522,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 				 /* our DATA message was bad */
 				 /* 500 error, 501 syntax, 571 relay */
 				 FCLOSE(miscconn[user].fd);
-				 write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad DATA:server said \"%s\"\n",
+				 write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad DATA:server said \"%s\"\n",
 				 miscconn[user].sock,user,miscconn[user].queuename,inpstr);
 				 requeue_smtp(user);
 				 free_sock(user,'5');
@@ -1523,8 +1537,8 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 #endif
 				 sprintf(filename,"%s/%s",MAILDIR_SMTP_ACTIVE,miscconn[user].queuename);
 				 remove(filename);
-				 write_log(SYSTEMLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:success to server %s:%d\n",
-				 miscconn[user].sock,user,miscconn[user].queuename,mailgateway_ip,mailgateway_port);
+				 write_log(SYSTEMLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:good BODY:server said \"%s\" - Mail successfully sent\n",
+				 miscconn[user].sock,user,miscconn[user].queuename,inpstr);
 				 miscconn[user].stage=2;
 				 miscconn[user].ready=1;
 				 miscconn[user].fd=NULL;
@@ -1535,7 +1549,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 				 /* 500 error, 501 syntax, 571 relay */
 				 /* we dont close the fd here, because writing */
 				 /* the body out already closes it */
-				 write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad BODY:server said \"%s\"\n",
+				 write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad BODY:server said \"%s\"\n",
 				 miscconn[user].sock,user,miscconn[user].queuename,inpstr);
 				 requeue_smtp(user);
 				 free_sock(user,'5');
@@ -1572,7 +1586,7 @@ write_log(DEBUGLOG,YESTIME,"Pos: %d Retval: %d sock: %d wwwsock: %d input: \"%s\
 					else {
 					 sprintf(filename,"%s/%s",MAILDIR_SMTP_ACTIVE,miscconn[user].queuename);
 					 if (!(miscconn[user].fd=fopen(filename,"r"))) {
-					  write_log(ERRLOG,YESTIME,"SMTP: Outgoing:sck#%d:slt#%d:%s:bad queue fopen:%s\n",
+					  write_log(ERRLOG,YESTIME,"SMTP: OUT: sck#%d:slt#%d:%s:bad queue fopen:%s\n",
 					  miscconn[user].sock,user,miscconn[user].queuename,get_error());
 					  requeue_smtp(user);
 					  free_sock(user,'5');
