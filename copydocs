@@ -1,9 +1,0 @@
-#!/bin/sh
-CODEPATH=~thelittleprince/www/ncohafmuta
-
-echo -n Copying..
-rm -fr $CODEPATH/docs/*
-cp docs/* $CODEPATH/docs/
-chmod 644 $CODEPATH/docs/*
-echo done.
-
